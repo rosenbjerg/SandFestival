@@ -2,16 +2,20 @@ import Foundation
 import Network
 import os
 
-enum HookListenerError: Error {
-    case noPortAvailable
+enum HookListenerError: Error, Equatable {
+    case bindFailed(port: UInt16)
     case invalidPort
 }
 
-/// Listens on `127.0.0.1` for HTTP POSTs from Claude Code's hook handlers.
-/// Authenticates each request against a bearer token and forwards the request
-/// body to a handler. Bodies are not parsed here — the adapter does that.
+/// Listens on `127.0.0.1:HookListener.port` for HTTP POSTs from Claude Code's
+/// hook handlers. The port is fixed: a stable value lets the hook entries in
+/// `~/.claude/settings.json` stay correct across app restarts without
+/// rewriting on every launch. If the port is already in use the listener
+/// surfaces a `bindFailed` error rather than wandering to another port.
 final class HookListener: @unchecked Sendable {
-    private static let portRange: Range<UInt16> = 51789..<52000
+    /// Picked once for SandFestival; changing this forces every hook entry
+    /// to be rewritten, so don't change it lightly.
+    static let port: UInt16 = 51789
 
     private let token: String
     private let onEvent: @Sendable (Data) -> Void
@@ -23,23 +27,13 @@ final class HookListener: @unchecked Sendable {
         self.onEvent = onEvent
     }
 
-    /// Probes ports starting from `preferredPort` (then upward through the
-    /// reserved range) and binds the first one that accepts.
-    func start(preferredPort: UInt16) async throws -> UInt16 {
-        var candidates: [UInt16] = []
-        if HookListener.portRange.contains(preferredPort) {
-            candidates.append(preferredPort)
+    /// Binds the listener to `HookListener.port`. Throws `.bindFailed` if the
+    /// port is already in use.
+    func start() async throws {
+        guard let bound = await tryStart(port: HookListener.port) else {
+            throw HookListenerError.bindFailed(port: HookListener.port)
         }
-        for port in HookListener.portRange where port != preferredPort {
-            candidates.append(port)
-        }
-
-        for candidate in candidates {
-            if let port = await tryStart(port: candidate) {
-                return port
-            }
-        }
-        throw HookListenerError.noPortAvailable
+        _ = bound
     }
 
     func stop() {

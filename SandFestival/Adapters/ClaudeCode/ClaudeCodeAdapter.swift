@@ -18,21 +18,21 @@ final class ClaudeCodeAdapter: AgentAdapter {
     func clearStartupError() { startupError = nil }
 
     @ObservationIgnored private let tokenStore: KeychainTokenStore
-    @ObservationIgnored private let portStore: PortStore
     @ObservationIgnored private let settingsManager: SettingsJSONManager
     @ObservationIgnored private let bindings = SessionBindingStore()
     @ObservationIgnored private var token: String?
-    @ObservationIgnored private var port: UInt16?
     @ObservationIgnored private var listener: HookListener?
     @ObservationIgnored private weak var eventSink: AgentEventSink?
 
+    /// Fixed port the listener binds to. Surfaced here so the adapter and
+    /// settings.json factory share one source of truth.
+    private var port: UInt16 { HookListener.port }
+
     init(
         tokenStore: KeychainTokenStore = KeychainTokenStore(),
-        portStore: PortStore = PortStore(),
         settingsManager: SettingsJSONManager = SettingsJSONManager()
     ) {
         self.tokenStore = tokenStore
-        self.portStore = portStore
         self.settingsManager = settingsManager
     }
 
@@ -44,21 +44,18 @@ final class ClaudeCodeAdapter: AgentAdapter {
             let token = try tokenStore.loadOrCreate()
             self.token = token
 
-            let preferredPort = portStore.load() ?? 51789
             let listener = HookListener(token: token) { [weak self] body in
                 guard let self else { return }
                 Task { @MainActor in
                     self.handleHookBody(body)
                 }
             }
-            let boundPort = try await listener.start(preferredPort: preferredPort)
+            try await listener.start()
             self.listener = listener
-            self.port = boundPort
-            try? portStore.save(boundPort)
 
             refreshNeedsInstallation()
         } catch {
-            startupError = error.localizedDescription
+            startupError = describe(error)
             throw error
         }
     }
@@ -74,10 +71,7 @@ final class ClaudeCodeAdapter: AgentAdapter {
         return SpawnEnvironment(additions: ["SAND_FESTIVAL_TOKEN": token])
     }
 
-    func didSpawnSession(_ session: SessionHandle) {
-        // The pending-spawn binding was already registered in prepareSpawn.
-        // Nothing further to do here until the first SessionStart hook arrives.
-    }
+    func didSpawnSession(_ session: SessionHandle) {}
 
     func willTerminateSession(_ session: SessionHandle) {
         bindings.unbindAll(projectID: session.projectID)
@@ -86,7 +80,6 @@ final class ClaudeCodeAdapter: AgentAdapter {
     // MARK: - Hook installation (used by the first-run sheet)
 
     func installHooks() {
-        guard let port else { return }
         do {
             try settingsManager.install(port: port)
             lastInstallError = nil
@@ -107,7 +100,6 @@ final class ClaudeCodeAdapter: AgentAdapter {
     }
 
     func previewInstallation() -> SettingsDiffPreview? {
-        guard let port else { return nil }
         do {
             return try settingsManager.previewInstall(port: port)
         } catch {
@@ -140,17 +132,11 @@ final class ClaudeCodeAdapter: AgentAdapter {
     // MARK: - Internal
 
     private func refreshNeedsInstallation() {
-        guard let port else {
-            needsInstallation = false
-            return
-        }
         do {
             switch try settingsManager.detectInstallState(port: port) {
             case .current:
                 needsInstallation = false
             case .outdated:
-                // The user already consented to hooks. Silently rewrite to the
-                // current format rather than re-prompting.
                 try settingsManager.install(port: port)
                 needsInstallation = false
             case .notInstalled:
@@ -163,6 +149,17 @@ final class ClaudeCodeAdapter: AgentAdapter {
     }
 
     private func describe(_ error: any Error) -> String {
+        if let listenerError = error as? HookListenerError {
+            switch listenerError {
+            case .bindFailed(let port):
+                return String(
+                    format: String(localized: "claudecode.error.port_in_use"),
+                    String(port)
+                )
+            case .invalidPort:
+                return String(localized: "claudecode.error.port_invalid")
+            }
+        }
         if let settingsError = error as? SettingsJSONManagerError {
             switch settingsError {
             case .malformedJSON:

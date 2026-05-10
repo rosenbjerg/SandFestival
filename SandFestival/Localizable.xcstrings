@@ -50,6 +50,22 @@
         }
       }
     },
+    "claudecode.error.port_in_use" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : { "state" : "translated", "value" : "Port %1$@ is already in use. Quit whichever process is holding it (lsof -i :%1$@) and relaunch SandFestival." }
+        }
+      }
+    },
+    "claudecode.error.port_invalid" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : { "state" : "translated", "value" : "Hook listener port is invalid." }
+        }
+      }
+    },
     "claudecode.error.settings_malformed" : {
       "extractionState" : "manual",
       "localizations" : {
