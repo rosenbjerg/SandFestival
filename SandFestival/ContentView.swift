@@ -23,7 +23,9 @@ private enum SpikeConfig {
         "claude",
         "--enable-auto-mode",
     ]
-    static var workingDirectory: URL { FileManager.default.homeDirectoryForCurrentUser }
+    static var workingDirectory: URL {
+        URL(fileURLWithPath: "/Users/malterosenbjerg/Documents/GitHub/SandFestival")
+    }
     static var environmentOverrides: [String: String] {
         let home = NSHomeDirectory()
         return [
