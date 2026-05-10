@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		1E70400000000000000000A3 /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 1E70400000000000000000A2 /* SwiftTerm */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		1E6046A82FB0A1A90013BBD3 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,6 +31,7 @@
 		1E6046982FB0A1A80013BBD3 /* SandFestival.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SandFestival.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1E6046A72FB0A1A90013BBD3 /* SandFestivalTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SandFestivalTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		1E6046B12FB0A1A90013BBD3 /* SandFestivalUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SandFestivalUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		1E6046C42FB0EBCC0013BBD3 /* SPEC.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SPEC.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -52,6 +57,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1E70400000000000000000A3 /* SwiftTerm in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -75,6 +81,7 @@
 		1E60468F2FB0A1A80013BBD3 = {
 			isa = PBXGroup;
 			children = (
+				1E6046C42FB0EBCC0013BBD3 /* SPEC.md */,
 				1E60469A2FB0A1A80013BBD3 /* SandFestival */,
 				1E6046AA2FB0A1A90013BBD3 /* SandFestivalTests */,
 				1E6046B42FB0A1A90013BBD3 /* SandFestivalUITests */,
@@ -112,6 +119,7 @@
 			);
 			name = SandFestival;
 			packageProductDependencies = (
+				1E70400000000000000000A2 /* SwiftTerm */,
 			);
 			productName = SandFestival;
 			productReference = 1E6046982FB0A1A80013BBD3 /* SandFestival.app */;
@@ -195,6 +203,9 @@
 			);
 			mainGroup = 1E60468F2FB0A1A80013BBD3;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				1E70400000000000000000A1 /* XCRemoteSwiftPackageReference "SwiftTerm" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1E6046992FB0A1A80013BBD3 /* Products */;
 			projectDirPath = "";
@@ -398,7 +409,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = WFV2YU28PC;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
@@ -430,7 +441,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = WFV2YU28PC;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
@@ -573,6 +584,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		1E70400000000000000000A1 /* XCRemoteSwiftPackageReference "SwiftTerm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/migueldeicaza/SwiftTerm";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1E70400000000000000000A2 /* SwiftTerm */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1E70400000000000000000A1 /* XCRemoteSwiftPackageReference "SwiftTerm" */;
+			productName = SwiftTerm;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 1E6046902FB0A1A80013BBD3 /* Project object */;
 }
