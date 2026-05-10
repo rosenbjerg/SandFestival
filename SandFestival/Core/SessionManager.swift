@@ -149,6 +149,13 @@ final class SessionManager {
     private func makeSession(for project: Project) -> Session {
         let session = Session(project: project)
         session.terminalView.font = currentTerminalFont()
+        // Pure black + ANSI "white" (≈ light gray) is what makes plain text
+        // look dull. A near-black background (Terminal.app's Pro theme is
+        // similar) and an off-white default foreground push contrast back up
+        // for non-styled output without affecting Claude Code's own ANSI
+        // colors.
+        session.terminalView.nativeBackgroundColor = NSColor(white: 0.11, alpha: 1.0)
+        session.terminalView.nativeForegroundColor = NSColor(white: 0.94, alpha: 1.0)
         session.spawnEnvProvider = { [weak self] project in
             self?.adapter?.prepareSpawn(project: project).additions ?? [:]
         }
@@ -181,7 +188,9 @@ final class SessionManager {
     }
 
     private func currentTerminalFont() -> NSFont {
-        NSFont.monospacedSystemFont(ofSize: terminalFontSize, weight: .regular)
+        // .medium reads noticeably crisper than .regular on dark backgrounds
+        // — the slightly thicker stroke survives anti-aliasing better.
+        NSFont.monospacedSystemFont(ofSize: terminalFontSize, weight: .medium)
     }
 
     private static func clampFontSize(_ size: CGFloat) -> CGFloat {
