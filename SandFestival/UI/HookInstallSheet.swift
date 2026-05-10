@@ -5,10 +5,21 @@ struct HookInstallSheet: View {
     let onInstall: () -> Void
     let onSkip: () -> Void
 
-    @State private var preview: SettingsDiffPreview?
-    @State private var showingPreview = false
+    @State private var displayedPreview: SettingsDiffPreview?
 
     var body: some View {
+        Group {
+            if let preview = displayedPreview {
+                preview_body(preview)
+            } else {
+                installBody
+            }
+        }
+    }
+
+    // MARK: - Install prompt
+
+    private var installBody: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(String(localized: "hooks.install.title"))
                 .font(.title2)
@@ -25,8 +36,7 @@ struct HookInstallSheet: View {
 
             HStack {
                 Button(String(localized: "hooks.install.view_changes")) {
-                    preview = adapter.previewInstallation()
-                    showingPreview = preview != nil
+                    displayedPreview = adapter.previewInstallation()
                 }
                 Spacer()
                 Button(String(localized: "hooks.install.skip"), role: .cancel) {
@@ -43,19 +53,11 @@ struct HookInstallSheet: View {
         }
         .padding(24)
         .frame(width: 520)
-        .sheet(isPresented: $showingPreview) {
-            if let preview {
-                SettingsPreviewSheet(preview: preview, onClose: { showingPreview = false })
-            }
-        }
     }
-}
 
-struct SettingsPreviewSheet: View {
-    let preview: SettingsDiffPreview
-    let onClose: () -> Void
+    // MARK: - Preview page
 
-    var body: some View {
+    private func preview_body(_ preview: SettingsDiffPreview) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(String(localized: "hooks.preview.title"))
                 .font(.title3)
@@ -64,38 +66,35 @@ struct SettingsPreviewSheet: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text(String(localized: "hooks.preview.before"))
                     .font(.headline)
-                ScrollView {
-                    Text(preview.before)
-                        .font(.system(.callout, design: .monospaced))
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(8)
-                }
-                .frame(height: 180)
-                .background(.quaternary.opacity(0.5))
-                .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(.tertiary))
+                previewBox(text: preview.before, height: 180)
 
                 Text(String(localized: "hooks.preview.after"))
                     .font(.headline)
-                ScrollView {
-                    Text(preview.after)
-                        .font(.system(.callout, design: .monospaced))
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(8)
-                }
-                .frame(height: 240)
-                .background(.quaternary.opacity(0.5))
-                .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(.tertiary))
+                previewBox(text: preview.after, height: 240)
             }
 
             HStack {
                 Spacer()
-                Button(String(localized: "hooks.preview.close"), action: onClose)
-                    .keyboardShortcut(.defaultAction)
+                Button(String(localized: "hooks.preview.close")) {
+                    displayedPreview = nil
+                }
+                .keyboardShortcut(.defaultAction)
             }
         }
         .padding(24)
         .frame(width: 720, height: 560)
+    }
+
+    private func previewBox(text: String, height: CGFloat) -> some View {
+        ScrollView {
+            Text(text.isEmpty ? "{}" : text)
+                .font(.system(.callout, design: .monospaced))
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(8)
+        }
+        .frame(height: height)
+        .background(.quaternary.opacity(0.5))
+        .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(.tertiary))
     }
 }

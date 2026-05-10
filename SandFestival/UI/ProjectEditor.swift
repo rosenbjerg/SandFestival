@@ -82,16 +82,29 @@ struct ProjectEditorView: View {
 
     @ViewBuilder
     private var argsEditor: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(String(localized: "editor.field.args"))
-                .font(.callout)
-            TextEditor(text: $draft.argsText)
-                .font(.system(.body, design: .monospaced))
-                .frame(minHeight: 80)
-                .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(.tertiary))
+        VStack(alignment: .leading, spacing: 12) {
+            argsBlock(
+                title: String(localized: "editor.field.args.wrapper"),
+                text: $draft.wrapperArgsText
+            )
+            argsBlock(
+                title: String(localized: "editor.field.args.agent"),
+                text: $draft.agentArgsText
+            )
             Text(String(localized: "editor.field.args.help"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    private func argsBlock(title: String, text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.callout)
+            TextEditor(text: text)
+                .font(.system(.body, design: .monospaced))
+                .frame(minHeight: 80)
+                .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(.tertiary))
         }
     }
 
@@ -141,7 +154,8 @@ private struct ProjectDraft {
     var name: String
     var pathString: String
     var command: String
-    var argsText: String
+    var wrapperArgsText: String
+    var agentArgsText: String
     var envEntries: [EnvEntry]
     var autoStart: Bool
 
@@ -149,7 +163,9 @@ private struct ProjectDraft {
         self.name = ""
         self.pathString = ""
         self.command = Project.defaultCommand
-        self.argsText = Project.defaultArgs.joined(separator: "\n")
+        let split = ArgsSplitter.split(Project.defaultArgs)
+        self.wrapperArgsText = split.wrapper.joined(separator: "\n")
+        self.agentArgsText = split.agent.joined(separator: "\n")
         self.envEntries = []
         self.autoStart = false
     }
@@ -158,7 +174,9 @@ private struct ProjectDraft {
         self.name = project.name
         self.pathString = project.path.path
         self.command = project.command
-        self.argsText = project.args.joined(separator: "\n")
+        let split = ArgsSplitter.split(project.args)
+        self.wrapperArgsText = split.wrapper.joined(separator: "\n")
+        self.agentArgsText = split.agent.joined(separator: "\n")
         self.envEntries = project.env
             .sorted(by: { $0.key < $1.key })
             .map { EnvEntry(key: $0.key, value: $0.value) }
@@ -171,11 +189,16 @@ private struct ProjectDraft {
         !command.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
-    func materialize(originalID: UUID?) -> Project {
-        let args = argsText
-            .split(whereSeparator: \.isNewline)
-            .map { String($0) }
+    private static func tokens(_ text: String) -> [String] {
+        text.split(whereSeparator: \.isNewline)
+            .map { String($0).trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
+    }
+
+    func materialize(originalID: UUID?) -> Project {
+        let wrapper = ProjectDraft.tokens(wrapperArgsText)
+        let agent = ProjectDraft.tokens(agentArgsText)
+        let args = ArgsSplitter.join(wrapper: wrapper, agent: agent)
         var env: [String: String] = [:]
         for entry in envEntries where !entry.key.isEmpty {
             env[entry.key] = entry.value
