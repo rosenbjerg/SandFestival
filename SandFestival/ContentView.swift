@@ -14,7 +14,15 @@ struct ContentView: View {
 
 private enum SpikeConfig {
     static let executable = "/opt/homebrew/bin/nono"
-    static let args = ["claude"]
+    static let args = [
+        "run",
+        "--allow-cwd",
+        "--profile", "xcode",
+        "--allow-launch-services",
+        "--",
+        "claude",
+        "--enable-auto-mode",
+    ]
     static var workingDirectory: URL { FileManager.default.homeDirectoryForCurrentUser }
     static var environmentOverrides: [String: String] {
         let home = NSHomeDirectory()
