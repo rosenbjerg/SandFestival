@@ -9,6 +9,8 @@ final class SessionManager {
     var selectedProjectID: Project.ID?
 
     @ObservationIgnored private let store: ProjectStore
+    @ObservationIgnored private(set) var adapter: (any AgentAdapter)?
+    @ObservationIgnored private var router: AgentEventRouter?
 
     init(store: ProjectStore? = nil) {
         let resolvedStore = store ?? ProjectStore()
@@ -24,7 +26,22 @@ final class SessionManager {
         if let first = projects.first {
             selectedProjectID = first.id
         }
+    }
+
+    // MARK: - Adapter binding
+
+    func attach(adapter: any AgentAdapter) async throws {
+        self.adapter = adapter
+        let router = AgentEventRouter(manager: self)
+        self.router = router
+        try await adapter.start(eventSink: router)
         autoStartIfNeeded()
+    }
+
+    func detachAdapter() async {
+        await adapter?.stop()
+        adapter = nil
+        router = nil
     }
 
     // MARK: - CRUD
@@ -35,7 +52,7 @@ final class SessionManager {
         selectedProjectID = project.id
         persist()
         if project.autoStart {
-            sessions[project.id]?.start()
+            startSession(id: project.id)
         }
     }
 
@@ -47,7 +64,12 @@ final class SessionManager {
     }
 
     func removeProject(id: Project.ID) {
-        sessions[id]?.stop()
+        if let session = sessions[id], session.state.isRunning {
+            session.stop()
+        }
+        if let project = projects.first(where: { $0.id == id }) {
+            adapter?.willTerminateSession(handle(for: project))
+        }
         sessions.removeValue(forKey: id)
         projects.removeAll { $0.id == id }
         if selectedProjectID == id {
@@ -68,32 +90,63 @@ final class SessionManager {
     }
 
     func startSession(id: Project.ID) {
-        sessions[id]?.start()
+        guard let session = sessions[id] else { return }
+        let extraEnv = adapter?.prepareSpawn(project: session.project).additions ?? [:]
+        session.start(extraEnvironment: extraEnv)
+        adapter?.didSpawnSession(handle(for: session.project))
     }
 
     func stopSession(id: Project.ID) {
-        sessions[id]?.stop()
+        guard let session = sessions[id], let project = projects.first(where: { $0.id == id }) else { return }
+        adapter?.willTerminateSession(handle(for: project))
+        session.stop()
     }
 
     func restartSession(id: Project.ID) {
-        sessions[id]?.restart()
+        guard let session = sessions[id], let project = projects.first(where: { $0.id == id }) else { return }
+        if session.state.isRunning {
+            adapter?.willTerminateSession(handle(for: project))
+        }
+        session.restart()
+        if !session.state.isRunning {
+            // restart is asynchronous when the session is currently running:
+            // we'll need to register the new spawn after it completes. For
+            // now, didSpawnSession is only emitted on the synchronous path.
+            adapter?.didSpawnSession(handle(for: project))
+        }
+    }
+
+    // MARK: - Matcher resolution
+
+    func resolveProjectID(_ matcher: SessionMatcher) -> Project.ID? {
+        switch matcher {
+        case .projectID(let id):
+            return projects.contains(where: { $0.id == id }) ? id : nil
+        case .workingDirectory(let url):
+            let target = url.standardizedFileURL.path
+            return projects.first { $0.path.standardizedFileURL.path == target }?.id
+        case .sessionID, .pid:
+            return nil
+        }
     }
 
     // MARK: - Internal
 
     private func autoStartIfNeeded() {
         for project in projects where project.autoStart {
-            sessions[project.id]?.start()
+            startSession(id: project.id)
         }
+    }
+
+    private func handle(for project: Project) -> SessionHandle {
+        SessionHandle(projectID: project.id, workingDirectory: project.path)
     }
 
     private func persist() {
         do {
             try store.save(projects)
         } catch {
-            // Surface persistence failures via a banner in a follow-up step;
-            // for now, silently swallow so a transient write failure doesn't
-            // crash the app.
+            // Persistence failures surface as a banner in Step 6 polish.
         }
     }
 }

@@ -9,9 +9,16 @@ final class Session: Identifiable {
     private(set) var state: SessionState = .stopped
     private(set) var lastActivityAt: Date = Date()
     private(set) var lastError: String?
+    private(set) var metadata: AgentMetadata = .empty
 
     @ObservationIgnored let terminalView: LocalProcessTerminalView
     @ObservationIgnored private let processBridge: ProcessBridge
+    @ObservationIgnored private var lastSameStateBumpAt: Date?
+
+    /// Sub-second debounce for same-state activity bumps (e.g. heartbeat
+    /// floods while in working state) so the sidebar doesn't re-render
+    /// dozens of times per second.
+    @ObservationIgnored private let sameStateBumpInterval: TimeInterval = 0.5
 
     var id: Project.ID { project.id }
 
@@ -31,11 +38,12 @@ final class Session: Identifiable {
 
     // MARK: - Lifecycle
 
-    func start() {
+    func start(extraEnvironment: [String: String] = [:]) {
         guard !state.isRunning else { return }
         guard let executable = CommandResolver.resolve(project.command) else {
-            state = .errored(reason: String(localized: "session.error.command_not_found"))
-            lastError = String(localized: "session.error.command_not_found")
+            let reason = String(localized: "session.error.command_not_found")
+            state = .errored(reason: reason)
+            lastError = reason
             bumpActivity()
             return
         }
@@ -45,10 +53,13 @@ final class Session: Identifiable {
         terminalView.startProcess(
             executable: executable,
             args: project.args,
-            environment: composedEnvironment(),
+            environment: composedEnvironment(extra: extraEnvironment),
             execName: nil,
             currentDirectory: project.path.path
         )
+        // Fallback transition to .idle so the UI shows life even when no
+        // adapter is feeding events. When the real adapter delivers .started,
+        // the state machine treats it as a no-op.
         state = .idle
         bumpActivity()
     }
@@ -61,9 +72,6 @@ final class Session: Identifiable {
     func restart() {
         if state.isRunning {
             terminalView.terminate()
-            // process termination triggers handleProcessTerminated, which just
-            // marks .stopped. The user's restart action sets a flag so the
-            // next termination handler re-spawns.
             wantsRestart = true
         } else {
             start()
@@ -74,6 +82,32 @@ final class Session: Identifiable {
 
     func update(project: Project) {
         self.project = project
+    }
+
+    // MARK: - Agent event ingestion
+
+    func apply(event: AgentEvent) {
+        let next = SessionStateMachine.next(from: state, event: event)
+        if next != state {
+            state = next
+            lastActivityAt = Date()
+            lastSameStateBumpAt = nil
+            if case .errored(let reason) = next {
+                lastError = reason
+            }
+        } else {
+            // Same-state event (heartbeat / repeat). Debounce activity bumps.
+            let now = Date()
+            if let last = lastSameStateBumpAt, now.timeIntervalSince(last) < sameStateBumpInterval {
+                return
+            }
+            lastSameStateBumpAt = now
+            lastActivityAt = now
+        }
+    }
+
+    func updateMetadata(_ newMetadata: AgentMetadata) {
+        metadata = newMetadata
     }
 
     private func handleProcessTerminated(exitCode: Int32?) {
@@ -91,10 +125,14 @@ final class Session: Identifiable {
         lastActivityAt = Date()
     }
 
-    private func composedEnvironment() -> [String] {
+    private func composedEnvironment(extra: [String: String]) -> [String] {
         var entries = Terminal.getEnvironmentVariables()
         var pathOverride = CommandResolver.defaultPathString
-        for (key, value) in project.env {
+        var merged = project.env
+        for (key, value) in extra {
+            merged[key] = value
+        }
+        for (key, value) in merged {
             if key == "PATH" {
                 pathOverride = value
             } else {
