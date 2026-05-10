@@ -58,7 +58,9 @@ struct DetailPaneView: View {
             .controlSize(.large)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.regularMaterial)
+        // Opaque so SwiftTerm's blinking caret underneath doesn't bleed
+        // through — a not-running session should look unambiguously empty.
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var emptyState: some View {
