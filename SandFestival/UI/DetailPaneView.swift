@@ -33,6 +33,7 @@ struct DetailPaneView: View {
         ZStack {
             TerminalPaneView(terminalView: session.terminalView)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.leading, 4)
 
             if !session.state.isRunning {
                 notRunningOverlay(session: session)
