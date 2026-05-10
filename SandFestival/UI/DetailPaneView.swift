@@ -56,11 +56,14 @@ struct DetailPaneView: View {
                 session.start()
             }
             .controlSize(.large)
+            .pointerStyle(.link)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        // Opaque so SwiftTerm's blinking caret underneath doesn't bleed
-        // through — a not-running session should look unambiguously empty.
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(.regularMaterial)
+        // Without an explicit pointer style, SwiftTerm's cursor rect from the
+        // underlying NSView wins and the mouse stays an I-beam over the
+        // overlay. .default forces an arrow on this layer's content rect.
+        .pointerStyle(.default)
     }
 
     private var emptyState: some View {
