@@ -4,11 +4,17 @@ struct StatusDot: View {
     let state: SessionState
 
     var body: some View {
-        Circle()
-            .fill(state.indicatorColor)
-            .frame(width: 8, height: 8)
-            .opacity(state == .stopped ? 0.6 : 1.0)
-            .accessibilityLabel(state.accessibilityLabel)
+        Group {
+            if state == .stopped {
+                Circle()
+                    .strokeBorder(Color.secondary, lineWidth: 1.5)
+            } else {
+                Circle()
+                    .fill(state.indicatorColor)
+            }
+        }
+        .frame(width: 9, height: 9)
+        .accessibilityLabel(state.accessibilityLabel)
     }
 }
 
