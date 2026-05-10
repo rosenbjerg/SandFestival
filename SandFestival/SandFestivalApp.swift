@@ -14,6 +14,24 @@ struct SandFestivalApp: App {
                     await attachAdapterIfNeeded()
                 }
         }
+        .commands {
+            CommandGroup(after: .toolbar) {
+                Button(String(localized: "view.terminal.font.larger")) {
+                    manager.bumpTerminalFontSize(by: 1)
+                }
+                .keyboardShortcut("+", modifiers: [.command])
+
+                Button(String(localized: "view.terminal.font.smaller")) {
+                    manager.bumpTerminalFontSize(by: -1)
+                }
+                .keyboardShortcut("-", modifiers: [.command])
+
+                Button(String(localized: "view.terminal.font.reset")) {
+                    manager.resetTerminalFontSize()
+                }
+                .keyboardShortcut("0", modifiers: [.command])
+            }
+        }
 
         MenuBarExtra {
             MenuBarContentView(manager: manager)
@@ -33,7 +51,6 @@ struct SandFestivalApp: App {
         if attentionCount == 0 {
             Image(systemName: "tray")
         } else {
-            // Title + icon — SwiftUI renders both in the menu bar item.
             Label("\(attentionCount)", systemImage: "tray.full.fill")
         }
     }

@@ -1,5 +1,7 @@
+import AppKit
 import Foundation
 import Observation
+import SwiftTerm
 
 @MainActor
 @Observable
@@ -8,6 +10,12 @@ final class SessionManager {
     private(set) var sessions: [Project.ID: Session] = [:]
     var selectedProjectID: Project.ID?
     private(set) var lastPersistError: String?
+    private(set) var terminalFontSize: CGFloat = SessionManager.defaultFontSize
+
+    static let defaultFontSize: CGFloat = 13
+    static let minFontSize: CGFloat = 9
+    static let maxFontSize: CGFloat = 32
+    private static let fontSizeKey = "terminal.fontSize"
 
     @ObservationIgnored private let store: ProjectStore
     @ObservationIgnored private(set) var adapter: (any AgentAdapter)?
@@ -16,6 +24,13 @@ final class SessionManager {
     init(store: ProjectStore? = nil) {
         let resolvedStore = store ?? ProjectStore()
         self.store = resolvedStore
+
+        UserDefaults.standard.register(defaults: [
+            SessionManager.fontSizeKey: Double(SessionManager.defaultFontSize),
+        ])
+        let storedFontSize = CGFloat(UserDefaults.standard.double(forKey: SessionManager.fontSizeKey))
+        terminalFontSize = SessionManager.clampFontSize(storedFontSize)
+
         do {
             projects = try resolvedStore.load()
         } catch {
@@ -133,6 +148,7 @@ final class SessionManager {
 
     private func makeSession(for project: Project) -> Session {
         let session = Session(project: project)
+        session.terminalView.font = currentTerminalFont()
         session.spawnEnvProvider = { [weak self] project in
             self?.adapter?.prepareSpawn(project: project).additions ?? [:]
         }
@@ -141,6 +157,35 @@ final class SessionManager {
             self.adapter?.didSpawnSession(self.handle(for: project))
         }
         return session
+    }
+
+    // MARK: - Terminal font size
+
+    func bumpTerminalFontSize(by delta: CGFloat) {
+        applyTerminalFontSize(SessionManager.clampFontSize(terminalFontSize + delta))
+    }
+
+    func resetTerminalFontSize() {
+        applyTerminalFontSize(SessionManager.defaultFontSize)
+    }
+
+    private func applyTerminalFontSize(_ size: CGFloat) {
+        let clamped = SessionManager.clampFontSize(size)
+        guard clamped != terminalFontSize else { return }
+        terminalFontSize = clamped
+        UserDefaults.standard.set(Double(clamped), forKey: SessionManager.fontSizeKey)
+        let font = currentTerminalFont()
+        for session in sessions.values {
+            session.terminalView.font = font
+        }
+    }
+
+    private func currentTerminalFont() -> NSFont {
+        NSFont.monospacedSystemFont(ofSize: terminalFontSize, weight: .regular)
+    }
+
+    private static func clampFontSize(_ size: CGFloat) -> CGFloat {
+        min(max(size, minFontSize), maxFontSize)
     }
 
     private func handle(for project: Project) -> SessionHandle {

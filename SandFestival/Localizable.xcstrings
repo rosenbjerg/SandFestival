@@ -512,6 +512,30 @@
         }
       }
     },
+    "view.terminal.font.larger" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : { "state" : "translated", "value" : "Increase Terminal Font Size" }
+        }
+      }
+    },
+    "view.terminal.font.reset" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : { "state" : "translated", "value" : "Default Terminal Font Size" }
+        }
+      }
+    },
+    "view.terminal.font.smaller" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : { "state" : "translated", "value" : "Decrease Terminal Font Size" }
+        }
+      }
+    },
     "session.error.command_not_found" : {
       "extractionState" : "manual",
       "localizations" : {
