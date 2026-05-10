@@ -64,10 +64,10 @@ struct SidebarView: View {
                     .imageScale(.small)
             }
 
-            if let lastActivityAt = session?.lastActivityAt {
-                Text(lastActivityAt, style: .relative)
+            if let session, session.state.needsAttention {
+                Text(session.enteredCurrentStateAt, style: .relative)
                     .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
         }

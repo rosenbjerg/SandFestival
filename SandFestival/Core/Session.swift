@@ -7,13 +7,17 @@ import SwiftTerm
 final class Session: Identifiable {
     var project: Project
     private(set) var state: SessionState = .stopped
-    private(set) var lastActivityAt: Date = Date()
+    /// Wall-clock instant the session entered its current state. The sidebar
+    /// uses this to display "waiting Xm" while in attention states; it is
+    /// **not** bumped by heartbeats or other same-state events, so the count
+    /// reflects "how long has Claude been waiting on you" rather than "when
+    /// did the last hook fire".
+    private(set) var enteredCurrentStateAt: Date = Date()
     private(set) var lastError: String?
     private(set) var metadata: AgentMetadata = .empty
 
     @ObservationIgnored let terminalView: LocalProcessTerminalView
     @ObservationIgnored private let processBridge: ProcessBridge
-    @ObservationIgnored private var lastSameStateBumpAt: Date?
 
     /// Returns env additions to merge into the spawn env. Wired by
     /// SessionManager so every start() — toolbar, overlay, auto-restart —
@@ -22,11 +26,6 @@ final class Session: Identifiable {
 
     /// Called after a successful spawn so adapters can register a handle.
     @ObservationIgnored var onDidSpawn: ((Project) -> Void)?
-
-    /// Sub-second debounce for same-state activity bumps (e.g. heartbeat
-    /// floods while in working state) so the sidebar doesn't re-render
-    /// dozens of times per second.
-    @ObservationIgnored private let sameStateBumpInterval: TimeInterval = 0.5
 
     var id: Project.ID { project.id }
 
@@ -50,15 +49,13 @@ final class Session: Identifiable {
         guard !state.isRunning else { return }
         guard let executable = CommandResolver.resolve(project.command) else {
             let reason = String(localized: "session.error.command_not_found")
-            state = .errored(reason: reason)
+            transition(to: .errored(reason: reason))
             lastError = reason
-            bumpActivity()
             return
         }
         let extraEnvironment = spawnEnvProvider?(project) ?? [:]
         lastError = nil
-        state = .starting
-        bumpActivity()
+        transition(to: .starting)
         terminalView.startProcess(
             executable: executable,
             args: project.args,
@@ -69,8 +66,7 @@ final class Session: Identifiable {
         // Fallback transition to .idle so the UI shows life even when no
         // adapter is feeding events. When the real adapter delivers .started,
         // the state machine treats it as a no-op.
-        state = .idle
-        bumpActivity()
+        transition(to: .idle)
         onDidSpawn?(project)
     }
 
@@ -98,21 +94,10 @@ final class Session: Identifiable {
 
     func apply(event: AgentEvent) {
         let next = SessionStateMachine.next(from: state, event: event)
-        if next != state {
-            state = next
-            lastActivityAt = Date()
-            lastSameStateBumpAt = nil
-            if case .errored(let reason) = next {
-                lastError = reason
-            }
-        } else {
-            // Same-state event (heartbeat / repeat). Debounce activity bumps.
-            let now = Date()
-            if let last = lastSameStateBumpAt, now.timeIntervalSince(last) < sameStateBumpInterval {
-                return
-            }
-            lastSameStateBumpAt = now
-            lastActivityAt = now
+        guard next != state else { return }  // Heartbeats and other same-state events are intentional no-ops here.
+        transition(to: next)
+        if case .errored(let reason) = next {
+            lastError = reason
         }
     }
 
@@ -121,8 +106,7 @@ final class Session: Identifiable {
     }
 
     private func handleProcessTerminated(exitCode: Int32?) {
-        state = .stopped
-        bumpActivity()
+        transition(to: .stopped)
         if wantsRestart {
             wantsRestart = false
             start()
@@ -131,8 +115,9 @@ final class Session: Identifiable {
 
     // MARK: - Helpers
 
-    private func bumpActivity() {
-        lastActivityAt = Date()
+    private func transition(to next: SessionState) {
+        state = next
+        enteredCurrentStateAt = Date()
     }
 
     private func composedEnvironment(extra: [String: String]) -> [String] {
