@@ -153,6 +153,83 @@ struct SettingsJSONManagerTests {
         #expect(preview.after.contains(HookEntryFactory.sourceSentinel))
     }
 
+    // MARK: - Install state detection
+
+    @Test("detectInstallState reports notInstalled when no entries exist")
+    func detectStateNotInstalled() throws {
+        let manager = SettingsJSONManager(fileURL: temporaryURL())
+        #expect(try manager.detectInstallState(port: 51789) == .notInstalled)
+    }
+
+    @Test("detectInstallState reports current after a fresh install")
+    func detectStateCurrentAfterInstall() throws {
+        let url = temporaryURL()
+        let manager = SettingsJSONManager(fileURL: url)
+        try manager.install(port: 51789)
+        #expect(try manager.detectInstallState(port: 51789) == .current)
+    }
+
+    @Test("detectInstallState reports outdated when a legacy http entry is present")
+    func detectStateOutdatedForLegacyHttpEntry() throws {
+        let url = temporaryURL()
+        // Seed every event with the old `type: "http"` shape we used to ship.
+        var hooks: [String: Any] = [:]
+        let legacyEntry: [String: Any] = [
+            "type": "http",
+            "url": HookEntryFactory.hookURL(port: 51789),
+            "headers": ["Authorization": "Bearer $SAND_FESTIVAL_TOKEN"],
+            "allowedEnvVars": ["SAND_FESTIVAL_TOKEN"],
+        ]
+        for event in HookEvent.allCases {
+            hooks[event.rawValue] = [["matcher": "", "hooks": [legacyEntry]]]
+        }
+        try seed(url: url, content: try jsonString(["hooks": hooks]))
+
+        let manager = SettingsJSONManager(fileURL: url)
+        #expect(try manager.detectInstallState(port: 51789) == .outdated)
+    }
+
+    @Test("detectInstallState reports outdated when port doesn't match")
+    func detectStateOutdatedForDifferentPort() throws {
+        let url = temporaryURL()
+        let manager = SettingsJSONManager(fileURL: url)
+        try manager.install(port: 51789)
+        #expect(try manager.detectInstallState(port: 51900) == .outdated)
+    }
+
+    @Test("install rewrites legacy http entries to the current command form")
+    func installMigratesLegacyEntries() throws {
+        let url = temporaryURL()
+        let legacyEntry: [String: Any] = [
+            "type": "http",
+            "url": HookEntryFactory.hookURL(port: 51789),
+            "headers": ["Authorization": "Bearer $SAND_FESTIVAL_TOKEN"],
+            "allowedEnvVars": ["SAND_FESTIVAL_TOKEN"],
+        ]
+        var hooks: [String: Any] = [:]
+        for event in HookEvent.allCases {
+            hooks[event.rawValue] = [["matcher": "", "hooks": [legacyEntry]]]
+        }
+        try seed(url: url, content: try jsonString(["hooks": hooks]))
+
+        let manager = SettingsJSONManager(fileURL: url)
+        try manager.install(port: 51789)
+
+        let json = try parsedSettings(at: url)
+        let allHooks = try #require(json["hooks"] as? [String: Any])
+        for event in HookEvent.allCases {
+            let groups = try #require(allHooks[event.rawValue] as? [[String: Any]])
+            let entries = groups.flatMap { ($0["hooks"] as? [[String: Any]]) ?? [] }
+            // No more legacy http entries
+            #expect(!entries.contains { ($0["type"] as? String) == "http" })
+            // At least one current command entry referencing our sentinel
+            #expect(entries.contains {
+                ($0["type"] as? String) == "command"
+                    && (($0["command"] as? String)?.contains(HookEntryFactory.sourceSentinel) ?? false)
+            })
+        }
+    }
+
     // MARK: - Helpers
 
     private func temporaryURL() -> URL {
@@ -174,6 +251,11 @@ struct SettingsJSONManagerTests {
         return try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
     }
 
+    private func jsonString(_ value: [String: Any]) throws -> String {
+        let data = try JSONSerialization.data(withJSONObject: value, options: [.prettyPrinted])
+        return try #require(String(data: data, encoding: .utf8))
+    }
+
     private func containsOurEntry(_ group: [String: Any]) -> Bool {
         guard let hookList = group["hooks"] as? [[String: Any]] else { return false }
         return hookList.contains(where: HookEntryFactory.isOurEntry)
@@ -187,10 +269,23 @@ struct SettingsJSONManagerTests {
             for group in groups {
                 guard let hookList = group["hooks"] as? [[String: Any]] else { continue }
                 for entry in hookList where HookEntryFactory.isOurEntry(entry) {
-                    if let url = entry["url"] as? String { urls.insert(url) }
+                    if let url = entry["url"] as? String {
+                        urls.insert(url)
+                    } else if let command = entry["command"] as? String,
+                              let extracted = extractHookURL(from: command) {
+                        urls.insert(extracted)
+                    }
                 }
             }
         }
         return urls
+    }
+
+    private func extractHookURL(from command: String) -> String? {
+        // Pulls a `http://127.0.0.1:<port>/event?source=sand-festival` token
+        // out of the curl command string the factory produces.
+        guard let range = command.range(of: #"http://127\.0\.0\.1:\d+/event\?source=sand-festival"#,
+                                        options: .regularExpression) else { return nil }
+        return String(command[range])
     }
 }

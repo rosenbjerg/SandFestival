@@ -10,6 +10,15 @@ enum SettingsJSONManagerError: Error, Equatable {
     case writeFailed(String)
 }
 
+/// Reflects how our hooks compare to what SandFestival currently installs.
+/// `outdated` is the upgrade path: we already have the user's consent, so
+/// the adapter rewrites silently rather than re-prompting.
+enum HookInstallState: Equatable {
+    case notInstalled
+    case outdated
+    case current
+}
+
 /// Merges/removes Sand Festival hook entries in `~/.claude/settings.json`
 /// without disturbing any other settings the user has added. All writes go
 /// through a tempfile + fsync + rename so a crash mid-write can't damage
@@ -30,9 +39,41 @@ struct SettingsJSONManager {
     // MARK: - Public API
 
     func isInstalled(port: UInt16) throws -> Bool {
+        try detectInstallState(port: port) == .current
+    }
+
+    /// Distinguishes between "no hooks installed", "hooks installed but in an
+    /// old format that needs rewriting", and "hooks match the current factory
+    /// output". The adapter uses this to silently migrate without re-asking
+    /// the user for consent.
+    func detectInstallState(port: UInt16, events: [HookEvent] = HookEvent.allCases) throws -> HookInstallState {
         let settings = try readSettings()
-        let target = HookEntryFactory.hookURL(port: port)
-        return ourEntryURLs(in: settings).contains(target)
+        let expected = HookEntryFactory.entry(port: port)
+        let expectedSerialized = stableSerialization(of: expected)
+
+        var anyOurEntries = false
+        var allMatch = true
+
+        for event in events {
+            let groups = (settings["hooks"] as? [String: Any])?[event.rawValue] as? [[String: Any]] ?? []
+            let ourEntries = groups
+                .flatMap { ($0["hooks"] as? [[String: Any]]) ?? [] }
+                .filter(HookEntryFactory.isOurEntry)
+
+            if ourEntries.isEmpty {
+                allMatch = false
+                continue
+            }
+
+            anyOurEntries = true
+            let anyEntryMatches = ourEntries.contains { stableSerialization(of: $0) == expectedSerialized }
+            if !anyEntryMatches {
+                allMatch = false
+            }
+        }
+
+        if !anyOurEntries { return .notInstalled }
+        return allMatch ? .current : .outdated
     }
 
     func install(port: UInt16, events: [HookEvent] = HookEvent.allCases) throws {
@@ -115,21 +156,8 @@ struct SettingsJSONManager {
         settings["hooks"] = hooks
     }
 
-    private func ourEntryURLs(in settings: [String: Any]) -> Set<String> {
-        var urls: Set<String> = []
-        guard let hooks = settings["hooks"] as? [String: Any] else { return urls }
-        for (_, groupsAny) in hooks {
-            guard let groups = groupsAny as? [[String: Any]] else { continue }
-            for group in groups {
-                guard let hookList = group["hooks"] as? [[String: Any]] else { continue }
-                for entry in hookList where HookEntryFactory.isOurEntry(entry) {
-                    if let url = entry["url"] as? String {
-                        urls.insert(url)
-                    }
-                }
-            }
-        }
-        return urls
+    private func stableSerialization(of object: [String: Any]) -> Data {
+        (try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])) ?? Data()
     }
 
     // MARK: - Atomic write

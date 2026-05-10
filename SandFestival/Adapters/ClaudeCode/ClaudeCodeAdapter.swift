@@ -145,7 +145,17 @@ final class ClaudeCodeAdapter: AgentAdapter {
             return
         }
         do {
-            needsInstallation = try !settingsManager.isInstalled(port: port)
+            switch try settingsManager.detectInstallState(port: port) {
+            case .current:
+                needsInstallation = false
+            case .outdated:
+                // The user already consented to hooks. Silently rewrite to the
+                // current format rather than re-prompting.
+                try settingsManager.install(port: port)
+                needsInstallation = false
+            case .notInstalled:
+                needsInstallation = true
+            }
         } catch {
             needsInstallation = false
             lastInstallError = describe(error)
