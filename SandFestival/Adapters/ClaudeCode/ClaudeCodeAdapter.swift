@@ -14,6 +14,9 @@ final class ClaudeCodeAdapter: AgentAdapter {
     private(set) var lastInstallError: String?
     private(set) var startupError: String?
 
+    func clearLastInstallError() { lastInstallError = nil }
+    func clearStartupError() { startupError = nil }
+
     @ObservationIgnored private let tokenStore: KeychainTokenStore
     @ObservationIgnored private let portStore: PortStore
     @ObservationIgnored private let settingsManager: SettingsJSONManager

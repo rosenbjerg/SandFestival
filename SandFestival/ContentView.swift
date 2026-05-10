@@ -7,10 +7,14 @@ struct ContentView: View {
     @State private var hookSheetSkipped = false
 
     var body: some View {
-        NavigationSplitView {
-            SidebarView(manager: manager, editorTarget: $editorTarget)
-        } detail: {
-            DetailPaneView(manager: manager, editorTarget: $editorTarget)
+        VStack(spacing: 0) {
+            StatusBannerStack(banners: banners)
+
+            NavigationSplitView {
+                SidebarView(manager: manager, editorTarget: $editorTarget)
+            } detail: {
+                DetailPaneView(manager: manager, editorTarget: $editorTarget)
+            }
         }
         .sheet(item: $editorTarget) { target in
             ProjectEditorView(
@@ -32,6 +36,32 @@ struct ContentView: View {
                 onSkip: { hookSheetSkipped = true }
             )
         }
+    }
+
+    private var banners: [StatusBannerStack.Banner] {
+        var result: [StatusBannerStack.Banner] = []
+        if let error = claudeCodeAdapter.startupError {
+            result.append(.init(
+                message: String(format: String(localized: "banner.adapter_startup_failed"), error),
+                severity: .error,
+                dismiss: { claudeCodeAdapter.clearStartupError() }
+            ))
+        }
+        if let error = claudeCodeAdapter.lastInstallError {
+            result.append(.init(
+                message: error,
+                severity: .warning,
+                dismiss: { claudeCodeAdapter.clearLastInstallError() }
+            ))
+        }
+        if let error = manager.lastPersistError {
+            result.append(.init(
+                message: String(format: String(localized: "banner.projects_persist_failed"), error),
+                severity: .warning,
+                dismiss: { manager.clearPersistError() }
+            ))
+        }
+        return result
     }
 
     private var hookSheetBinding: Binding<Bool> {

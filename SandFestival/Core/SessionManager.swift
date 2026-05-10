@@ -7,6 +7,7 @@ final class SessionManager {
     private(set) var projects: [Project] = []
     private(set) var sessions: [Project.ID: Session] = [:]
     var selectedProjectID: Project.ID?
+    private(set) var lastPersistError: String?
 
     @ObservationIgnored private let store: ProjectStore
     @ObservationIgnored private(set) var adapter: (any AgentAdapter)?
@@ -146,8 +147,13 @@ final class SessionManager {
     private func persist() {
         do {
             try store.save(projects)
+            lastPersistError = nil
         } catch {
-            // Persistence failures surface as a banner in Step 6 polish.
+            lastPersistError = error.localizedDescription
         }
+    }
+
+    func clearPersistError() {
+        lastPersistError = nil
     }
 }

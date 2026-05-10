@@ -1,6 +1,30 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "banner.adapter_startup_failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : { "state" : "translated", "value" : "Claude Code adapter failed to start: %@" }
+        }
+      }
+    },
+    "banner.dismiss" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : { "state" : "translated", "value" : "Dismiss" }
+        }
+      }
+    },
+    "banner.projects_persist_failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : { "state" : "translated", "value" : "Couldn't save projects.json: %@" }
+        }
+      }
+    },
     "claudecode.error.settings_malformed" : {
       "extractionState" : "manual",
       "localizations" : {
