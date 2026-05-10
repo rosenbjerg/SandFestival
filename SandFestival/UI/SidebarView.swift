@@ -41,6 +41,37 @@ struct SidebarView: View {
     }
 
     @ViewBuilder
+    private func rightSideStatus(for session: Session) -> some View {
+        switch session.state {
+        case .working:
+            Text(session.enteredCurrentStateAt, style: .relative)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .monospacedDigit()
+        case .waitingForPermission:
+            attentionLabel(String(localized: "sidebar.row.label.permission"), color: .orange)
+        case .waitingForIdle:
+            attentionLabel(String(localized: "sidebar.row.label.needs_input"), color: .orange)
+        case .blockedByAutoMode:
+            attentionLabel(String(localized: "sidebar.row.label.blocked"), color: .red)
+        case .errored:
+            attentionLabel(String(localized: "sidebar.row.label.errored"), color: .red)
+        case .starting, .idle, .stopped:
+            EmptyView()
+        }
+    }
+
+    private func attentionLabel(_ text: String, color: Color) -> some View {
+        Text(text)
+            .font(.caption2)
+            .fontWeight(.semibold)
+            .foregroundStyle(color)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(color.opacity(0.15), in: Capsule())
+    }
+
+    @ViewBuilder
     private func sidebarRow(project: Project) -> some View {
         let session = manager.session(for: project.id)
         HStack(spacing: 8) {
@@ -58,17 +89,8 @@ struct SidebarView: View {
 
             Spacer(minLength: 4)
 
-            if let session, session.state.needsAttention, manager.selectedProjectID != project.id {
-                Image(systemName: "exclamationmark.circle.fill")
-                    .foregroundStyle(.orange)
-                    .imageScale(.small)
-            }
-
-            if let session, session.state.needsAttention {
-                Text(session.enteredCurrentStateAt, style: .relative)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
+            if let session {
+                rightSideStatus(for: session)
             }
         }
         .padding(.vertical, 2)

@@ -574,6 +574,38 @@
         }
       }
     },
+    "sidebar.row.label.blocked" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : { "state" : "translated", "value" : "Blocked" }
+        }
+      }
+    },
+    "sidebar.row.label.errored" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : { "state" : "translated", "value" : "Error" }
+        }
+      }
+    },
+    "sidebar.row.label.needs_input" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : { "state" : "translated", "value" : "Needs input" }
+        }
+      }
+    },
+    "sidebar.row.label.permission" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : { "state" : "translated", "value" : "Permission" }
+        }
+      }
+    },
     "sidebar.row.edit" : {
       "extractionState" : "manual",
       "localizations" : {
