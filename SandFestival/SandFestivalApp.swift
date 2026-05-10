@@ -4,10 +4,11 @@ import SwiftUI
 struct SandFestivalApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var manager = SessionManager()
+    @State private var claudeCodeAdapter = ClaudeCodeAdapter()
 
     var body: some Scene {
         WindowGroup {
-            ContentView(manager: manager)
+            ContentView(manager: manager, claudeCodeAdapter: claudeCodeAdapter)
                 .frame(minWidth: 900, minHeight: 600)
                 .task {
                     await attachAdapterIfNeeded()
@@ -18,11 +19,10 @@ struct SandFestivalApp: App {
     private func attachAdapterIfNeeded() async {
         guard manager.adapter == nil else { return }
         do {
-            try await manager.attach(adapter: ClaudeCodeAdapter())
+            try await manager.attach(adapter: claudeCodeAdapter)
         } catch {
-            // Surfaced as a banner in the Task 10 polish pass; for now,
-            // the app runs in degraded mode (state machine never leaves
-            // idle/working/stopped because hook events don't arrive).
+            // Adapter logs the failure via `startupError`. The app remains
+            // usable; sessions just won't get state updates from hooks.
         }
     }
 }

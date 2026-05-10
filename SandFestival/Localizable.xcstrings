@@ -1,6 +1,22 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "claudecode.error.settings_malformed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : { "state" : "translated", "value" : "~/.claude/settings.json is malformed. Fix it manually before installing hooks." }
+        }
+      }
+    },
+    "claudecode.error.settings_write_failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : { "state" : "translated", "value" : "Couldn't write ~/.claude/settings.json." }
+        }
+      }
+    },
     "detail.empty.title" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -198,6 +214,78 @@
       "localizations" : {
         "en" : {
           "stringUnit" : { "state" : "translated", "value" : "Environment" }
+        }
+      }
+    },
+    "hooks.install.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : { "state" : "translated", "value" : "Sand Festival needs to add HTTP hook entries to your global Claude Code settings (~/.claude/settings.json) so it can detect when sessions need your attention." }
+        }
+      }
+    },
+    "hooks.install.install" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : { "state" : "translated", "value" : "Install" }
+        }
+      }
+    },
+    "hooks.install.skip" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : { "state" : "translated", "value" : "Skip" }
+        }
+      }
+    },
+    "hooks.install.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : { "state" : "translated", "value" : "Install Claude Code hooks?" }
+        }
+      }
+    },
+    "hooks.install.view_changes" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : { "state" : "translated", "value" : "View changes…" }
+        }
+      }
+    },
+    "hooks.preview.after" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : { "state" : "translated", "value" : "After" }
+        }
+      }
+    },
+    "hooks.preview.before" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : { "state" : "translated", "value" : "Before" }
+        }
+      }
+    },
+    "hooks.preview.close" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : { "state" : "translated", "value" : "Done" }
+        }
+      }
+    },
+    "hooks.preview.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : { "state" : "translated", "value" : "Changes to ~/.claude/settings.json" }
         }
       }
     },
