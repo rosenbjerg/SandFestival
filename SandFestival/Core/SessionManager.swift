@@ -31,6 +31,7 @@ final class SessionManager {
     // MARK: - Adapter binding
 
     func attach(adapter: any AgentAdapter) async throws {
+        guard self.adapter == nil else { return }
         self.adapter = adapter
         let router = AgentEventRouter(manager: self)
         self.router = router

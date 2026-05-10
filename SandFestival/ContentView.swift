@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var manager = SessionManager()
+    @Bindable var manager: SessionManager
     @State private var editorTarget: ProjectEditorTarget?
 
     var body: some View {
@@ -31,5 +31,5 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView()
+    ContentView(manager: SessionManager())
 }
