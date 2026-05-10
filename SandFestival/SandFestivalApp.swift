@@ -14,6 +14,28 @@ struct SandFestivalApp: App {
                     await attachAdapterIfNeeded()
                 }
         }
+
+        MenuBarExtra {
+            MenuBarContentView(manager: manager)
+        } label: {
+            menuBarLabel
+        }
+        .menuBarExtraStyle(.menu)
+    }
+
+    @ViewBuilder
+    private var menuBarLabel: some View {
+        let attentionCount = manager.projects
+            .compactMap { manager.session(for: $0.id) }
+            .filter(\.state.needsAttention)
+            .count
+
+        if attentionCount == 0 {
+            Image(systemName: "tray")
+        } else {
+            // Title + icon — SwiftUI renders both in the menu bar item.
+            Label("\(attentionCount)", systemImage: "tray.full.fill")
+        }
     }
 
     private func attachAdapterIfNeeded() async {
@@ -21,8 +43,7 @@ struct SandFestivalApp: App {
         do {
             try await manager.attach(adapter: claudeCodeAdapter)
         } catch {
-            // Adapter logs the failure via `startupError`. The app remains
-            // usable; sessions just won't get state updates from hooks.
+            // Adapter logs the failure via `startupError`. App remains usable.
         }
     }
 }
