@@ -1,36 +1,32 @@
 import SwiftUI
 
 struct ContentView: View {
-    var body: some View {
-        TerminalPaneView(
-            executable: SpikeConfig.executable,
-            args: SpikeConfig.args,
-            workingDirectory: SpikeConfig.workingDirectory,
-            environmentOverrides: SpikeConfig.environmentOverrides
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
+    @State private var manager = SessionManager()
+    @State private var editorTarget: ProjectEditorTarget?
 
-private enum SpikeConfig {
-    static let executable = "/opt/homebrew/bin/nono"
-    static let args = [
-        "run",
-        "--allow-cwd",
-        "--profile", "xcode",
-        "--allow-launch-services",
-        "--",
-        "claude",
-        "--enable-auto-mode",
-    ]
-    static var workingDirectory: URL {
-        URL(fileURLWithPath: "/Users/malterosenbjerg/Documents/GitHub/SandFestival")
-    }
-    static var environmentOverrides: [String: String] {
-        let home = NSHomeDirectory()
-        return [
-            "PATH": "\(home)/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-        ]
+    var body: some View {
+        NavigationSplitView {
+            SidebarView(manager: manager, editorTarget: $editorTarget)
+        } detail: {
+            DetailPaneView(manager: manager, editorTarget: $editorTarget)
+        }
+        .sheet(item: $editorTarget) { target in
+            ProjectEditorView(
+                target: target,
+                onSave: { project in
+                    switch target {
+                    case .add:
+                        manager.addProject(project)
+                    case .edit:
+                        manager.updateProject(project)
+                    }
+                    editorTarget = nil
+                },
+                onCancel: {
+                    editorTarget = nil
+                }
+            )
+        }
     }
 }
 
