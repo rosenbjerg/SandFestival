@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct ContentView: View {
@@ -15,6 +16,12 @@ struct ContentView: View {
             } detail: {
                 DetailPaneView(manager: manager, editorTarget: $editorTarget)
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            manager.focusSelectedTerminal()
+        }
+        .onChange(of: manager.selectedProjectID) { _, _ in
+            manager.focusSelectedTerminal()
         }
         .sheet(item: $editorTarget) { target in
             ProjectEditorView(

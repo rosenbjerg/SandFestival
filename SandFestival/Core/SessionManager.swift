@@ -106,6 +106,17 @@ final class SessionManager {
         return sessions[id]
     }
 
+    /// Makes the selected session's terminal the window's first responder so
+    /// keystrokes land in the PTY immediately. Scheduled on the next runloop
+    /// tick because callers (app-activation, selection-change) fire before
+    /// the window has finished settling its responder chain.
+    func focusSelectedTerminal() {
+        guard let session = selectedSession() else { return }
+        DispatchQueue.main.async {
+            session.terminalView.window?.makeFirstResponder(session.terminalView)
+        }
+    }
+
     func startSession(id: Project.ID) {
         sessions[id]?.start()
     }
