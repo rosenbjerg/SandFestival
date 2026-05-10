@@ -10,22 +10,18 @@ final class ClaudeCodeAdapter: AgentAdapter {
     let defaultCommand = Project.defaultCommand
     let defaultArgs = Project.defaultArgs
 
-    /// `true` once the listener is bound and we've confirmed hooks aren't
-    /// installed yet. The UI watches this to show the first-run sheet.
     private(set) var needsInstallation = false
-
-    /// Populated when hook install/uninstall fails — UI can surface it.
     private(set) var lastInstallError: String?
-
-    /// Populated when adapter startup itself fails (listener bind, keychain).
     private(set) var startupError: String?
 
     @ObservationIgnored private let tokenStore: KeychainTokenStore
     @ObservationIgnored private let portStore: PortStore
     @ObservationIgnored private let settingsManager: SettingsJSONManager
+    @ObservationIgnored private let bindings = SessionBindingStore()
     @ObservationIgnored private var token: String?
     @ObservationIgnored private var port: UInt16?
     @ObservationIgnored private var listener: HookListener?
+    @ObservationIgnored private weak var eventSink: AgentEventSink?
 
     init(
         tokenStore: KeychainTokenStore = KeychainTokenStore(),
@@ -40,13 +36,17 @@ final class ClaudeCodeAdapter: AgentAdapter {
     // MARK: - AgentAdapter
 
     func start(eventSink: AgentEventSink) async throws {
+        self.eventSink = eventSink
         do {
             let token = try tokenStore.loadOrCreate()
             self.token = token
 
             let preferredPort = portStore.load() ?? 51789
-            let listener = HookListener(token: token) { _ in
-                // Body translation lands in Task 8.
+            let listener = HookListener(token: token) { [weak self] body in
+                guard let self else { return }
+                Task { @MainActor in
+                    self.handleHookBody(body)
+                }
             }
             let boundPort = try await listener.start(preferredPort: preferredPort)
             self.listener = listener
@@ -66,19 +66,21 @@ final class ClaudeCodeAdapter: AgentAdapter {
     }
 
     func prepareSpawn(project: Project) -> SpawnEnvironment {
+        bindings.registerPendingSpawn(projectID: project.id, cwd: project.path)
         guard let token else { return .empty }
         return SpawnEnvironment(additions: ["SAND_FESTIVAL_TOKEN": token])
     }
 
     func didSpawnSession(_ session: SessionHandle) {
-        // session_id binding lands in Task 8.
+        // The pending-spawn binding was already registered in prepareSpawn.
+        // Nothing further to do here until the first SessionStart hook arrives.
     }
 
     func willTerminateSession(_ session: SessionHandle) {
-        // session_id cleanup lands in Task 8.
+        bindings.unbindAll(projectID: session.projectID)
     }
 
-    // MARK: - Hook installation API (used by the first-run sheet)
+    // MARK: - Hook installation (used by the first-run sheet)
 
     func installHooks() {
         guard let port else { return }
@@ -111,6 +113,27 @@ final class ClaudeCodeAdapter: AgentAdapter {
         }
     }
 
+    // MARK: - Hook body handling
+
+    private func handleHookBody(_ body: Data) {
+        guard let payload = HookPayloadDecoder.decode(body) else { return }
+
+        let projectID: UUID?
+        if payload.hookEventName == HookEvent.sessionStart.rawValue {
+            projectID = bindings.bindOnSessionStart(sessionID: payload.sessionID, cwd: payload.cwd)
+            ?? bindings.projectID(forSession: payload.sessionID)
+        } else {
+            projectID = bindings.projectID(forSession: payload.sessionID)
+        }
+
+        guard let projectID, let event = HookPayloadTranslator.translate(payload) else { return }
+        eventSink?.report(matching: .projectID(projectID), event: event)
+
+        if payload.hookEventName == HookEvent.sessionEnd.rawValue {
+            bindings.unbind(sessionID: payload.sessionID)
+        }
+    }
+
     // MARK: - Internal
 
     private func refreshNeedsInstallation() {
@@ -121,8 +144,6 @@ final class ClaudeCodeAdapter: AgentAdapter {
         do {
             needsInstallation = try !settingsManager.isInstalled(port: port)
         } catch {
-            // Malformed settings.json: don't try to merge — surface the error
-            // and leave hooks alone so we don't damage user state.
             needsInstallation = false
             lastInstallError = describe(error)
         }
