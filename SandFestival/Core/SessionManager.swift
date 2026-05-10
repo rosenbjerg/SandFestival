@@ -22,7 +22,7 @@ final class SessionManager {
             projects = []
         }
         for project in projects {
-            sessions[project.id] = Session(project: project)
+            sessions[project.id] = makeSession(for: project)
         }
         if let first = projects.first {
             selectedProjectID = first.id
@@ -50,7 +50,7 @@ final class SessionManager {
 
     func addProject(_ project: Project) {
         projects.append(project)
-        sessions[project.id] = Session(project: project)
+        sessions[project.id] = makeSession(for: project)
         selectedProjectID = project.id
         persist()
         if project.autoStart {
@@ -92,10 +92,7 @@ final class SessionManager {
     }
 
     func startSession(id: Project.ID) {
-        guard let session = sessions[id] else { return }
-        let extraEnv = adapter?.prepareSpawn(project: session.project).additions ?? [:]
-        session.start(extraEnvironment: extraEnv)
-        adapter?.didSpawnSession(handle(for: session.project))
+        sessions[id]?.start()
     }
 
     func stopSession(id: Project.ID) {
@@ -110,12 +107,6 @@ final class SessionManager {
             adapter?.willTerminateSession(handle(for: project))
         }
         session.restart()
-        if !session.state.isRunning {
-            // restart is asynchronous when the session is currently running:
-            // we'll need to register the new spawn after it completes. For
-            // now, didSpawnSession is only emitted on the synchronous path.
-            adapter?.didSpawnSession(handle(for: project))
-        }
     }
 
     // MARK: - Matcher resolution
@@ -138,6 +129,18 @@ final class SessionManager {
         for project in projects where project.autoStart {
             startSession(id: project.id)
         }
+    }
+
+    private func makeSession(for project: Project) -> Session {
+        let session = Session(project: project)
+        session.spawnEnvProvider = { [weak self] project in
+            self?.adapter?.prepareSpawn(project: project).additions ?? [:]
+        }
+        session.onDidSpawn = { [weak self] project in
+            guard let self else { return }
+            self.adapter?.didSpawnSession(self.handle(for: project))
+        }
+        return session
     }
 
     private func handle(for project: Project) -> SessionHandle {

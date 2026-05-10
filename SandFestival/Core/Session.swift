@@ -15,6 +15,14 @@ final class Session: Identifiable {
     @ObservationIgnored private let processBridge: ProcessBridge
     @ObservationIgnored private var lastSameStateBumpAt: Date?
 
+    /// Returns env additions to merge into the spawn env. Wired by
+    /// SessionManager so every start() — toolbar, overlay, auto-restart —
+    /// picks up the current adapter's prepareSpawn output.
+    @ObservationIgnored var spawnEnvProvider: ((Project) -> [String: String])?
+
+    /// Called after a successful spawn so adapters can register a handle.
+    @ObservationIgnored var onDidSpawn: ((Project) -> Void)?
+
     /// Sub-second debounce for same-state activity bumps (e.g. heartbeat
     /// floods while in working state) so the sidebar doesn't re-render
     /// dozens of times per second.
@@ -38,7 +46,7 @@ final class Session: Identifiable {
 
     // MARK: - Lifecycle
 
-    func start(extraEnvironment: [String: String] = [:]) {
+    func start() {
         guard !state.isRunning else { return }
         guard let executable = CommandResolver.resolve(project.command) else {
             let reason = String(localized: "session.error.command_not_found")
@@ -47,6 +55,7 @@ final class Session: Identifiable {
             bumpActivity()
             return
         }
+        let extraEnvironment = spawnEnvProvider?(project) ?? [:]
         lastError = nil
         state = .starting
         bumpActivity()
@@ -62,6 +71,7 @@ final class Session: Identifiable {
         // the state machine treats it as a no-op.
         state = .idle
         bumpActivity()
+        onDidSpawn?(project)
     }
 
     func stop() {
