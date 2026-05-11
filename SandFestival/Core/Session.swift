@@ -21,7 +21,7 @@ final class Session: Identifiable {
     /// on start/stop so a stale title never outlives the process.
     private(set) var terminalTitle: String?
 
-    @ObservationIgnored let terminalView: LocalProcessTerminalView
+    @ObservationIgnored let terminalView: SessionTerminalView
     @ObservationIgnored private let processBridge: ProcessBridge
 
     /// Returns env additions to merge into the spawn env. Wired by
@@ -42,7 +42,7 @@ final class Session: Identifiable {
 
     init(project: Project) {
         self.project = project
-        let view = LocalProcessTerminalView(frame: .zero)
+        let view = SessionTerminalView(frame: .zero)
         self.terminalView = view
         let bridge = ProcessBridge()
         self.processBridge = bridge
@@ -56,6 +56,9 @@ final class Session: Identifiable {
             Task { @MainActor in
                 self?.updateTerminalTitle(title)
             }
+        }
+        view.onUserSent = { [weak self] in
+            self?.handleUserKeystroke()
         }
     }
 
@@ -126,6 +129,16 @@ final class Session: Identifiable {
 
     func updateMetadata(_ newMetadata: AgentMetadata) {
         metadata = newMetadata
+    }
+
+    /// Called when the user types into this session's terminal. Used as a
+    /// fallback for `waitingForIdle` because Claude Code doesn't fire any
+    /// hook when the user dismisses an interactive prompt (e.g. cancelling
+    /// `AskUserQuestion` with Ctrl+C). Other waiting states have their own
+    /// resolution paths and aren't affected.
+    func handleUserKeystroke() {
+        guard state == .waitingForIdle else { return }
+        transition(to: .idle)
     }
 
     private func handleProcessTerminated(exitCode: Int32?) {
