@@ -27,6 +27,12 @@ final class Session: Identifiable {
     /// Called after a successful spawn so adapters can register a handle.
     @ObservationIgnored var onDidSpawn: ((Project) -> Void)?
 
+    /// Fires when the session moves from one state to another. Same-state
+    /// "transitions" don't fire — heartbeats stay quiet. Wired by SessionManager
+    /// so cross-session coordinators (attention notifier, etc.) can react
+    /// without each owning a separate observation tracker.
+    @ObservationIgnored var onStateChanged: ((SessionState, SessionState) -> Void)?
+
     var id: Project.ID { project.id }
 
     init(project: Project) {
@@ -116,8 +122,11 @@ final class Session: Identifiable {
     // MARK: - Helpers
 
     private func transition(to next: SessionState) {
+        guard next != state else { return }
+        let previous = state
         state = next
         enteredCurrentStateAt = Date()
+        onStateChanged?(previous, next)
     }
 
     private func composedEnvironment(extra: [String: String]) -> [String] {

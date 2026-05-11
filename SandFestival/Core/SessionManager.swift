@@ -21,6 +21,13 @@ final class SessionManager {
     @ObservationIgnored private(set) var adapter: (any AgentAdapter)?
     @ObservationIgnored private var router: AgentEventRouter?
 
+    /// Forwards every real session state transition (`from`, `to`) to a
+    /// single subscriber — owned by the App layer and used by
+    /// `AttentionNotifier` to drive dock badge / bounce / notifications.
+    /// Single observer is fine: only one component cares cross-session today,
+    /// and a one-to-one closure beats a publisher for this scope.
+    @ObservationIgnored var sessionStateObserver: ((Session, SessionState, SessionState) -> Void)?
+
     init(store: ProjectStore? = nil) {
         let resolvedStore = store ?? ProjectStore()
         self.store = resolvedStore
@@ -173,6 +180,10 @@ final class SessionManager {
         session.onDidSpawn = { [weak self] project in
             guard let self else { return }
             self.adapter?.didSpawnSession(self.handle(for: project))
+        }
+        session.onStateChanged = { [weak self, weak session] old, new in
+            guard let self, let session else { return }
+            self.sessionStateObserver?(session, old, new)
         }
         return session
     }
