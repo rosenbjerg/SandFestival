@@ -85,15 +85,19 @@ if [[ "${SKIP_NOTARIZE:-0}" != "1" ]]; then
   NOTARY_EXIT=$?
   set -e
 
-  cat "${BUILD_DIR}/notary.plist"
+  if [[ -s "${BUILD_DIR}/notary.plist" ]]; then
+    cat "${BUILD_DIR}/notary.plist"
+  fi
   if [[ ${NOTARY_EXIT} -ne 0 ]]; then
-    echo "==> Notarization failed; fetching log"
     SUBMISSION_ID=$(/usr/libexec/PlistBuddy -c "Print :id" "${BUILD_DIR}/notary.plist" 2>/dev/null || true)
-    if [[ -n "${SUBMISSION_ID}" ]]; then
+    if [[ "${SUBMISSION_ID}" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+      echo "==> Notarization failed; fetching log for ${SUBMISSION_ID}"
       xcrun notarytool log "${SUBMISSION_ID}" \
         --key "${NOTARY_KEY_PATH}" \
         --key-id "${NOTARY_KEY_ID}" \
-        --issuer "${NOTARY_ISSUER_ID}"
+        --issuer "${NOTARY_ISSUER_ID}" || true
+    else
+      echo "==> Notarization failed before a submission ID was issued (likely an auth problem — check NOTARY_KEY_PATH / NOTARY_KEY_ID / NOTARY_ISSUER_ID)" >&2
     fi
     exit ${NOTARY_EXIT}
   fi
