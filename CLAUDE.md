@@ -11,6 +11,13 @@ emerged in code.
 - `~/.claude/scripts/check-localizations.ts` — run after touching any user-facing string
 - App Sandbox is intentionally **off** (the target spawns nono/claude from PATH, binds 127.0.0.1:51789, edits ~/.claude/settings.json). Don't re-enable.
 
+## Release
+
+- Distribution is **Developer ID + notarization, direct download via Homebrew cask** — not the Mac App Store. The sandbox-off architecture rules out MAS.
+- `scripts/release.sh` runs the full pipeline: archive → exportArchive (Developer ID) → codesign verify → `notarytool submit --wait` → staple → DMG → sha256. See `scripts/README.md` for env-var setup (`NOTARY_KEY_ID`, `NOTARY_ISSUER_ID`, `NOTARY_KEY_PATH`).
+- Version source of truth is `MARKETING_VERSION` in pbxproj (six occurrences, all kept in sync). The release script reads it directly.
+- `build/` is the artifact directory and is gitignored.
+
 ## Layout
 
 - `SandFestival/Core/` — agent-neutral: `Project`, `Session`, `SessionManager`, `SessionStateMachine`, `AgentAdapter` protocol
