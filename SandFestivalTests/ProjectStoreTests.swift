@@ -69,8 +69,8 @@ struct ProjectStoreTests {
         #expect(project.command == "nono")
         #expect(project.args == [
             "run",
-            "--allow-cwd",
             "--profile", "claude-code",
+            "--allow-cwd",
             "--allow-launch-services",
             "--",
             "claude",

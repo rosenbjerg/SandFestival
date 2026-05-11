@@ -49,6 +49,9 @@ struct ProjectEditorView: View {
 
                 Section(String(localized: "editor.section.command")) {
                     TextField(String(localized: "editor.field.command"), text: $draft.command)
+                    if draft.isNonoCommand {
+                        profilePicker
+                    }
                     argsEditor
                 }
 
@@ -78,6 +81,17 @@ struct ProjectEditorView: View {
         }
         .frame(minWidth: 540, minHeight: 480)
         .navigationTitle(target.title)
+    }
+
+    @ViewBuilder
+    private var profilePicker: some View {
+        Picker(String(localized: "editor.field.nono_profile"), selection: $draft.nonoProfile) {
+            Text(String(localized: "editor.field.nono_profile.none"))
+                .tag(String?.none)
+            ForEach(draft.profileChoices, id: \.self) { profile in
+                Text(profile).tag(String?.some(profile))
+            }
+        }
     }
 
     @ViewBuilder
@@ -158,16 +172,24 @@ private struct ProjectDraft {
     var agentArgsText: String
     var envEntries: [EnvEntry]
     var autoStart: Bool
+    /// nil means "no --profile flag". Only meaningful when the command is nono.
+    var nonoProfile: String?
+    /// Discovered profiles plus the current selection, so a value not in
+    /// the discovered list still renders rather than silently resetting.
+    private let discoveredProfiles: [String]
 
     init() {
         self.name = ""
         self.pathString = ""
         self.command = Project.defaultCommand
         let split = ArgsSplitter.split(Project.defaultArgs)
-        self.wrapperArgsText = split.wrapper.joined(separator: "\n")
+        let extracted = NonoProfileArgs.extract(from: split.wrapper)
+        self.wrapperArgsText = extracted.rest.joined(separator: "\n")
         self.agentArgsText = split.agent.joined(separator: "\n")
         self.envEntries = []
         self.autoStart = false
+        self.nonoProfile = extracted.profile
+        self.discoveredProfiles = NonoProfileDiscovery.availableProfiles()
     }
 
     init(project: Project) {
@@ -175,12 +197,32 @@ private struct ProjectDraft {
         self.pathString = project.path.path
         self.command = project.command
         let split = ArgsSplitter.split(project.args)
-        self.wrapperArgsText = split.wrapper.joined(separator: "\n")
+        let extracted = NonoProfileArgs.extract(from: split.wrapper)
+        self.wrapperArgsText = extracted.rest.joined(separator: "\n")
         self.agentArgsText = split.agent.joined(separator: "\n")
         self.envEntries = project.env
             .sorted(by: { $0.key < $1.key })
             .map { EnvEntry(key: $0.key, value: $0.value) }
         self.autoStart = project.autoStart
+        self.nonoProfile = extracted.profile
+        self.discoveredProfiles = NonoProfileDiscovery.availableProfiles()
+    }
+
+    var isNonoCommand: Bool {
+        let trimmed = command.trimmingCharacters(in: .whitespaces)
+        return trimmed == "nono" || trimmed.hasSuffix("/nono")
+    }
+
+    var profileChoices: [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+        for profile in discoveredProfiles where seen.insert(profile).inserted {
+            result.append(profile)
+        }
+        if let current = nonoProfile, !current.isEmpty, seen.insert(current).inserted {
+            result.append(current)
+        }
+        return result
     }
 
     var isValid: Bool {
@@ -196,7 +238,10 @@ private struct ProjectDraft {
     }
 
     func materialize(originalID: UUID?) -> Project {
-        let wrapper = ProjectDraft.tokens(wrapperArgsText)
+        let baseWrapper = ProjectDraft.tokens(wrapperArgsText)
+        let wrapper = isNonoCommand
+            ? NonoProfileArgs.inject(profile: nonoProfile, into: baseWrapper)
+            : baseWrapper
         let agent = ProjectDraft.tokens(agentArgsText)
         let args = ArgsSplitter.join(wrapper: wrapper, agent: agent)
         var env: [String: String] = [:]

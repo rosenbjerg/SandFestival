@@ -368,6 +368,28 @@
         }
       }
     },
+    "editor.field.nono_profile": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sandbox profile"
+          }
+        }
+      }
+    },
+    "editor.field.nono_profile.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "None"
+          }
+        }
+      }
+    },
     "editor.field.path": {
       "extractionState": "manual",
       "localizations": {

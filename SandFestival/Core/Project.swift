@@ -38,8 +38,8 @@ extension Project {
     static let defaultCommand = "nono"
     static let defaultArgs: [String] = [
         "run",
-        "--allow-cwd",
         "--profile", "claude-code",
+        "--allow-cwd",
         "--allow-launch-services",
         "--",
         "claude",
