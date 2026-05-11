@@ -72,11 +72,10 @@ brew uninstall --zap --cask sandfestival      # also removes projects, prefs, ca
 
 ## How it works
 
-Architecture details live in [SPEC.md](SPEC.md). In short: an agent-neutral
-`Core` (session manager, state machine, project store) plus a `ClaudeCode`
-adapter that owns the hook listener and the merge of hook entries into
-`~/.claude/settings.json`. Adding another agent would mean writing a sibling
-adapter, not touching `Core`.
+An agent-neutral `Core` (session manager, state machine, project store) plus
+a `ClaudeCode` adapter that owns the hook listener and the merge of hook
+entries into `~/.claude/settings.json`. Adding another agent would mean
+writing a sibling adapter, not touching `Core`.
 
 ## Building from source
 

@@ -49,7 +49,7 @@ struct NonoProfileArgsTests {
         #expect(NonoProfileArgs.inject(profile: "", into: wrapper) == wrapper)
     }
 
-    @Test("extract then inject round-trips the SPEC default wrapper")
+    @Test("extract then inject round-trips the default wrapper")
     func roundTripsDefaultArgs() {
         let split = ArgsSplitter.split(Project.defaultArgs)
         let (profile, rest) = NonoProfileArgs.extract(from: split.wrapper)

@@ -1,8 +1,8 @@
 import Foundation
 
-/// Pure state machine: maps `(currentState, event) → nextState` per the SPEC
-/// transition table. Lives separately from `Session` so it can be tested
-/// without spinning up a process.
+/// Pure state machine: maps `(currentState, event) → nextState`. Lives
+/// separately from `Session` so it can be tested without spinning up a
+/// process.
 enum SessionStateMachine {
     static func next(from current: SessionState, event: AgentEvent) -> SessionState {
         // .stopped is a terminal sink from any state.

@@ -1,8 +1,7 @@
 # Sand Festival
 
-macOS dashboard hosting long-running Claude Code sessions. **SPEC.md** is the
-authoritative architecture doc; this file captures conventions that have
-emerged in code.
+macOS dashboard hosting long-running Claude Code sessions. This file captures
+conventions that have emerged in code.
 
 ## Build & test
 

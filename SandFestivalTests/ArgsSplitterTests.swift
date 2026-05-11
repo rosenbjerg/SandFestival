@@ -44,7 +44,7 @@ struct ArgsSplitterTests {
         #expect(joined == ["nono", "run", "--", "claude"])
     }
 
-    @Test("split + join round-trips the SPEC default args")
+    @Test("split + join round-trips the default args")
     func roundTripsDefaultArgs() {
         let split = ArgsSplitter.split(Project.defaultArgs)
         let rejoined = ArgsSplitter.join(wrapper: split.wrapper, agent: split.agent)
