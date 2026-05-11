@@ -70,7 +70,7 @@ struct ProjectStoreTests {
         #expect(project.args == [
             "run",
             "--allow-cwd",
-            "--profile", "xcode",
+            "--profile", "claude-code",
             "--allow-launch-services",
             "--",
             "claude",

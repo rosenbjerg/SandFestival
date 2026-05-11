@@ -38,7 +38,7 @@ The long form auto-taps the formula repo — no separate `brew tap` step needed.
 By default each project spawns:
 
 ```sh
-nono run --allow-cwd --profile xcode --allow-launch-services -- claude --enable-auto-mode
+nono run --allow-cwd --profile claude-code --allow-launch-services -- claude --enable-auto-mode
 ```
 
 You can change the `command` and `args` per project in the project settings,

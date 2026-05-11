@@ -39,7 +39,7 @@ extension Project {
     static let defaultArgs: [String] = [
         "run",
         "--allow-cwd",
-        "--profile", "xcode",
+        "--profile", "claude-code",
         "--allow-launch-services",
         "--",
         "claude",

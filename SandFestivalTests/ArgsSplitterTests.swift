@@ -27,8 +27,8 @@ struct ArgsSplitterTests {
 
     @Test("flags starting with `--` are NOT treated as separators")
     func doubleDashFlagsArentSeparators() {
-        let (wrapper, agent) = ArgsSplitter.split(["--profile", "xcode", "--allow-cwd"])
-        #expect(wrapper == ["--profile", "xcode", "--allow-cwd"])
+        let (wrapper, agent) = ArgsSplitter.split(["--profile", "claude-code", "--allow-cwd"])
+        #expect(wrapper == ["--profile", "claude-code", "--allow-cwd"])
         #expect(agent.isEmpty)
     }
 
