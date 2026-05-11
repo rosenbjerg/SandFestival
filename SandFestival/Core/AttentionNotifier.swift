@@ -135,11 +135,7 @@ final class AttentionNotifier: NSObject {
     }
 
     private func attentionCount() -> Int {
-        guard let manager else { return 0 }
-        return manager.projects
-            .compactMap { manager.session(for: $0.id) }
-            .filter(\.state.needsAttention)
-            .count
+        manager?.attentionSessions.count ?? 0
     }
 
     private func isInFocusMode() -> Bool {
@@ -196,10 +192,7 @@ final class AttentionNotifier: NSObject {
     }
 
     private func focusProject(id: UUID) {
-        guard let manager else { return }
-        manager.selectedProjectID = id
-        NSApp.activate(ignoringOtherApps: true)
-        NSApp.windows.first?.makeKeyAndOrderFront(nil)
+        manager?.focus(projectID: id)
     }
 }
 

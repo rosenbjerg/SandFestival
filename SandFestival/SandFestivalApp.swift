@@ -69,10 +69,7 @@ struct SandFestivalApp: App {
 
     @ViewBuilder
     private var menuBarLabel: some View {
-        let attentionCount = manager.projects
-            .compactMap { manager.session(for: $0.id) }
-            .filter(\.state.needsAttention)
-            .count
+        let attentionCount = manager.attentionSessions.count
 
         if attentionCount == 0 {
             Image(systemName: "tray")

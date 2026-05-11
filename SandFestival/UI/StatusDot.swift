@@ -9,7 +9,7 @@ struct StatusDot: View {
             .foregroundStyle(strokeOrFill)
             .symbolEffect(.pulse, options: .repeating, isActive: state.needsAttention)
             .frame(width: 12, height: 12)
-            .accessibilityLabel(state.accessibilityLabel)
+            .accessibilityLabel(state.displayLabel)
     }
 
     private var symbolName: String {
@@ -18,20 +18,5 @@ struct StatusDot: View {
 
     private var strokeOrFill: Color {
         state == .stopped ? Color.secondary : state.indicatorColor
-    }
-}
-
-private extension SessionState {
-    var accessibilityLabel: String {
-        switch self {
-        case .starting: return String(localized: "status.starting")
-        case .idle: return String(localized: "status.idle")
-        case .working: return String(localized: "status.working")
-        case .waitingForPermission: return String(localized: "status.waiting_permission")
-        case .waitingForIdle: return String(localized: "status.waiting_idle")
-        case .blockedByAutoMode: return String(localized: "status.blocked_auto_mode")
-        case .errored: return String(localized: "status.errored")
-        case .stopped: return String(localized: "status.stopped")
-        }
     }
 }
