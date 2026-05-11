@@ -28,6 +28,15 @@ final class SessionManager {
     /// and a one-to-one closure beats a publisher for this scope.
     @ObservationIgnored var sessionStateObserver: ((Session, SessionState, SessionState) -> Void)?
 
+    /// Gates the "auto-surface to row 0 on Claude-driven activity" behavior.
+    /// App layer wires this to AttentionPreferences so Core stays free of the
+    /// preference type. Defaults to off — bare `SessionManager()` (and tests)
+    /// see the previous behavior unless they opt in.
+    @ObservationIgnored var shouldSurfaceOnActivity: () -> Bool = { false }
+
+    @ObservationIgnored private var persistDebounceTask: Task<Void, Never>?
+    @ObservationIgnored var persistDebounceDelay: Duration = .seconds(1)
+
     init(store: ProjectStore? = nil) {
         let resolvedStore = store ?? ProjectStore()
         self.store = resolvedStore
@@ -216,9 +225,44 @@ final class SessionManager {
         }
         session.onStateChanged = { [weak self, weak session] old, new in
             guard let self, let session else { return }
+            self.surfaceIfActivityTrigger(projectID: session.id, to: new)
             self.sessionStateObserver?(session, old, new)
         }
         return session
+    }
+
+    /// Lifts `projectID` to row 0 when Claude reports activity worth surfacing,
+    /// gated on the user's preference. State equality is already guaranteed by
+    /// `Session.transition` (which is the only caller of `onStateChanged`), so
+    /// "burst" duplicates from same-state events can't reach here. The in-memory
+    /// move is immediate; the disk write is debounced so a flurry of transitions
+    /// coalesces into one `projects.json` write.
+    private func surfaceIfActivityTrigger(projectID: Project.ID, to state: SessionState) {
+        guard shouldSurfaceOnActivity() else { return }
+        guard SessionManager.isActivitySurfaceTrigger(state) else { return }
+        guard let index = projects.firstIndex(where: { $0.id == projectID }), index != 0 else { return }
+        let project = projects.remove(at: index)
+        projects.insert(project, at: 0)
+        schedulePersist()
+    }
+
+    static func isActivitySurfaceTrigger(_ state: SessionState) -> Bool {
+        switch state {
+        case .working, .waitingForPermission, .waitingForIdle, .errored:
+            return true
+        case .starting, .idle, .blockedByAutoMode, .stopped:
+            return false
+        }
+    }
+
+    private func schedulePersist() {
+        persistDebounceTask?.cancel()
+        let delay = persistDebounceDelay
+        persistDebounceTask = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled, let self else { return }
+            self.persist()
+        }
     }
 
     // MARK: - Terminal font size
@@ -257,6 +301,8 @@ final class SessionManager {
     }
 
     private func persist() {
+        persistDebounceTask?.cancel()
+        persistDebounceTask = nil
         do {
             try store.save(projects)
             lastPersistError = nil

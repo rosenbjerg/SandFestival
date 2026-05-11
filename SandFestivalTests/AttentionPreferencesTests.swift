@@ -6,13 +6,14 @@ import Testing
 @Suite("AttentionPreferences")
 struct AttentionPreferencesTests {
 
-    @Test("Defaults: informational bounce, notifications off, unfocused-only trigger")
+    @Test("Defaults: informational bounce, notifications off, unfocused-only trigger, auto-surface off")
     func freshInstanceMatchesRegisteredDefaults() {
         let defaults = makeDefaults()
         let prefs = AttentionPreferences(defaults: defaults)
         #expect(prefs.dockBounceStyle == .informational)
         #expect(prefs.notificationsEnabled == false)
         #expect(prefs.notificationTrigger == .unfocusedOnly)
+        #expect(prefs.autoSurfaceActiveProject == false)
     }
 
     @Test("Mutations persist to the same UserDefaults suite")
@@ -23,11 +24,13 @@ struct AttentionPreferencesTests {
         first.dockBounceStyle = .critical
         first.notificationsEnabled = true
         first.notificationTrigger = .always
+        first.autoSurfaceActiveProject = true
 
         let second = AttentionPreferences(defaults: defaults)
         #expect(second.dockBounceStyle == .critical)
         #expect(second.notificationsEnabled == true)
         #expect(second.notificationTrigger == .always)
+        #expect(second.autoSurfaceActiveProject == true)
     }
 
     @Test("Unrecognised stored raw values fall back to safe defaults")

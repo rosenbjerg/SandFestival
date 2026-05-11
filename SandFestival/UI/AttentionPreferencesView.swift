@@ -63,6 +63,18 @@ struct AttentionPreferencesView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+
+            Section(String(localized: "preferences.section.sidebar")) {
+                Toggle(
+                    String(localized: "preferences.sidebar.auto_surface_active"),
+                    isOn: $preferences.autoSurfaceActiveProject
+                )
+
+                Text(String(localized: "preferences.sidebar.auto_surface_active.description"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .formStyle(.grouped)
         .frame(width: 480)

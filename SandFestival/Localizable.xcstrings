@@ -1059,6 +1059,36 @@
           }
         }
       }
+    },
+    "preferences.section.sidebar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sidebar"
+          }
+        }
+      }
+    },
+    "preferences.sidebar.auto_surface_active": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move active project to the top"
+          }
+        }
+      }
+    },
+    "preferences.sidebar.auto_surface_active.description": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When Claude reports work, prompts, or errors in a project, that project jumps to the top of the sidebar."
+          }
+        }
+      }
     }
   },
   "version": "1.1"

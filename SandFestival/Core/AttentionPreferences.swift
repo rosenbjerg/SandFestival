@@ -29,6 +29,13 @@ final class AttentionPreferences {
         }
     }
 
+    var autoSurfaceActiveProject: Bool {
+        didSet {
+            guard autoSurfaceActiveProject != oldValue else { return }
+            defaults.set(autoSurfaceActiveProject, forKey: Keys.autoSurfaceActiveProject)
+        }
+    }
+
     @ObservationIgnored private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
@@ -37,6 +44,7 @@ final class AttentionPreferences {
             Keys.dockBounceStyle: DockBounceStyle.informational.rawValue,
             Keys.notificationsEnabled: false,
             Keys.notificationTrigger: NotificationTrigger.unfocusedOnly.rawValue,
+            Keys.autoSurfaceActiveProject: false,
         ])
         self.dockBounceStyle =
             DockBounceStyle(rawValue: defaults.string(forKey: Keys.dockBounceStyle) ?? "")
@@ -45,12 +53,14 @@ final class AttentionPreferences {
         self.notificationTrigger =
             NotificationTrigger(rawValue: defaults.string(forKey: Keys.notificationTrigger) ?? "")
             ?? .unfocusedOnly
+        self.autoSurfaceActiveProject = defaults.bool(forKey: Keys.autoSurfaceActiveProject)
     }
 
     private enum Keys {
         static let dockBounceStyle = "attention.dockBounceStyle"
         static let notificationsEnabled = "attention.notificationsEnabled"
         static let notificationTrigger = "attention.notificationTrigger"
+        static let autoSurfaceActiveProject = "attention.autoSurfaceActiveProject"
     }
 }
 

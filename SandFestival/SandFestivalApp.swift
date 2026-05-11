@@ -24,6 +24,9 @@ struct SandFestivalApp: App {
                             manager: manager
                         )
                     }
+                    manager.shouldSurfaceOnActivity = { [attentionPreferences] in
+                        attentionPreferences.autoSurfaceActiveProject
+                    }
                     await attachAdapterIfNeeded()
                 }
         }
