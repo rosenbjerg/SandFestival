@@ -7,4 +7,4 @@ xcuserdata/
 # macOS
 .DS_Store
 
-./release.sh
+release.sh
