@@ -19,11 +19,16 @@ protocol AgentAdapter: AnyObject {
     func stop() async
 
     /// Called immediately before a session is spawned. The adapter returns
-    /// any environment additions it wants merged onto the spawn env.
+    /// any environment additions it wants merged onto the spawn env, and may
+    /// also register pre-spawn routing state — the Claude Code adapter binds
+    /// `(projectID, cwd)` here so the SessionStart hook can resolve to a
+    /// project even if it fires before `didSpawnSession` runs.
     func prepareSpawn(project: Project) -> SpawnEnvironment
 
-    /// Called once a session has been spawned, so the adapter can register
-    /// the handle for routing future events.
+    /// Called once a session has been spawned. Adapters that need post-spawn
+    /// state (e.g. starting a timer once the process is alive) can hook in
+    /// here; routing setup that must survive the very first hook fire
+    /// belongs in `prepareSpawn` instead.
     func didSpawnSession(_ session: SessionHandle)
 
     /// Called immediately before a session terminates so the adapter can

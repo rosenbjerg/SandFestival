@@ -30,10 +30,9 @@ final class HookListener: @unchecked Sendable {
     /// Binds the listener to `HookListener.port`. Throws `.bindFailed` if the
     /// port is already in use.
     func start() async throws {
-        guard let bound = await tryStart(port: HookListener.port) else {
+        guard await tryStart(port: HookListener.port) != nil else {
             throw HookListenerError.bindFailed(port: HookListener.port)
         }
-        _ = bound
     }
 
     func stop() {

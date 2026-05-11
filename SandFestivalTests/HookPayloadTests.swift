@@ -145,7 +145,6 @@ struct HookPayloadTranslatorTests {
             cwd: URL(fileURLWithPath: "/tmp"),
             permissionMode: nil,
             notificationMessage: message,
-            stopReason: nil,
             toolName: toolName
         )
     }

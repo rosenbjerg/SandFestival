@@ -151,8 +151,6 @@ final class SessionManager {
         case .workingDirectory(let url):
             let target = url.standardizedFileURL.path
             return projects.first { $0.path.standardizedFileURL.path == target }?.id
-        case .sessionID, .pid:
-            return nil
         }
     }
 
