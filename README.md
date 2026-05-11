@@ -90,3 +90,7 @@ For a reproducible signed/notarized build, see
 
 Pre-1.0. Working day-to-day for the author but expect rough edges and
 occasional breaking changes between releases.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
