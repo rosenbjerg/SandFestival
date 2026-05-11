@@ -27,7 +27,12 @@ enum HookPayloadTranslator {
         case HookEvent.stop.rawValue:
             return .idle
         case HookEvent.sessionEnd.rawValue:
-            return .stopped
+            // SessionEnd fires for `/clear` and `/resume` too — the OS process
+            // keeps running with a fresh session_id. Process death is detected
+            // by the OS-level termination callback in `Session`, so don't let
+            // this hook drive the state machine to `.stopped` and trigger the
+            // "not running" overlay over a live process.
+            return nil
         default:
             return nil
         }

@@ -109,9 +109,11 @@ struct HookPayloadTranslatorTests {
         #expect(HookPayloadTranslator.translate(makePayload(event: "Stop")) == .idle)
     }
 
-    @Test("SessionEnd maps to .stopped")
-    func sessionEndMapsToStopped() {
-        #expect(HookPayloadTranslator.translate(makePayload(event: "SessionEnd")) == .stopped)
+    @Test("SessionEnd yields no event — OS process termination is the authoritative .stopped signal")
+    func sessionEndYieldsNil() {
+        // SessionEnd also fires for /clear and /resume while the process keeps
+        // running, so it must not push the state machine into .stopped.
+        #expect(HookPayloadTranslator.translate(makePayload(event: "SessionEnd")) == nil)
     }
 
     @Test("Notification with permission language maps to .waitingForPermission")
