@@ -32,6 +32,14 @@ final class Session: Identifiable {
     /// Called after a successful spawn so adapters can register a handle.
     @ObservationIgnored var onDidSpawn: ((Project) -> Void)?
 
+    /// Called after the OS-level process exits — including unexpected exits
+    /// the user didn't trigger. Adapters use this to drop any per-process
+    /// state (Claude Code clears its live cwd→project binding here so a
+    /// later hand-launched `claude` from the same cwd doesn't attach to the
+    /// dead session). User-initiated stop/restart paths also fire this once
+    /// the kill takes effect — duplicate cleanup is harmless.
+    @ObservationIgnored var onDidTerminate: ((Project) -> Void)?
+
     /// Fires when the session moves from one state to another. Same-state
     /// "transitions" don't fire — heartbeats stay quiet. Wired by SessionManager
     /// so cross-session coordinators (attention notifier, etc.) can react
@@ -157,6 +165,9 @@ final class Session: Identifiable {
             lastError = formatExitFailure(exitCode: exitCode)
         }
 
+        // Notify before `.stopped` so adapters drop per-process state before
+        // any restart re-registers fresh bindings for the same cwd.
+        onDidTerminate?(project)
         transition(to: .stopped)
         if wantsRestart {
             wantsRestart = false

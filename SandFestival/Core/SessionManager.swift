@@ -198,6 +198,10 @@ final class SessionManager {
             guard let self else { return }
             self.adapter?.didSpawnSession(self.handle(for: project))
         }
+        session.onDidTerminate = { [weak self] project in
+            guard let self else { return }
+            self.adapter?.willTerminateSession(self.handle(for: project))
+        }
         session.onStateChanged = { [weak self, weak session] old, new in
             guard let self, let session else { return }
             self.sessionStateObserver?(session, old, new)
