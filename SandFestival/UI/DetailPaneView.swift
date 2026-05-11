@@ -43,14 +43,19 @@ struct DetailPaneView: View {
 
     private func notRunningOverlay(session: Session) -> some View {
         VStack(spacing: 12) {
-            Text(String(localized: "detail.not_running.title"))
+            Text(String(localized: session.lastError == nil ? "detail.not_running.title" : "detail.not_running.failed_title"))
                 .font(.headline)
-            if case let .errored(reason) = session.state {
-                Text(reason)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
+            if let reason = session.lastError {
+                ScrollView {
+                    Text(reason)
+                        .font(.system(.callout, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+                }
+                .frame(maxWidth: 520, maxHeight: 220)
+                .padding(.horizontal, 24)
             }
             Button(String(localized: "detail.not_running.start")) {
                 session.start()

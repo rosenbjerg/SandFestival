@@ -1,4 +1,5 @@
 import AppKit
+import Foundation
 import Observation
 import SwiftTerm
 
@@ -71,6 +72,7 @@ final class Session: Identifiable {
         let extraEnvironment = spawnEnvProvider?(project) ?? [:]
         lastError = nil
         terminalTitle = nil
+        wantsStop = false
         transition(to: .starting)
         terminalView.startProcess(
             executable: executable,
@@ -79,6 +81,7 @@ final class Session: Identifiable {
             execName: nil,
             currentDirectory: project.path.path
         )
+        processStartedAt = Date()
         // Fallback transition to .idle so the UI shows life even when no
         // adapter is feeding events. When the real adapter delivers .started,
         // the state machine treats it as a no-op.
@@ -88,11 +91,13 @@ final class Session: Identifiable {
 
     func stop() {
         guard state.isRunning else { return }
+        wantsStop = true
         terminalView.terminate()
     }
 
     func restart() {
         if state.isRunning {
+            wantsStop = true
             terminalView.terminate()
             wantsRestart = true
         } else {
@@ -101,6 +106,8 @@ final class Session: Identifiable {
     }
 
     @ObservationIgnored private var wantsRestart = false
+    @ObservationIgnored private var wantsStop = false
+    @ObservationIgnored private var processStartedAt: Date?
 
     func update(project: Project) {
         self.project = project
@@ -123,11 +130,48 @@ final class Session: Identifiable {
 
     private func handleProcessTerminated(exitCode: Int32?) {
         terminalTitle = nil
+        let userInitiated = wantsStop
+        let runDuration = processStartedAt.map { Date().timeIntervalSince($0) } ?? .infinity
+        wantsStop = false
+        processStartedAt = nil
+
+        // Surface unexpected exits (non-zero status, or any exit within the
+        // startup window) so the user can see why nono/claude died instead of
+        // just watching the terminal flash. User-initiated stop/restart paths
+        // bypass this because the SIGTERM we sent isn't a failure.
+        if !userInitiated, exitCode != 0 || runDuration < Session.startupFailureWindow {
+            lastError = formatExitFailure(exitCode: exitCode)
+        }
+
         transition(to: .stopped)
         if wantsRestart {
             wantsRestart = false
             start()
         }
+    }
+
+    private static let startupFailureWindow: TimeInterval = 3
+
+    private func formatExitFailure(exitCode: Int32?) -> String {
+        let header: String
+        if let code = exitCode {
+            header = String(format: String(localized: "session.error.exited_with_code"), code)
+        } else {
+            header = String(localized: "session.error.exited_unexpectedly")
+        }
+        let tail = recentTerminalOutput()
+        return tail.isEmpty ? header : "\(header)\n\n\(tail)"
+    }
+
+    private func recentTerminalOutput(maxLines: Int = 8) -> String {
+        guard let terminal = terminalView.terminal else { return "" }
+        let data = terminal.getBufferAsData()
+        guard let text = String(data: data, encoding: .utf8) else { return "" }
+        let lines = text
+            .split(omittingEmptySubsequences: false, whereSeparator: { $0.isNewline })
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        return lines.suffix(maxLines).joined(separator: "\n")
     }
 
     private func updateTerminalTitle(_ title: String) {
