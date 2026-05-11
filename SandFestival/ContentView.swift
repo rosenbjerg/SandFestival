@@ -16,6 +16,8 @@ struct ContentView: View {
             } detail: {
                 DetailPaneView(manager: manager, editorTarget: $editorTarget)
             }
+            .navigationTitle(windowTitle)
+            .navigationSubtitle(windowSubtitle)
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             manager.focusSelectedTerminal()
@@ -43,6 +45,23 @@ struct ContentView: View {
                 onSkip: { hookSheetSkipped = true }
             )
         }
+    }
+
+    /// macOS shows `navigationTitle — navigationSubtitle` in the window title
+    /// bar. We surface the selected project as the title and the terminal's
+    /// OSC 0/2 title as the subtitle so the title bar mirrors what the user is
+    /// looking at in the detail pane.
+    private var windowTitle: String {
+        guard let id = manager.selectedProjectID,
+              let project = manager.projects.first(where: { $0.id == id })
+        else {
+            return String(localized: "app.name")
+        }
+        return project.name
+    }
+
+    private var windowSubtitle: String {
+        manager.selectedSession()?.terminalTitle ?? ""
     }
 
     private var banners: [StatusBannerStack.Banner] {
