@@ -31,7 +31,6 @@
 		1E6046982FB0A1A80013BBD3 /* SandFestival.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SandFestival.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1E6046A72FB0A1A90013BBD3 /* SandFestivalTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SandFestivalTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		1E6046B12FB0A1A90013BBD3 /* SandFestivalUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SandFestivalUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		1E6046C42FB0EBCC0013BBD3 /* SPEC.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SPEC.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -81,7 +80,6 @@
 		1E60468F2FB0A1A80013BBD3 = {
 			isa = PBXGroup;
 			children = (
-				1E6046C42FB0EBCC0013BBD3 /* SPEC.md */,
 				1E60469A2FB0A1A80013BBD3 /* SandFestival */,
 				1E6046AA2FB0A1A90013BBD3 /* SandFestivalTests */,
 				1E6046B42FB0A1A90013BBD3 /* SandFestivalUITests */,
