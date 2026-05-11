@@ -204,21 +204,49 @@ final class Session: Identifiable {
     }
 
     private func composedEnvironment(extra: [String: String]) -> [String] {
-        var entries = Terminal.getEnvironmentVariables()
-        var pathOverride = CommandResolver.defaultPathString
-        var merged = project.env
+        Session.composeEnvironment(
+            inherited: Terminal.getEnvironmentVariables(),
+            projectEnv: project.env,
+            extra: extra
+        )
+    }
+
+    /// PATH precedence is: explicit project/adapter override → inherited from
+    /// the parent process (the user's shell PATH) → `CommandResolver`'s
+    /// hardcoded fallback. Older behavior replaced every inherited PATH with
+    /// the fallback unconditionally, which silently broke setups that put
+    /// `claude` / `nono` in non-system locations (mise, asdf, ~/.cargo/bin,
+    /// etc.). Extracted as a pure static so the precedence rules can be
+    /// tested without spinning up a Session.
+    static func composeEnvironment(
+        inherited: [String],
+        projectEnv: [String: String],
+        extra: [String: String]
+    ) -> [String] {
+        var merged = projectEnv
         for (key, value) in extra {
             merged[key] = value
         }
+        let explicitPath = merged.removeValue(forKey: "PATH")
+
+        var entries = inherited.filter { !$0.hasPrefix("PATH=") }
         for (key, value) in merged {
-            if key == "PATH" {
-                pathOverride = value
-            } else {
-                entries.append("\(key)=\(value)")
-            }
+            entries.append("\(key)=\(value)")
         }
-        entries.append("PATH=\(pathOverride)")
+
+        let resolvedPath = explicitPath
+            ?? Session.extractPATH(from: inherited)
+            ?? CommandResolver.defaultPathString
+        entries.append("PATH=\(resolvedPath)")
         return entries
+    }
+
+    private static func extractPATH(from entries: [String]) -> String? {
+        for entry in entries where entry.hasPrefix("PATH=") {
+            let value = String(entry.dropFirst("PATH=".count))
+            return value.isEmpty ? nil : value
+        }
+        return nil
     }
 }
 
