@@ -1,6 +1,11 @@
 import Foundation
 
 enum HookPayloadTranslator {
+    /// Tool name Claude Code uses when prompting the user with a structured
+    /// question. We listen for it on PreToolUse to flip into a "waiting"
+    /// state, and on PostToolUse to flip back out once the user answers.
+    static let askUserQuestionTool = "AskUserQuestion"
+
     /// Maps a decoded hook payload to an `AgentEvent`, or `nil` if the event
     /// carries no signal for the state machine.
     static func translate(_ payload: HookPayload) -> AgentEvent? {
@@ -9,7 +14,13 @@ enum HookPayloadTranslator {
             return .started
         case HookEvent.userPromptSubmit.rawValue:
             return .working
+        case HookEvent.preToolUse.rawValue:
+            return preToolUseEvent(toolName: payload.toolName)
         case HookEvent.postToolUse.rawValue:
+            // AskUserQuestion's PostToolUse fires once the user has answered,
+            // so treat it as a definite "back to working" signal rather than
+            // the generic heartbeat — otherwise waitingForIdle would linger.
+            if payload.toolName == Self.askUserQuestionTool { return .working }
             return .heartbeat
         case HookEvent.notification.rawValue:
             return notificationEvent(message: payload.notificationMessage)
@@ -20,6 +31,11 @@ enum HookPayloadTranslator {
         default:
             return nil
         }
+    }
+
+    private static func preToolUseEvent(toolName: String?) -> AgentEvent? {
+        guard toolName == Self.askUserQuestionTool else { return nil }
+        return .waitingForInput
     }
 
     private static func notificationEvent(message: String?) -> AgentEvent? {

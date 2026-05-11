@@ -52,6 +52,19 @@ struct HookPayloadDecoderTests {
         let payload = try? #require(HookPayloadDecoder.decode(Data(json.utf8)))
         #expect(payload?.notificationMessage == "Claude needs your permission to use Bash")
     }
+
+    @Test("captures tool_name on tool-use payloads")
+    func capturesToolName() {
+        let json = """
+        {
+          "session_id": "sess-3",
+          "hook_event_name": "PreToolUse",
+          "tool_name": "AskUserQuestion"
+        }
+        """
+        let payload = try? #require(HookPayloadDecoder.decode(Data(json.utf8)))
+        #expect(payload?.toolName == "AskUserQuestion")
+    }
 }
 
 @Suite("HookPayloadTranslator")
@@ -71,6 +84,24 @@ struct HookPayloadTranslatorTests {
     @Test("PostToolUse maps to .heartbeat")
     func postToolUseMapsToHeartbeat() {
         #expect(HookPayloadTranslator.translate(makePayload(event: "PostToolUse")) == .heartbeat)
+    }
+
+    @Test("PreToolUse for AskUserQuestion maps to .waitingForInput")
+    func preToolUseAskUserQuestionMapsToWaitingForInput() {
+        let payload = makePayload(event: "PreToolUse", toolName: "AskUserQuestion")
+        #expect(HookPayloadTranslator.translate(payload) == .waitingForInput)
+    }
+
+    @Test("PreToolUse for any other tool yields no event")
+    func preToolUseOtherToolYieldsNil() {
+        #expect(HookPayloadTranslator.translate(makePayload(event: "PreToolUse", toolName: "Bash")) == nil)
+        #expect(HookPayloadTranslator.translate(makePayload(event: "PreToolUse", toolName: nil)) == nil)
+    }
+
+    @Test("PostToolUse for AskUserQuestion maps to .working (user answered)")
+    func postToolUseAskUserQuestionMapsToWorking() {
+        let payload = makePayload(event: "PostToolUse", toolName: "AskUserQuestion")
+        #expect(HookPayloadTranslator.translate(payload) == .working)
     }
 
     @Test("Stop maps to .idle")
@@ -103,18 +134,19 @@ struct HookPayloadTranslatorTests {
 
     @Test("unknown hook event names yield no event")
     func unknownHookEventsYieldNil() {
-        #expect(HookPayloadTranslator.translate(makePayload(event: "PreToolUse")) == nil)
+        #expect(HookPayloadTranslator.translate(makePayload(event: "SubagentStop")) == nil)
         #expect(HookPayloadTranslator.translate(makePayload(event: "")) == nil)
     }
 
-    private func makePayload(event: String, message: String? = nil) -> HookPayload {
+    private func makePayload(event: String, message: String? = nil, toolName: String? = nil) -> HookPayload {
         HookPayload(
             sessionID: "sess",
             hookEventName: event,
             cwd: URL(fileURLWithPath: "/tmp"),
             permissionMode: nil,
             notificationMessage: message,
-            stopReason: nil
+            stopReason: nil,
+            toolName: toolName
         )
     }
 }

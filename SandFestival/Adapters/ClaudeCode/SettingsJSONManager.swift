@@ -56,20 +56,23 @@ struct SettingsJSONManager {
 
         for event in events {
             let groups = (settings["hooks"] as? [String: Any])?[event.rawValue] as? [[String: Any]] ?? []
-            let ourEntries = groups
-                .flatMap { ($0["hooks"] as? [[String: Any]]) ?? [] }
-                .filter(HookEntryFactory.isOurEntry)
 
-            if ourEntries.isEmpty {
-                allMatch = false
-                continue
+            var sawOurEntry = false
+            var sawCurrentEntry = false
+            for group in groups {
+                let groupMatcher = (group["matcher"] as? String) ?? ""
+                let entries = (group["hooks"] as? [[String: Any]]) ?? []
+                for entry in entries where HookEntryFactory.isOurEntry(entry) {
+                    sawOurEntry = true
+                    if groupMatcher == event.matcher
+                        && stableSerialization(of: entry) == expectedSerialized {
+                        sawCurrentEntry = true
+                    }
+                }
             }
 
-            anyOurEntries = true
-            let anyEntryMatches = ourEntries.contains { stableSerialization(of: $0) == expectedSerialized }
-            if !anyEntryMatches {
-                allMatch = false
-            }
+            if sawOurEntry { anyOurEntries = true }
+            if !sawCurrentEntry { allMatch = false }
         }
 
         if !anyOurEntries { return .notInstalled }
@@ -148,7 +151,7 @@ struct SettingsJSONManager {
         for event in events {
             var groups = (hooks[event.rawValue] as? [[String: Any]]) ?? []
             groups.append([
-                "matcher": "",
+                "matcher": event.matcher,
                 "hooks": [entry],
             ])
             hooks[event.rawValue] = groups

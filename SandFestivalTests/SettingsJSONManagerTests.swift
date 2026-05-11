@@ -197,6 +197,50 @@ struct SettingsJSONManagerTests {
         #expect(try manager.detectInstallState(port: 51900) == .outdated)
     }
 
+    @Test("install scopes PreToolUse to the AskUserQuestion matcher")
+    func installScopesPreToolUseMatcher() throws {
+        let url = temporaryURL()
+        let manager = SettingsJSONManager(fileURL: url)
+        try manager.install(port: 51789)
+
+        let json = try parsedSettings(at: url)
+        let hooks = try #require(json["hooks"] as? [String: Any])
+        let preGroups = try #require(hooks["PreToolUse"] as? [[String: Any]])
+        // Our PreToolUse entry must live in a group whose matcher is the
+        // tool name — otherwise we'd fire a curl on every tool call.
+        let ourGroup = try #require(preGroups.first { containsOurEntry($0) })
+        #expect((ourGroup["matcher"] as? String) == "AskUserQuestion")
+
+        // Every other event we install stays scoped to the empty matcher.
+        for event in HookEvent.allCases where event != .preToolUse {
+            let groups = try #require(hooks[event.rawValue] as? [[String: Any]])
+            let group = try #require(groups.first { containsOurEntry($0) })
+            #expect((group["matcher"] as? String) == "")
+        }
+    }
+
+    @Test("detectInstallState reports outdated when our PreToolUse entry has the wrong matcher")
+    func detectStateOutdatedForWrongPreToolUseMatcher() throws {
+        let url = temporaryURL()
+        let manager = SettingsJSONManager(fileURL: url)
+        try manager.install(port: 51789)
+
+        // Tamper the matcher to simulate a previous install where PreToolUse
+        // was registered with the empty matcher (would fire on every tool).
+        var json = try parsedSettings(at: url)
+        var hooks = try #require(json["hooks"] as? [String: Any])
+        var preGroups = try #require(hooks["PreToolUse"] as? [[String: Any]])
+        var group = try #require(preGroups.first)
+        group["matcher"] = ""
+        preGroups[0] = group
+        hooks["PreToolUse"] = preGroups
+        json["hooks"] = hooks
+        try Data(JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]))
+            .write(to: url)
+
+        #expect(try manager.detectInstallState(port: 51789) == .outdated)
+    }
+
     @Test("install rewrites legacy http entries to the current command form")
     func installMigratesLegacyEntries() throws {
         let url = temporaryURL()
