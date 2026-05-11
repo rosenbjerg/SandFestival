@@ -96,33 +96,10 @@ struct SidebarView: View {
 
             Spacer(minLength: 4)
 
-            VStack(alignment: .trailing, spacing: 3) {
-                if let session {
-                    rightSideStatus(for: session)
-                }
-                if let session, let mode = session.metadata.permissionMode,
-                   !mode.isEmpty, session.state != .stopped {
-                    permissionModeBadge(mode)
-                }
+            if let session {
+                rightSideStatus(for: session)
             }
         }
         .padding(.vertical, 2)
-    }
-
-    /// Surfaces Claude's `permission_mode` (default / plan / acceptEdits /
-    /// bypassPermissions / etc.) as a subtle capsule next to the status
-    /// label. The raw value from Claude is shown verbatim — these are
-    /// technical identifiers, not display copy, so we treat them like a
-    /// branch name rather than translating them.
-    private func permissionModeBadge(_ mode: String) -> some View {
-        Text(mode)
-            .font(.system(size: 9, weight: .semibold).monospaced())
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 5)
-            .padding(.vertical, 1)
-            .background(Color.gray.opacity(0.18), in: Capsule())
-            .accessibilityLabel(
-                String(format: String(localized: "sidebar.row.label.permission_mode"), mode)
-            )
     }
 }

@@ -31,27 +31,6 @@ struct ClaudeCodeAdapterIntegrationTests {
         #expect(received.event == .started)
     }
 
-    @Test("permission_mode on the SessionStart payload surfaces as metadata")
-    func permissionModeSurfacesAsMetadata() async throws {
-        let env = try await IntegrationEnvironment.start(port: 51791)
-        defer { env.teardown() }
-
-        let project = env.makeProject(cwdName: "sf-int-\(UUID().uuidString)")
-        _ = env.adapter.prepareSpawn(project: project)
-
-        try await env.postHook([
-            "session_id": "sess-mode",
-            "hook_event_name": "SessionStart",
-            "cwd": project.path.path,
-            "permission_mode": "plan",
-        ])
-
-        try await env.sink.waitForMetadata(1)
-        let received = try #require(env.sink.metadata.first)
-        #expect(received.matcher == .projectID(project.id))
-        #expect(received.metadata.permissionMode == "plan")
-    }
-
     @Test("Notification with permission language maps to .waitingForPermission")
     func notificationPermissionRoutesAsWaiting() async throws {
         let env = try await IntegrationEnvironment.start(port: 51792)
@@ -221,31 +200,18 @@ private struct InMemoryTokenStore: TokenStore {
 @MainActor
 private final class RecordingSink: AgentEventSink {
     private(set) var events: [(matcher: SessionMatcher, event: AgentEvent)] = []
-    private(set) var metadata: [(matcher: SessionMatcher, metadata: AgentMetadata)] = []
 
     func report(matching: SessionMatcher, event: AgentEvent) {
         events.append((matching, event))
     }
 
-    func updateMetadata(matching: SessionMatcher, metadata: AgentMetadata) {
-        self.metadata.append((matching, metadata))
-    }
-
     func drainEvents() { events.removeAll() }
-    func drainMetadata() { metadata.removeAll() }
 
     func waitForEvents(
         _ count: Int,
         timeout: Duration = .seconds(2)
     ) async throws {
         try await wait(timeout: timeout) { self.events.count >= count }
-    }
-
-    func waitForMetadata(
-        _ count: Int,
-        timeout: Duration = .seconds(2)
-    ) async throws {
-        try await wait(timeout: timeout) { self.metadata.count >= count }
     }
 
     private func wait(

@@ -12,7 +12,6 @@ struct HookPayloadDecoderTests {
           "session_id": "sess-1",
           "hook_event_name": "SessionStart",
           "cwd": "/tmp/project",
-          "permission_mode": "default",
           "source": "startup"
         }
         """
@@ -20,7 +19,6 @@ struct HookPayloadDecoderTests {
         #expect(payload?.sessionID == "sess-1")
         #expect(payload?.hookEventName == "SessionStart")
         #expect(payload?.cwd?.path == "/tmp/project")
-        #expect(payload?.permissionMode == "default")
     }
 
     @Test("returns nil for malformed JSON")
@@ -145,7 +143,6 @@ struct HookPayloadTranslatorTests {
             sessionID: "sess",
             hookEventName: event,
             cwd: URL(fileURLWithPath: "/tmp"),
-            permissionMode: nil,
             notificationMessage: message,
             toolName: toolName
         )

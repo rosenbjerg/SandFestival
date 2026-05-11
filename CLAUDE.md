@@ -46,7 +46,6 @@ PATH precedence in `Session.composeEnvironment(inherited:projectEnv:extra:)`: pr
 - `SessionState.displayLabel` — localized one-word status name; use anywhere the UI describes session state
 - `SessionManager.attentionSessions` — sessions in attention states, in sidebar order
 - `SessionManager.focus(projectID:)` — select + activate + bring window front; route every "open this project" path through here
-- `AgentMetadata.permissionMode` flows hook payload → `Session.metadata` → `SidebarView` capsule. Extend `AgentMetadata` + the badge site when surfacing new adapter metadata
 
 ## Session routing (ClaudeCodeAdapter)
 

@@ -13,10 +13,4 @@ final class AgentEventRouter: AgentEventSink {
         guard let projectID = manager.resolveProjectID(matcher) else { return }
         manager.session(for: projectID)?.apply(event: event)
     }
-
-    func updateMetadata(matching matcher: SessionMatcher, metadata: AgentMetadata) {
-        guard let manager else { return }
-        guard let projectID = manager.resolveProjectID(matcher) else { return }
-        manager.session(for: projectID)?.updateMetadata(metadata)
-    }
 }

@@ -6,5 +6,4 @@ import Foundation
 @MainActor
 protocol AgentEventSink: AnyObject {
     func report(matching: SessionMatcher, event: AgentEvent)
-    func updateMetadata(matching: SessionMatcher, metadata: AgentMetadata)
 }

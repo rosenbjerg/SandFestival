@@ -15,7 +15,6 @@ final class Session: Identifiable {
     /// did the last hook fire".
     private(set) var enteredCurrentStateAt: Date = Date()
     private(set) var lastError: String?
-    private(set) var metadata: AgentMetadata = .empty
     /// Latest terminal title emitted by the child process (claude sets this
     /// via the OSC 0/2 escape sequence to summarise the current task). Cleared
     /// on start/stop so a stale title never outlives the process.
@@ -133,11 +132,6 @@ final class Session: Identifiable {
         if case .errored(let reason) = next {
             lastError = reason
         }
-    }
-
-    func updateMetadata(_ newMetadata: AgentMetadata) {
-        guard newMetadata != metadata else { return }
-        metadata = newMetadata
     }
 
     /// Called when the user types into this session's terminal. Used as a

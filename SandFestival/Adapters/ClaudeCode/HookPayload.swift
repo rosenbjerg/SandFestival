@@ -4,7 +4,6 @@ struct HookPayload: Equatable {
     let sessionID: String
     let hookEventName: String
     let cwd: URL?
-    let permissionMode: String?
     let notificationMessage: String?
     let toolName: String?
 }
@@ -27,7 +26,6 @@ enum HookPayloadDecoder {
             sessionID: sessionID,
             hookEventName: hookEventName,
             cwd: (json["cwd"] as? String).map { URL(fileURLWithPath: $0) },
-            permissionMode: json["permission_mode"] as? String,
             notificationMessage: json["message"] as? String,
             toolName: json["tool_name"] as? String
         )

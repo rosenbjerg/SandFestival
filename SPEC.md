@@ -254,8 +254,8 @@ proceeds. The sheet only appears if our entries aren't already present.
 
 ### Routing events to projects
 
-Hook payloads include `session_id`, `cwd`, and `permission_mode`. They do
-**not** include the spawning process's PID.
+Hook payloads include `session_id` and `cwd`. They do **not** include the
+spawning process's PID.
 
 Routing strategy:
 
@@ -272,16 +272,6 @@ Routing strategy:
    from outside Sand Festival (the user running `claude` in some other
    terminal entirely, since our hooks are installed globally).
 5. On `SessionEnd`, drop the binding.
-
-### Adapter-specific metadata for the UI
-
-The adapter exposes per-session metadata the UI can show:
-- `permission_mode` (default / plan / accept-edits / auto / dont-ask /
-  bypass) — small badge in the sidebar
-- `effort` level if present — small badge
-
-Define an `AgentMetadata` struct with optional fields the core UI knows how
-to render generically; don't make the core UI special-case Claude Code.
 
 ## Project model
 
