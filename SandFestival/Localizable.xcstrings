@@ -484,6 +484,61 @@
         }
       }
     },
+    "notification.body.blocked_auto_mode" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto-mode is blocked — Claude needs guidance."
+          }
+        }
+      }
+    },
+    "notification.body.errored" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Session errored: %@"
+          }
+        }
+      }
+    },
+    "notification.body.generic" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Needs your attention."
+          }
+        }
+      }
+    },
+    "notification.body.waiting_idle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude is waiting for your input."
+          }
+        }
+      }
+    },
+    "notification.body.waiting_permission" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude is asking for permission."
+          }
+        }
+      }
+    },
     "menubar.action.quit" : {
       "extractionState" : "manual",
       "localizations" : {
