@@ -42,7 +42,13 @@ final class SessionBindingStore {
         pendingSpawns = pendingSpawns.filter { $0.value != projectID }
     }
 
+    /// Canonicalizes cwd before keying so the spawn-side and SessionStart-side
+    /// hash to the same value even when one path traverses a symlink (e.g. a
+    /// project rooted at `/Users/me/Code/foo` that's a link to
+    /// `/Volumes/SSD/Code/foo` — Claude reports the resolved target while the
+    /// app stores whatever the user picked). Without this, hook events for
+    /// symlinked projects get silently dropped.
     private static func key(cwd: URL) -> String {
-        cwd.standardizedFileURL.path
+        cwd.resolvingSymlinksInPath().standardizedFileURL.path
     }
 }

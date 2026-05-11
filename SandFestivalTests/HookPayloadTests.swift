@@ -248,4 +248,26 @@ struct SessionBindingStoreTests {
         )
         #expect(resolved == projectID)
     }
+
+    @Test("cwd matching resolves through symlinks")
+    func cwdMatchingResolvesThroughSymlinks() throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory
+            .appendingPathComponent("sandfest-symlink-\(UUID().uuidString)")
+        try fm.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+
+        let real = root.appendingPathComponent("real")
+        let link = root.appendingPathComponent("link")
+        try fm.createDirectory(at: real, withIntermediateDirectories: true)
+        try fm.createSymbolicLink(at: link, withDestinationURL: real)
+
+        let store = SessionBindingStore()
+        let projectID = UUID()
+        // Register under the symlink path (what the user typed in the editor)…
+        store.registerPendingSpawn(projectID: projectID, cwd: link)
+        // …and bind under the resolved path (what Claude's cwd hook reports).
+        let resolved = store.bindOnSessionStart(sessionID: "sess-1", cwd: real)
+        #expect(resolved == projectID)
+    }
 }
