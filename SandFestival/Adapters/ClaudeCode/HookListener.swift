@@ -7,31 +7,40 @@ enum HookListenerError: Error, Equatable {
     case invalidPort
 }
 
-/// Listens on `127.0.0.1:HookListener.port` for HTTP POSTs from Claude Code's
-/// hook handlers. The port is fixed: a stable value lets the hook entries in
+/// Listens on `127.0.0.1:port` for HTTP POSTs from Claude Code's hook
+/// handlers. Production always uses `HookListener.defaultPort`; the port is
+/// fixed because a stable value lets the hook entries in
 /// `~/.claude/settings.json` stay correct across app restarts without
-/// rewriting on every launch. If the port is already in use the listener
-/// surfaces a `bindFailed` error rather than wandering to another port.
+/// rewriting on every launch. The init parameter exists so tests can bind
+/// to an alternate port without colliding with a running app. If the
+/// chosen port is in use, `start()` surfaces `.bindFailed` instead of
+/// wandering to another port.
 final class HookListener: @unchecked Sendable {
     /// Picked once for SandFestival; changing this forces every hook entry
     /// to be rewritten, so don't change it lightly.
-    static let port: UInt16 = 51789
+    static let defaultPort: UInt16 = 51789
+
+    let port: UInt16
 
     private let token: String
     private let onEvent: @Sendable (Data) -> Void
     private let queue = DispatchQueue(label: "app.sandfestival.claudecode.hooks")
     private var listener: NWListener?
 
-    init(token: String, onEvent: @escaping @Sendable (Data) -> Void) {
+    init(
+        port: UInt16 = HookListener.defaultPort,
+        token: String,
+        onEvent: @escaping @Sendable (Data) -> Void
+    ) {
+        self.port = port
         self.token = token
         self.onEvent = onEvent
     }
 
-    /// Binds the listener to `HookListener.port`. Throws `.bindFailed` if the
-    /// port is already in use.
+    /// Binds the listener to `port`. Throws `.bindFailed` if it's already in use.
     func start() async throws {
-        guard await tryStart(port: HookListener.port) != nil else {
-            throw HookListenerError.bindFailed(port: HookListener.port)
+        guard await tryStart(port: port) != nil else {
+            throw HookListenerError.bindFailed(port: port)
         }
     }
 

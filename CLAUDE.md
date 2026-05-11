@@ -24,7 +24,7 @@ emerged in code.
 - Identified by the `?source=sand-festival` sentinel in either the URL field (legacy) or the command string. `HookEntryFactory.isOurEntry` recognizes both
 - `SettingsJSONManager.detectInstallState` → `notInstalled` / `outdated` / `current`. `outdated` is silently rewritten on adapter start; the consent sheet only appears for `notInstalled`
 - Atomic write: tempfile + fsync + rename(2) (POSIX C). Never overwrite a malformed settings.json — surface the error
-- Port is **fixed** at `HookListener.port = 51789`. Don't reintroduce probing — stable hook entries beat fallback availability
+- Port is **fixed** at `HookListener.defaultPort = 51789` in production. Don't reintroduce probing — stable hook entries beat fallback availability. The instance `port` is configurable via init for test isolation only
 
 ## Auth flow
 

@@ -1,7 +1,15 @@
 import Foundation
 import Security
 
-struct KeychainTokenStore {
+/// Pluggable token source for `ClaudeCodeAdapter`. Production uses
+/// `KeychainTokenStore`; tests can swap in an in-memory implementation so
+/// the adapter doesn't reach into the developer's keychain just to run a
+/// hook-routing assertion.
+protocol TokenStore {
+    func loadOrCreate() throws -> String
+}
+
+struct KeychainTokenStore: TokenStore {
     let service: String
     let account: String
 

@@ -17,7 +17,7 @@ final class ClaudeCodeAdapter: AgentAdapter {
     func clearLastInstallError() { lastInstallError = nil }
     func clearStartupError() { startupError = nil }
 
-    @ObservationIgnored private let tokenStore: KeychainTokenStore
+    @ObservationIgnored private let tokenStore: any TokenStore
     @ObservationIgnored private let settingsManager: SettingsJSONManager
     @ObservationIgnored private let bindings = SessionBindingStore()
     @ObservationIgnored private var token: String?
@@ -25,13 +25,16 @@ final class ClaudeCodeAdapter: AgentAdapter {
     @ObservationIgnored private weak var eventSink: AgentEventSink?
 
     /// Fixed port the listener binds to. Surfaced here so the adapter and
-    /// settings.json factory share one source of truth.
-    private var port: UInt16 { HookListener.port }
+    /// settings.json factory share one source of truth. Configurable via
+    /// init for test isolation; production always uses the default.
+    @ObservationIgnored private let port: UInt16
 
     init(
-        tokenStore: KeychainTokenStore = KeychainTokenStore(),
+        port: UInt16 = HookListener.defaultPort,
+        tokenStore: any TokenStore = KeychainTokenStore(),
         settingsManager: SettingsJSONManager = SettingsJSONManager()
     ) {
+        self.port = port
         self.tokenStore = tokenStore
         self.settingsManager = settingsManager
     }
@@ -44,7 +47,7 @@ final class ClaudeCodeAdapter: AgentAdapter {
             let token = try tokenStore.loadOrCreate()
             self.token = token
 
-            let listener = HookListener(token: token) { [weak self] body in
+            let listener = HookListener(port: port, token: token) { [weak self] body in
                 guard let self else { return }
                 Task { @MainActor in
                     self.handleHookBody(body)
