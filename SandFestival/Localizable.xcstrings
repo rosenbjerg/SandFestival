@@ -484,6 +484,171 @@
         }
       }
     },
+    "preferences.dock.bounce.critical" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Critical (keep bouncing)"
+          }
+        }
+      }
+    },
+    "preferences.dock.bounce.informational" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Informational (one bounce)"
+          }
+        }
+      }
+    },
+    "preferences.dock.bounce_style" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock bounce"
+          }
+        }
+      }
+    },
+    "preferences.dock.description.critical" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Dock icon keeps bouncing until Sand Festival is brought to the front."
+          }
+        }
+      }
+    },
+    "preferences.dock.description.informational" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Dock icon bounces once."
+          }
+        }
+      }
+    },
+    "preferences.dock.focus.authorized" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bouncing is suppressed when system Focus is on."
+          }
+        }
+      }
+    },
+    "preferences.dock.focus.denied" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Focus access denied. The Dock will bounce even while Focus is on. Re-enable in System Settings → Privacy & Security → Focus."
+          }
+        }
+      }
+    },
+    "preferences.dock.focus.grant" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow Sand Festival to read Focus status"
+          }
+        }
+      }
+    },
+    "preferences.notifications.enabled" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show notifications"
+          }
+        }
+      }
+    },
+    "preferences.notifications.permission_denied" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notification permission denied. Re-enable in System Settings → Notifications."
+          }
+        }
+      }
+    },
+    "preferences.notifications.trigger" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trigger"
+          }
+        }
+      }
+    },
+    "preferences.notifications.trigger.always" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Whether Sand Festival is focused or not"
+          }
+        }
+      }
+    },
+    "preferences.notifications.trigger.unfocused" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only when Sand Festival isn't focused"
+          }
+        }
+      }
+    },
+    "preferences.section.dock" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock"
+          }
+        }
+      }
+    },
+    "preferences.section.notifications" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notifications"
+          }
+        }
+      }
+    },
     "notification.body.blocked_auto_mode" : {
       "extractionState" : "manual",
       "localizations" : {

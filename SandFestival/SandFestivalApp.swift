@@ -47,6 +47,13 @@ struct SandFestivalApp: App {
             menuBarLabel
         }
         .menuBarExtraStyle(.menu)
+
+        Settings {
+            AttentionPreferencesView(
+                preferences: attentionPreferences,
+                notifier: attentionNotifier
+            )
+        }
     }
 
     @ViewBuilder
