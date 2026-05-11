@@ -15,6 +15,10 @@ final class Session: Identifiable {
     private(set) var enteredCurrentStateAt: Date = Date()
     private(set) var lastError: String?
     private(set) var metadata: AgentMetadata = .empty
+    /// Latest terminal title emitted by the child process (claude sets this
+    /// via the OSC 0/2 escape sequence to summarise the current task). Cleared
+    /// on start/stop so a stale title never outlives the process.
+    private(set) var terminalTitle: String?
 
     @ObservationIgnored let terminalView: LocalProcessTerminalView
     @ObservationIgnored private let processBridge: ProcessBridge
@@ -47,6 +51,11 @@ final class Session: Identifiable {
                 self?.handleProcessTerminated(exitCode: exitCode)
             }
         }
+        bridge.onTerminalTitleChanged = { [weak self] title in
+            Task { @MainActor in
+                self?.updateTerminalTitle(title)
+            }
+        }
     }
 
     // MARK: - Lifecycle
@@ -61,6 +70,7 @@ final class Session: Identifiable {
         }
         let extraEnvironment = spawnEnvProvider?(project) ?? [:]
         lastError = nil
+        terminalTitle = nil
         transition(to: .starting)
         terminalView.startProcess(
             executable: executable,
@@ -112,11 +122,17 @@ final class Session: Identifiable {
     }
 
     private func handleProcessTerminated(exitCode: Int32?) {
+        terminalTitle = nil
         transition(to: .stopped)
         if wantsRestart {
             wantsRestart = false
             start()
         }
+    }
+
+    private func updateTerminalTitle(_ title: String) {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        terminalTitle = trimmed.isEmpty ? nil : trimmed
     }
 
     // MARK: - Helpers
@@ -152,9 +168,12 @@ final class Session: Identifiable {
 
 private final class ProcessBridge: NSObject, LocalProcessTerminalViewDelegate {
     var onProcessTerminated: ((Int32?) -> Void)?
+    var onTerminalTitleChanged: ((String) -> Void)?
 
     func sizeChanged(source: LocalProcessTerminalView, newCols: Int, newRows: Int) {}
-    func setTerminalTitle(source: LocalProcessTerminalView, title: String) {}
+    func setTerminalTitle(source: LocalProcessTerminalView, title: String) {
+        onTerminalTitleChanged?(title)
+    }
     func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {}
 
     func processTerminated(source: TerminalView, exitCode: Int32?) {
