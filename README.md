@@ -27,9 +27,23 @@ The long form auto-taps the formula repo — no separate `brew tap` step needed.
 
 - macOS 26 (Tahoe) or later
 - [Claude Code](https://docs.claude.com/en/docs/claude-code/) on your `PATH`
-- *(optional)* a sandbox wrapper such as `nono` if you want Claude Code to
-  run sandboxed — the per-project command and args are user-editable, so any
-  wrapper works (or none)
+- [`nono`](https://github.com/always-further/nono) on your `PATH` — the
+  capability-based sandbox Sand Festival uses by default to run Claude Code
+  with OS-enforced isolation:
+
+  ```sh
+  brew install nono
+  ```
+
+By default each project spawns:
+
+```sh
+nono run --allow-cwd --profile xcode --allow-launch-services -- claude --enable-auto-mode
+```
+
+You can change the `command` and `args` per project in the project settings,
+so running Claude Code directly (`claude`) or under a different wrapper is a
+one-field edit. If you do that, `nono` is no longer required.
 
 ### Update / uninstall
 
