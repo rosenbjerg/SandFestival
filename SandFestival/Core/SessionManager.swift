@@ -87,6 +87,18 @@ final class SessionManager {
         persist()
     }
 
+    func moveProjects(fromOffsets source: IndexSet, toOffset destination: Int) {
+        let moving = source.map { projects[$0] }
+        var remaining = projects
+        for index in source.sorted(by: >) {
+            remaining.remove(at: index)
+        }
+        let shift = source.filter { $0 < destination }.count
+        remaining.insert(contentsOf: moving, at: destination - shift)
+        projects = remaining
+        persist()
+    }
+
     func removeProject(id: Project.ID) {
         if let session = sessions[id], session.state.isRunning {
             session.stop()

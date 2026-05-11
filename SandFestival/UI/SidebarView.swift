@@ -21,6 +21,9 @@ struct SidebarView: View {
                             }
                         }
                 }
+                .onMove { source, destination in
+                    manager.moveProjects(fromOffsets: source, toOffset: destination)
+                }
             }
             .listStyle(.sidebar)
 
