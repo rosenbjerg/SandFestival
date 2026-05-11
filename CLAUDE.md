@@ -28,7 +28,7 @@ emerged in code.
 
 ## Auth flow
 
-1. UUID token in Keychain (`KeychainTokenStore`, service `app.sandfestival.claudecode.token`)
+1. UUID token in Keychain (`KeychainTokenStore`, service `app.sandfestival.claudecode.token`). Adapter accepts `any TokenStore` — tests pass an in-memory stub
 2. `ClaudeCodeAdapter.prepareSpawn` injects `SAND_FESTIVAL_TOKEN=<uuid>` into the spawn env
 3. Hook command's shell expands `$SAND_FESTIVAL_TOKEN` into `Authorization: Bearer …` at fire time
 4. `HookListener` validates against the same Keychain token; 401s otherwise
@@ -38,6 +38,15 @@ The token never appears in settings.json. **Don't** add code that logs it.
 ## Spawn env injection — every path or none
 
 `Session.spawnEnvProvider` is a closure `SessionManager.makeSession` wires once. Toolbar Start, the not-running overlay's Start, auto-restart-after-stop, and `SessionManager.startSession` all hit `Session.start()`. Removing or bypassing the closure means sessions launch without `SAND_FESTIVAL_TOKEN` and every hook 401s silently.
+
+PATH precedence in `Session.composeEnvironment(inherited:projectEnv:extra:)`: project/adapter override → inherited parent PATH → `CommandResolver.defaultPathString`. Don't revert to clobbering — that silently breaks mise/asdf/non-default installs.
+
+## Canonical helpers — don't duplicate
+
+- `SessionState.displayLabel` — localized one-word status name; use anywhere the UI describes session state
+- `SessionManager.attentionSessions` — sessions in attention states, in sidebar order
+- `SessionManager.focus(projectID:)` — select + activate + bring window front; route every "open this project" path through here
+- `AgentMetadata.permissionMode` flows hook payload → `Session.metadata` → `SidebarView` capsule. Extend `AgentMetadata` + the badge site when surfacing new adapter metadata
 
 ## Session routing (ClaudeCodeAdapter)
 
