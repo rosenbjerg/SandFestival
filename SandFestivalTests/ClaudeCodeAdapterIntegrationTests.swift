@@ -81,6 +81,56 @@ struct ClaudeCodeAdapterIntegrationTests {
         #expect(received.event == .waitingForPermission)
     }
 
+    @Test("/resume rebinds the new session_id to the same project and emits no .stopped")
+    func resumeRebindsToSameProject() async throws {
+        let env = try await IntegrationEnvironment.start(port: 51794)
+        defer { env.teardown() }
+
+        let project = env.makeProject(cwdName: "sf-int-\(UUID().uuidString)")
+        _ = env.adapter.prepareSpawn(project: project)
+
+        // 1. Original session starts.
+        try await env.postHook([
+            "session_id": "sess-original",
+            "hook_event_name": "SessionStart",
+            "cwd": project.path.path,
+        ])
+        try await env.sink.waitForEvents(1)
+        env.sink.drainEvents()
+
+        // 2. User runs /resume — claude emits SessionEnd for the old id and
+        //    SessionStart for a new id, but the OS process keeps running.
+        try await env.postHook([
+            "session_id": "sess-original",
+            "hook_event_name": "SessionEnd",
+            "cwd": project.path.path,
+        ])
+        try await env.postHook([
+            "session_id": "sess-resumed",
+            "hook_event_name": "SessionStart",
+            "cwd": project.path.path,
+        ])
+
+        // 3. A follow-up event under the new session_id must route to the same
+        //    project — this is what proves the rebind worked end-to-end.
+        try await env.postHook([
+            "session_id": "sess-resumed",
+            "hook_event_name": "UserPromptSubmit",
+            "cwd": project.path.path,
+        ])
+
+        try await env.sink.waitForEvents(2)
+
+        // SessionEnd no longer emits anything, so the only events we expect are
+        // .started (from the resumed SessionStart) and .working (from the
+        // follow-up UserPromptSubmit). Crucially: no .stopped.
+        let events = env.sink.events
+        #expect(events.allSatisfy { $0.matcher == .projectID(project.id) })
+        #expect(events.contains { $0.event == .started })
+        #expect(events.contains { $0.event == .working })
+        #expect(!events.contains { $0.event == .stopped })
+    }
+
     @Test("POST without the bearer token is rejected and never reaches the sink")
     func unauthorizedPostIsDropped() async throws {
         let env = try await IntegrationEnvironment.start(port: 51793)
