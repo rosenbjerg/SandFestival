@@ -5,12 +5,20 @@ struct SandFestivalApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var manager = SessionManager()
     @State private var claudeCodeAdapter = ClaudeCodeAdapter()
+    @State private var attentionPreferences = AttentionPreferences()
+    @State private var attentionNotifier: AttentionNotifier?
 
     var body: some Scene {
         WindowGroup {
             ContentView(manager: manager, claudeCodeAdapter: claudeCodeAdapter)
                 .frame(minWidth: 900, minHeight: 600)
                 .task {
+                    if attentionNotifier == nil {
+                        attentionNotifier = AttentionNotifier(
+                            preferences: attentionPreferences,
+                            manager: manager
+                        )
+                    }
                     await attachAdapterIfNeeded()
                 }
         }
