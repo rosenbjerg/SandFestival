@@ -20,12 +20,17 @@ struct HookInstallSheet: View {
     // MARK: - Install prompt
 
     private var installBody: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text(String(localized: "hooks.install.title"))
+        // The sheet doubles as both the first-run consent prompt and a
+        // manual reinstall surface. Swap the copy based on whether the
+        // hooks are already installed so the verbs match.
+        let isReinstall = !adapter.needsInstallation
+
+        return VStack(alignment: .leading, spacing: 16) {
+            Text(String(localized: isReinstall ? "hooks.install.title.reinstall" : "hooks.install.title"))
                 .font(.title2)
                 .bold()
 
-            Text(String(localized: "hooks.install.body"))
+            Text(String(localized: isReinstall ? "hooks.install.body.reinstall" : "hooks.install.body"))
                 .fixedSize(horizontal: false, vertical: true)
 
             if let error = adapter.lastInstallError {
@@ -39,10 +44,13 @@ struct HookInstallSheet: View {
                     displayedPreview = adapter.previewInstallation()
                 }
                 Spacer()
-                Button(String(localized: "hooks.install.skip"), role: .cancel) {
+                Button(
+                    String(localized: isReinstall ? "hooks.install.cancel" : "hooks.install.skip"),
+                    role: .cancel
+                ) {
                     onSkip()
                 }
-                Button(String(localized: "hooks.install.install")) {
+                Button(String(localized: isReinstall ? "hooks.install.reinstall" : "hooks.install.install")) {
                     adapter.installHooks()
                     if adapter.lastInstallError == nil {
                         onInstall()

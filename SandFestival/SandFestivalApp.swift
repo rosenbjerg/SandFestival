@@ -7,10 +7,15 @@ struct SandFestivalApp: App {
     @State private var claudeCodeAdapter = ClaudeCodeAdapter()
     @State private var attentionPreferences = AttentionPreferences()
     @State private var attentionNotifier: AttentionNotifier?
+    @State private var manualHookSheet = false
 
     var body: some Scene {
         WindowGroup {
-            ContentView(manager: manager, claudeCodeAdapter: claudeCodeAdapter)
+            ContentView(
+                manager: manager,
+                claudeCodeAdapter: claudeCodeAdapter,
+                manualHookSheet: $manualHookSheet
+            )
                 .frame(minWidth: 900, minHeight: 600)
                 .task {
                     if attentionNotifier == nil {
@@ -23,6 +28,12 @@ struct SandFestivalApp: App {
                 }
         }
         .commands {
+            CommandGroup(after: .appSettings) {
+                Button(String(localized: "menu.manage_hooks")) {
+                    manualHookSheet = true
+                }
+            }
+
             CommandGroup(after: .toolbar) {
                 Button(String(localized: "view.terminal.font.larger")) {
                     manager.bumpTerminalFontSize(by: 1)

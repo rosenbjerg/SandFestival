@@ -4,6 +4,7 @@ import SwiftUI
 struct ContentView: View {
     @Bindable var manager: SessionManager
     @Bindable var claudeCodeAdapter: ClaudeCodeAdapter
+    @Binding var manualHookSheet: Bool
     @State private var editorTarget: ProjectEditorTarget?
     @State private var hookSheetSkipped = false
 
@@ -41,8 +42,14 @@ struct ContentView: View {
         .sheet(isPresented: hookSheetBinding) {
             HookInstallSheet(
                 adapter: claudeCodeAdapter,
-                onInstall: { hookSheetSkipped = false },
-                onSkip: { hookSheetSkipped = true }
+                onInstall: {
+                    hookSheetSkipped = false
+                    manualHookSheet = false
+                },
+                onSkip: {
+                    hookSheetSkipped = true
+                    manualHookSheet = false
+                }
             )
         }
     }
@@ -92,9 +99,17 @@ struct ContentView: View {
 
     private var hookSheetBinding: Binding<Bool> {
         Binding(
-            get: { claudeCodeAdapter.needsInstallation && !hookSheetSkipped },
+            get: {
+                manualHookSheet
+                    || (claudeCodeAdapter.needsInstallation && !hookSheetSkipped)
+            },
             set: { newValue in
-                if !newValue {
+                guard !newValue else { return }
+                manualHookSheet = false
+                // Only the auto-prompt path should be sticky-skipped; if the
+                // user opened the sheet manually they're not declining
+                // anything by closing it.
+                if claudeCodeAdapter.needsInstallation {
                     hookSheetSkipped = true
                 }
             }
@@ -105,6 +120,7 @@ struct ContentView: View {
 #Preview {
     ContentView(
         manager: SessionManager(),
-        claudeCodeAdapter: ClaudeCodeAdapter()
+        claudeCodeAdapter: ClaudeCodeAdapter(),
+        manualHookSheet: .constant(false)
     )
 }

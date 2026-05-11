@@ -1005,6 +1005,56 @@
           }
         }
       }
+    },
+    "menu.manage_hooks": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manage Claude Code Hooks…"
+          }
+        }
+      }
+    },
+    "hooks.install.title.reinstall": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reinstall Claude Code hooks?"
+          }
+        }
+      }
+    },
+    "hooks.install.body.reinstall": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sand Festival's hook entries are already in ~/.claude/settings.json. Reinstalling rewrites them to match the current build — useful after upgrading."
+          }
+        }
+      }
+    },
+    "hooks.install.reinstall": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reinstall"
+          }
+        }
+      }
+    },
+    "hooks.install.cancel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        }
+      }
     }
   },
   "version": "1.1"
