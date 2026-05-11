@@ -2,31 +2,45 @@ import Foundation
 
 /// Tracks Claude Code session_id ↔ Project.ID bindings. On spawn we record a
 /// "pending" entry keyed by cwd, and the first SessionStart hook for that
-/// cwd consumes the entry and binds the session_id.
+/// cwd consumes the entry and binds the session_id. We also keep a
+/// "live cwds" entry that survives until the spawned process actually dies,
+/// so `/resume` and `/clear` — which mint a new session_id while the same
+/// OS process keeps running — can rebind to the same project.
 @MainActor
 final class SessionBindingStore {
     private var pendingSpawns: [String: UUID] = [:]
+    private var liveProjectsByCwd: [String: UUID] = [:]
     private var sessionToProject: [String: UUID] = [:]
 
     func registerPendingSpawn(projectID: UUID, cwd: URL) {
-        pendingSpawns[Self.key(cwd: cwd)] = projectID
+        let key = Self.key(cwd: cwd)
+        pendingSpawns[key] = projectID
+        liveProjectsByCwd[key] = projectID
     }
 
     func clearPendingSpawn(projectID: UUID) {
         pendingSpawns = pendingSpawns.filter { $0.value != projectID }
     }
 
-    /// Tries to bind a Claude `session_id` for the SessionStart hook by
-    /// matching its cwd against pending spawns. Returns the resolved
-    /// project ID or `nil` if no spawn was waiting.
+    /// Tries to bind a Claude `session_id` for the SessionStart hook. The
+    /// first SessionStart after a spawn consumes the pending entry; later
+    /// SessionStart events for the same cwd (e.g. after `/resume` or
+    /// `/clear`) fall back to the live-projects map, which lives until
+    /// `unbindAll(projectID:)` is called from process-termination cleanup.
+    /// Returns the resolved project ID, or `nil` if nothing matched.
     @discardableResult
     func bindOnSessionStart(sessionID: String, cwd: URL?) -> UUID? {
-        guard let cwd, let projectID = pendingSpawns[Self.key(cwd: cwd)] else {
-            return nil
+        guard let cwd else { return nil }
+        let key = Self.key(cwd: cwd)
+        if let projectID = pendingSpawns.removeValue(forKey: key) {
+            sessionToProject[sessionID] = projectID
+            return projectID
         }
-        sessionToProject[sessionID] = projectID
-        pendingSpawns.removeValue(forKey: Self.key(cwd: cwd))
-        return projectID
+        if let projectID = liveProjectsByCwd[key] {
+            sessionToProject[sessionID] = projectID
+            return projectID
+        }
+        return nil
     }
 
     func projectID(forSession sessionID: String) -> UUID? {
@@ -40,6 +54,7 @@ final class SessionBindingStore {
     func unbindAll(projectID: UUID) {
         sessionToProject = sessionToProject.filter { $0.value != projectID }
         pendingSpawns = pendingSpawns.filter { $0.value != projectID }
+        liveProjectsByCwd = liveProjectsByCwd.filter { $0.value != projectID }
     }
 
     /// Canonicalizes cwd before keying so the spawn-side and SessionStart-side

@@ -223,17 +223,36 @@ struct SessionBindingStoreTests {
         #expect(store.projectID(forSession: "sess-B") == nil)
     }
 
-    @Test("pending spawn entries are consumed on first SessionStart")
-    func pendingSpawnIsConsumed() {
+    @Test("a second SessionStart for the same cwd rebinds while the project is still live (e.g. /resume, /clear)")
+    func secondSessionStartRebindsLiveProject() {
         let store = SessionBindingStore()
         let projectID = UUID()
         let cwd = URL(fileURLWithPath: "/tmp/repo")
 
         store.registerPendingSpawn(projectID: projectID, cwd: cwd)
         _ = store.bindOnSessionStart(sessionID: "sess-1", cwd: cwd)
-        // A second SessionStart with the same cwd should not re-bind.
+        // /resume mints a new session_id without restarting the process. As
+        // long as we haven't been told the project is gone, the new session_id
+        // must bind to the same project so subsequent events route correctly.
         let second = store.bindOnSessionStart(sessionID: "sess-2", cwd: cwd)
-        #expect(second == nil)
+        #expect(second == projectID)
+        #expect(store.projectID(forSession: "sess-2") == projectID)
+    }
+
+    @Test("a SessionStart for a cwd whose project has been unbound is dropped")
+    func sessionStartAfterUnbindAllIsDropped() {
+        let store = SessionBindingStore()
+        let projectID = UUID()
+        let cwd = URL(fileURLWithPath: "/tmp/repo")
+
+        store.registerPendingSpawn(projectID: projectID, cwd: cwd)
+        _ = store.bindOnSessionStart(sessionID: "sess-1", cwd: cwd)
+        // unbindAll fires on process termination — a stray claude run from the
+        // same cwd afterwards (e.g. the user invokes claude by hand) must not
+        // attach to the dead session.
+        store.unbindAll(projectID: projectID)
+        let stray = store.bindOnSessionStart(sessionID: "sess-stray", cwd: cwd)
+        #expect(stray == nil)
     }
 
     @Test("cwd matching is path-normalized")
