@@ -17,10 +17,18 @@ final class HookListener: @unchecked Sendable {
     /// to be rewritten, so don't change it lightly.
     static let port: UInt16 = 51789
 
+    /// Sentinel path; `touch /tmp/sand-festival-hooks.log` enables debug
+    /// logging without a restart, `rm` disables it. Useful for quick
+    /// "what hook is Claude actually firing?" investigations without
+    /// editing `~/.claude/settings.json`.
+    static let debugSentinelPath = "/tmp/sand-festival-hooks.log"
+    static let debugEnvVarName = "SAND_FESTIVAL_HOOK_LOG"
+
     private let token: String
     private let onEvent: @Sendable (Data) -> Void
     private let queue = DispatchQueue(label: "app.sandfestival.claudecode.hooks")
     private var listener: NWListener?
+    private let debugLog = HookDebugLog()
 
     init(token: String, onEvent: @escaping @Sendable (Data) -> Void) {
         self.token = token
@@ -124,10 +132,12 @@ final class HookListener: @unchecked Sendable {
 
     private func dispatchAfterHeaders(connection: NWConnection, headerString: String, bodySoFar: Data) {
         guard let headers = HookRequestParser.parseHeaders(headerString) else {
+            debugLog.append(tag: "PARSE_FAIL", body: nil, extra: headerString)
             sendResponse(connection: connection, status: 400, reason: "Bad Request")
             return
         }
         guard HookRequestParser.isAuthorized(headers: headers, expectedToken: token) else {
+            debugLog.append(tag: "AUTH_FAIL", body: nil, extra: headers.requestLine)
             sendResponse(connection: connection, status: 401, reason: "Unauthorized")
             return
         }
@@ -138,6 +148,7 @@ final class HookListener: @unchecked Sendable {
     private func consumeBody(connection: NWConnection, accumulated: Data, target: Int) {
         if accumulated.count >= target {
             let body = accumulated.prefix(target)
+            debugLog.append(tag: "EVENT", body: body, extra: nil)
             onEvent(body)
             sendResponse(connection: connection, status: 200, reason: "OK")
             return
@@ -186,5 +197,45 @@ private final class ResumeFlag: @unchecked Sendable {
         guard !fired else { return false }
         fired = true
         return true
+    }
+}
+
+/// Append-only debug log used to trace hook traffic during investigations.
+/// Resolves the destination on every write so the user can toggle logging
+/// (`touch`/`rm` the sentinel) without restarting SandFestival.
+private final class HookDebugLog: @unchecked Sendable {
+    private static let timestampFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    func append(tag: String, body: Data?, extra: String?) {
+        guard let path = currentLogPath() else { return }
+        let timestamp = Self.timestampFormatter.string(from: Date())
+        let bodyString = body.flatMap { String(data: $0, encoding: .utf8) } ?? extra ?? ""
+        let line = "[\(timestamp)] \(tag) \(bodyString)\n"
+        guard let data = line.data(using: .utf8) else { return }
+        write(data, to: path)
+    }
+
+    private func currentLogPath() -> String? {
+        if let env = ProcessInfo.processInfo.environment[HookListener.debugEnvVarName],
+           !env.isEmpty {
+            return env
+        }
+        return FileManager.default.fileExists(atPath: HookListener.debugSentinelPath)
+            ? HookListener.debugSentinelPath
+            : nil
+    }
+
+    private func write(_ data: Data, to path: String) {
+        let fd = open(path, O_WRONLY | O_APPEND | O_CREAT, 0o644)
+        guard fd >= 0 else { return }
+        _ = data.withUnsafeBytes { raw -> Int in
+            guard let base = raw.baseAddress else { return -1 }
+            return Darwin.write(fd, base, raw.count)
+        }
+        close(fd)
     }
 }
