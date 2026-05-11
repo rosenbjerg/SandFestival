@@ -121,8 +121,21 @@ final class ClaudeCodeAdapter: AgentAdapter {
             projectID = bindings.projectID(forSession: payload.sessionID)
         }
 
-        guard let projectID, let event = HookPayloadTranslator.translate(payload) else { return }
-        eventSink?.report(matching: .projectID(projectID), event: event)
+        guard let projectID else { return }
+
+        // Surface permission_mode on every payload that carries it — Claude
+        // includes it on most hook events, so the sidebar badge tracks the
+        // live mode without needing to special-case which events update it.
+        if let mode = payload.permissionMode, !mode.isEmpty {
+            eventSink?.updateMetadata(
+                matching: .projectID(projectID),
+                metadata: AgentMetadata(permissionMode: mode)
+            )
+        }
+
+        if let event = HookPayloadTranslator.translate(payload) {
+            eventSink?.report(matching: .projectID(projectID), event: event)
+        }
 
         if payload.hookEventName == HookEvent.sessionEnd.rawValue {
             bindings.unbind(sessionID: payload.sessionID)

@@ -128,6 +128,7 @@ final class Session: Identifiable {
     }
 
     func updateMetadata(_ newMetadata: AgentMetadata) {
+        guard newMetadata != metadata else { return }
         metadata = newMetadata
     }
 
