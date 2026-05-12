@@ -99,17 +99,28 @@ final class Session: Identifiable {
         onDidSpawn?(project)
     }
 
+    /// Soft stop: SIGINT the wrapper PID so nono can run its post-kill prompt
+    /// on the still-attached PTY. SwiftTerm's `terminate()` would close the
+    /// PTY, flip `running` to false (silently dropping further keystrokes),
+    /// and cancel the child monitor — none of which we want while nono is
+    /// asking the user to confirm something. The natural exit path
+    /// (`childMonitor` → `handleProcessTerminated`) flips us to `.stopped`
+    /// once nono actually exits.
     func stop() {
         guard state.isRunning else { return }
+        let pid = terminalView.process.shellPid
+        guard pid != 0 else { return }
         wantsStop = true
-        terminalView.terminate()
+        kill(pid, SIGINT)
     }
 
     func restart() {
         if state.isRunning {
+            let pid = terminalView.process.shellPid
+            guard pid != 0 else { return }
             wantsStop = true
-            terminalView.terminate()
             wantsRestart = true
+            kill(pid, SIGINT)
         } else {
             start()
         }
