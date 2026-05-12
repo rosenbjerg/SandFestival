@@ -56,10 +56,26 @@ struct SandFestivalApp: App {
         }
 
         Settings {
-            AttentionPreferencesView(
-                preferences: attentionPreferences,
-                notifier: attentionNotifier
-            )
+            TabView {
+                AttentionPreferencesView(
+                    preferences: attentionPreferences,
+                    notifier: attentionNotifier
+                )
+                .tabItem {
+                    Label(
+                        String(localized: "preferences.tab.attention"),
+                        systemImage: "bell.badge"
+                    )
+                }
+
+                TerminalPreferencesView(manager: manager)
+                    .tabItem {
+                        Label(
+                            String(localized: "preferences.tab.terminal"),
+                            systemImage: "terminal"
+                        )
+                    }
+            }
         }
     }
 
