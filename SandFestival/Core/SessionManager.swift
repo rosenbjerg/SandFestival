@@ -80,13 +80,33 @@ final class SessionManager {
     // MARK: - CRUD
 
     func addProject(_ project: Project) {
-        projects.append(project)
+        if let parentID = project.parentProjectID,
+           let insertIndex = insertionIndex(forChildOf: parentID) {
+            projects.insert(project, at: insertIndex)
+        } else {
+            projects.append(project)
+        }
         sessions[project.id] = makeSession(for: project)
         selectedProjectID = project.id
         persist()
         if project.autoStart {
             startSession(id: project.id)
         }
+    }
+
+    /// Keeps the flat `projects` array in display order: a duplicate is
+    /// inserted directly after the parent's existing children (so siblings
+    /// stay adjacent), or right after the parent itself when there are
+    /// none yet. Returns `nil` when the parent isn't in the list — caller
+    /// falls back to a plain append, which also re-parents to top level on
+    /// next render because the parent reference no longer resolves.
+    private func insertionIndex(forChildOf parentID: Project.ID) -> Int? {
+        guard let parentIndex = projects.firstIndex(where: { $0.id == parentID }) else { return nil }
+        var insertAt = parentIndex + 1
+        while insertAt < projects.count && projects[insertAt].parentProjectID == parentID {
+            insertAt += 1
+        }
+        return insertAt
     }
 
     func updateProject(_ project: Project) {
@@ -108,6 +128,19 @@ final class SessionManager {
         persist()
     }
 
+    /// Replaces the flat `projects` order with `newOrder` after sanity
+    /// checks. Used by the sidebar's hierarchical drag-reorder, which
+    /// computes the new order externally (moving parent + children as a
+    /// block) and just hands the resulting array back here. The set of ids
+    /// must match exactly — otherwise the call is a no-op so a malformed
+    /// caller can't accidentally drop or duplicate projects.
+    func replaceProjectsOrder(_ newOrder: [Project]) {
+        guard newOrder.count == projects.count else { return }
+        guard Set(newOrder.map(\.id)) == Set(projects.map(\.id)) else { return }
+        projects = newOrder
+        persist()
+    }
+
     func removeProject(id: Project.ID) {
         if let session = sessions[id], session.state.isRunning {
             session.stop()
@@ -117,6 +150,13 @@ final class SessionManager {
         }
         sessions.removeValue(forKey: id)
         projects.removeAll { $0.id == id }
+        // Any duplicates of the removed project become top-level on their
+        // own — preserve them rather than cascade-removing. The user can
+        // delete them individually if they want, including the worktree
+        // cleanup sheet.
+        for index in projects.indices where projects[index].parentProjectID == id {
+            projects[index].parentProjectID = nil
+        }
         if selectedProjectID == id {
             selectedProjectID = projects.first?.id
         }

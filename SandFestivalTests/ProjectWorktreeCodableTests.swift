@@ -29,6 +29,7 @@ struct ProjectWorktreeCodableTests {
         #expect(decoded.count == 1)
         #expect(decoded[0].name == "Legacy")
         #expect(decoded[0].worktreeInfo == nil)
+        #expect(decoded[0].parentProjectID == nil)
     }
 
     @Test("a Project with worktreeInfo round-trips through JSON")
@@ -48,5 +49,21 @@ struct ProjectWorktreeCodableTests {
         #expect(decoded == [original])
         #expect(decoded[0].worktreeInfo?.branch == "new-feature")
         #expect(decoded[0].worktreeInfo?.sourceRepoPath.path == "/tmp/source")
+    }
+
+    @Test("a Project with parentProjectID round-trips through JSON")
+    func parentProjectIDRoundTrips() throws {
+        let parentID = UUID()
+        let original = Project(
+            name: "Child",
+            path: URL(fileURLWithPath: "/tmp/child"),
+            parentProjectID: parentID
+        )
+
+        let encoded = try JSONEncoder().encode([original])
+        let decoded = try JSONDecoder().decode([Project].self, from: encoded)
+
+        #expect(decoded == [original])
+        #expect(decoded[0].parentProjectID == parentID)
     }
 }

@@ -1,10 +1,11 @@
 import AppKit
 import SwiftUI
 
-/// Sheet that creates a sibling `Project` backed by a fresh git worktree.
-/// Mirrors `ProjectEditorView`'s shape — Form + Cancel/Confirm buttons in a
-/// footer — so the two sheets feel like siblings rather than two different
-/// dialogs.
+/// Sheet that creates a sibling `Project`. By default the new project is
+/// backed by a fresh `git worktree`, but the user can opt out — in that
+/// case the duplicate shares the source's path and only differs in name /
+/// auto-start. Either way the new project records `parentProjectID` so
+/// the sidebar can render it grouped underneath its source.
 struct ProjectDuplicateView: View {
     let source: Project
     let onCreate: (Project) -> Void
@@ -31,14 +32,19 @@ struct ProjectDuplicateView: View {
                     }
                 }
 
-                Section(String(localized: "duplicate.section.worktree")) {
-                    TextField(String(localized: "duplicate.field.branch"), text: branchBinding)
-                    basePicker
-                    HStack {
-                        TextField(String(localized: "duplicate.field.worktree_path"), text: pathBinding)
-                            .truncationMode(.head)
-                        Button(String(localized: "duplicate.field.worktree_path.choose")) {
-                            choosePath()
+                if draft.isGitRepo {
+                    Section(String(localized: "duplicate.section.worktree")) {
+                        Toggle(String(localized: "duplicate.field.create_worktree"), isOn: createWorktreeBinding)
+                        if draft.createWorktree {
+                            TextField(String(localized: "duplicate.field.branch"), text: branchBinding)
+                            basePicker
+                            HStack {
+                                TextField(String(localized: "duplicate.field.worktree_path"), text: pathBinding)
+                                    .truncationMode(.head)
+                                Button(String(localized: "duplicate.field.worktree_path.choose")) {
+                                    choosePath()
+                                }
+                            }
                         }
                     }
                 }
@@ -79,7 +85,7 @@ struct ProjectDuplicateView: View {
             }
             .padding()
         }
-        .frame(minWidth: 540, minHeight: 420)
+        .frame(minWidth: 540, minHeight: 360)
         .navigationTitle(String(localized: "duplicate.title"))
     }
 
@@ -127,6 +133,21 @@ struct ProjectDuplicateView: View {
         )
     }
 
+    // Toggling "Create git worktree" off should leave the name field in a
+    // sensible state. Tracking-mode names like "Demo (feature-x)" stop
+    // making sense when we're no longer making a feature-x branch, so we
+    // reset the auto-derived name back to the source name. A name the user
+    // explicitly typed is left alone.
+    private var createWorktreeBinding: Binding<Bool> {
+        Binding(
+            get: { draft.createWorktree },
+            set: { newValue in
+                draft.createWorktree = newValue
+                draft.refreshDerivedFields()
+            }
+        )
+    }
+
     private func choosePath() {
         let panel = NSSavePanel()
         panel.canCreateDirectories = true
@@ -142,12 +163,31 @@ struct ProjectDuplicateView: View {
 
     private func submit() {
         let snapshot = draft
-        let trimmedBranch = snapshot.branchName.trimmingCharacters(in: .whitespaces)
-        let trimmedPath = snapshot.pathString.trimmingCharacters(in: .whitespaces)
         let trimmedName = snapshot.name.trimmingCharacters(in: .whitespaces)
-        let base = snapshot.baseBranch?.trimmingCharacters(in: .whitespaces)
 
         errorMessage = nil
+
+        guard snapshot.createWorktree else {
+            // No-worktree duplicate: share the source path, no git work.
+            let project = Project(
+                name: trimmedName,
+                path: source.path,
+                agentID: source.agentID,
+                command: source.command,
+                args: source.args,
+                env: source.env,
+                autoStart: snapshot.autoStart,
+                worktreeInfo: nil,
+                parentProjectID: source.id
+            )
+            onCreate(project)
+            return
+        }
+
+        let trimmedBranch = snapshot.branchName.trimmingCharacters(in: .whitespaces)
+        let trimmedPath = snapshot.pathString.trimmingCharacters(in: .whitespaces)
+        let base = snapshot.baseBranch?.trimmingCharacters(in: .whitespaces)
+
         isCreating = true
 
         let sourceRepoPath = source.path
@@ -178,7 +218,8 @@ struct ProjectDuplicateView: View {
                         worktreeInfo: WorktreeInfo(
                             sourceRepoPath: sourceRepoPath,
                             branch: trimmedBranch
-                        )
+                        ),
+                        parentProjectID: source.id
                     )
                     onCreate(project)
                 case .failure(let error):
@@ -194,49 +235,65 @@ struct ProjectDuplicateView: View {
 /// View-model for `ProjectDuplicateView`. Lives at module scope (not
 /// fileprivate) so the auto-derivation behavior can be unit-tested without
 /// instantiating the SwiftUI view.
-struct ProjectProjectDuplicateDraft {
+struct ProjectDuplicateDraft {
     var name: String
     var branchName: String
     var baseBranch: String?
     var pathString: String
     var autoStart: Bool
+    var createWorktree: Bool
     var nameUserEdited: Bool = false
     var pathUserEdited: Bool = false
 
     let sourceName: String
     let parentDir: String
     let availableBranches: [String]
+    let isGitRepo: Bool
 
-    init(source: Project, availableBranches: [String]? = nil) {
+    init(
+        source: Project,
+        availableBranches: [String]? = nil,
+        isGitRepo: Bool? = nil
+    ) {
         let parent = source.path.deletingLastPathComponent().path
+        // Tests inject overrides to avoid shelling out to git.
+        let resolvedIsGitRepo = isGitRepo ?? GitWorktree.isGitRepo(at: source.path)
         self.sourceName = source.name
         self.parentDir = parent
-        // Tests inject an explicit branch list to avoid shelling out to git.
-        self.availableBranches = availableBranches ?? GitWorktree.listLocalBranches(at: source.path)
+        self.availableBranches = availableBranches ?? (resolvedIsGitRepo ? GitWorktree.listLocalBranches(at: source.path) : [])
+        self.isGitRepo = resolvedIsGitRepo
         self.name = source.name
         self.branchName = ""
         self.baseBranch = nil
         self.pathString = parent
         self.autoStart = source.autoStart
+        // Default to "make a worktree" when we can — that's the path users
+        // following the duplicate flow usually want. Non-git sources don't
+        // get the toggle at all, so this just stays false there.
+        self.createWorktree = resolvedIsGitRepo
     }
 
     var isValid: Bool {
-        !name.trimmingCharacters(in: .whitespaces).isEmpty &&
-        !branchName.trimmingCharacters(in: .whitespaces).isEmpty &&
-        !pathString.trimmingCharacters(in: .whitespaces).isEmpty
+        guard !name.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
+        guard createWorktree else { return true }
+        return !branchName.trimmingCharacters(in: .whitespaces).isEmpty &&
+            !pathString.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     /// Auto-fills `name` and `pathString` from the current branch name, but
     /// only for fields the user hasn't typed into yet. Once a field has been
     /// edited it stops tracking, so the branch field can be tweaked
-    /// afterwards without clobbering custom values.
+    /// afterwards without clobbering custom values. When `createWorktree` is
+    /// off the branch is irrelevant — fall back to the source name / parent
+    /// dir for the auto-derived fields.
     mutating func refreshDerivedFields() {
         let trimmed = branchName.trimmingCharacters(in: .whitespaces)
+        let effectiveBranch = createWorktree ? trimmed : ""
         if !nameUserEdited {
-            name = trimmed.isEmpty ? sourceName : "\(sourceName) (\(trimmed))"
+            name = effectiveBranch.isEmpty ? sourceName : "\(sourceName) (\(effectiveBranch))"
         }
         if !pathUserEdited {
-            let dir = trimmed.isEmpty ? "" : "/\(trimmed)"
+            let dir = effectiveBranch.isEmpty ? "" : "/\(effectiveBranch)"
             pathString = parentDir + dir
         }
     }

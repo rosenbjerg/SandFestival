@@ -1233,6 +1233,17 @@
         }
       }
     },
+    "duplicate.field.create_worktree": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create git worktree"
+          }
+        }
+      }
+    },
     "duplicate.action.cancel": {
       "extractionState": "manual",
       "localizations": {
@@ -1383,6 +1394,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Duplicate…"
+          }
+        }
+      }
+    },
+    "sidebar.disclosure.expand": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Expand"
+          }
+        }
+      }
+    },
+    "sidebar.disclosure.collapse": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Collapse"
           }
         }
       }
