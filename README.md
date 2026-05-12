@@ -9,11 +9,10 @@
 ---
 
 Sand Festival replaces "many Terminal tabs each running `claude` in a different
-project" with a single window: a sidebar listing every project, a real
-embedded terminal for the selected one, and a menu bar item that tells you
-which sessions are waiting on you. Sessions live for as long as the app does;
-when something needs your attention, you see it at a glance and jump in with
-one click.
+project" with a single window: a sidebar listing every project and a real
+embedded terminal for the selected one. Sessions live for as long as the app
+does; when something needs your attention, the dock badge and a notification
+tell you which project, and you jump in with one click.
 
 ## Install
 
@@ -62,8 +61,9 @@ brew uninstall --zap --cask sandfestival      # also removes projects, prefs, ca
   entries in `~/.claude/settings.json` so it knows exactly when a session
   starts, finishes a turn, or is waiting on you — no PTY scraping, no
   guessing.
-- **Menu bar attention indicator.** A single glance tells you whether any
-  session needs input. Click to jump straight to that project.
+- **Dock-badge attention indicator.** A glance at the dock tells you how
+  many sessions need input; tap the notification to jump straight to that
+  project.
 - **Drag-to-reorder sidebar.** Or let the most recently active project float
   to the top automatically.
 - **Token-scoped local listener.** The hook receiver binds to

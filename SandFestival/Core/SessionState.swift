@@ -13,9 +13,9 @@ enum SessionState: Equatable {
 }
 
 extension SessionState {
-    /// Short, localized name for the state. Used by the menu bar list, the
-    /// sidebar status dot's accessibility label, and anywhere else the UI
-    /// needs to say "what is this session doing right now" in one word.
+    /// Short, localized name for the state. Used by the sidebar status
+    /// dot's accessibility label and anywhere else the UI needs to say
+    /// "what is this session doing right now" in one word.
     var displayLabel: String {
         switch self {
         case .starting: return String(localized: "status.starting")

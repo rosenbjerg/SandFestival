@@ -55,29 +55,11 @@ struct SandFestivalApp: App {
             }
         }
 
-        MenuBarExtra {
-            MenuBarContentView(manager: manager)
-        } label: {
-            menuBarLabel
-        }
-        .menuBarExtraStyle(.menu)
-
         Settings {
             AttentionPreferencesView(
                 preferences: attentionPreferences,
                 notifier: attentionNotifier
             )
-        }
-    }
-
-    @ViewBuilder
-    private var menuBarLabel: some View {
-        let attentionCount = manager.attentionSessions.count
-
-        if attentionCount == 0 {
-            Image(systemName: "tray")
-        } else {
-            Label("\(attentionCount)", systemImage: "tray.full.fill")
         }
     }
 

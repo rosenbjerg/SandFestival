@@ -175,18 +175,18 @@ final class SessionManager {
     }
 
     /// Live sessions whose state needs the user's attention, in sidebar order.
-    /// Used by the menu bar label, the menu bar drop-down list, and the
-    /// dock-badge / bounce logic in AttentionNotifier so all three surfaces
-    /// stay in agreement about what "needs attention" means.
+    /// Used by the dock-badge / bounce logic in AttentionNotifier so the
+    /// sidebar and notifications stay in agreement about what "needs
+    /// attention" means.
     var attentionSessions: [Session] {
         projects.compactMap { sessions[$0.id] }
             .filter { $0.state.needsAttention }
     }
 
-    /// Selects a project and brings the app to the front. The menu bar list,
-    /// the notification-tap handler, and any future deep-link entry point
-    /// route through here so the three-step (select / activate / front)
-    /// dance lives in exactly one place.
+    /// Selects a project and brings the app to the front. The
+    /// notification-tap handler and any future deep-link entry point route
+    /// through here so the three-step (select / activate / front) dance
+    /// lives in exactly one place.
     func focus(projectID: Project.ID) {
         selectedProjectID = projectID
         NSApp.activate(ignoringOtherApps: true)
