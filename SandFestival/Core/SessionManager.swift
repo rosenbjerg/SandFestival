@@ -11,11 +11,21 @@ final class SessionManager {
     var selectedProjectID: Project.ID?
     private(set) var lastPersistError: String?
     private(set) var terminalFontSize: CGFloat = SessionManager.defaultFontSize
+    private(set) var terminalScrollback: Int = SessionManager.defaultScrollback
 
     static let defaultFontSize: CGFloat = 13
     static let minFontSize: CGFloat = 9
     static let maxFontSize: CGFloat = 32
     private static let fontSizeKey = "terminal.fontSize"
+
+    /// Scrollback covers a few screens of Claude output without ballooning
+    /// memory across many always-resident terminal views (DetailPaneView
+    /// keeps every session's view in the hierarchy, so the cost is linear
+    /// in project count).
+    static let defaultScrollback: Int = 2_000
+    static let minScrollback: Int = 500
+    static let maxScrollback: Int = 50_000
+    private static let scrollbackKey = "terminal.scrollback"
 
     @ObservationIgnored private let store: ProjectStore
     @ObservationIgnored private(set) var adapter: (any AgentAdapter)?
@@ -43,9 +53,12 @@ final class SessionManager {
 
         UserDefaults.standard.register(defaults: [
             SessionManager.fontSizeKey: Double(SessionManager.defaultFontSize),
+            SessionManager.scrollbackKey: SessionManager.defaultScrollback,
         ])
         let storedFontSize = CGFloat(UserDefaults.standard.double(forKey: SessionManager.fontSizeKey))
         terminalFontSize = SessionManager.clampFontSize(storedFontSize)
+        let storedScrollback = UserDefaults.standard.integer(forKey: SessionManager.scrollbackKey)
+        terminalScrollback = SessionManager.clampScrollback(storedScrollback)
 
         do {
             projects = try resolvedStore.load()
@@ -247,6 +260,7 @@ final class SessionManager {
     private func makeSession(for project: Project) -> Session {
         let session = Session(project: project)
         session.terminalView.font = currentTerminalFont()
+        session.terminalView.getTerminal().changeScrollback(terminalScrollback)
         // Pure black + ANSI "white" (≈ light gray) is what makes plain text
         // look dull. A near-black background (Terminal.app's Pro theme is
         // similar) and an off-white default foreground push contrast back up
@@ -336,6 +350,22 @@ final class SessionManager {
 
     private static func clampFontSize(_ size: CGFloat) -> CGFloat {
         min(max(size, minFontSize), maxFontSize)
+    }
+
+    // MARK: - Terminal scrollback
+
+    func applyTerminalScrollback(_ lines: Int) {
+        let clamped = SessionManager.clampScrollback(lines)
+        guard clamped != terminalScrollback else { return }
+        terminalScrollback = clamped
+        UserDefaults.standard.set(clamped, forKey: SessionManager.scrollbackKey)
+        for session in sessions.values {
+            session.terminalView.getTerminal().changeScrollback(clamped)
+        }
+    }
+
+    private static func clampScrollback(_ lines: Int) -> Int {
+        min(max(lines, minScrollback), maxScrollback)
     }
 
     private func handle(for project: Project) -> SessionHandle {

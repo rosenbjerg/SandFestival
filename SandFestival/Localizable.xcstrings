@@ -1385,6 +1385,66 @@
           }
         }
       }
+    },
+    "preferences.tab.attention": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attention"
+          }
+        }
+      }
+    },
+    "preferences.tab.terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal"
+          }
+        }
+      }
+    },
+    "preferences.terminal.scrollback.section": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scrollback"
+          }
+        }
+      }
+    },
+    "preferences.terminal.scrollback.label": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scrollback buffer"
+          }
+        }
+      }
+    },
+    "preferences.terminal.scrollback.unit": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ lines"
+          }
+        }
+      }
+    },
+    "preferences.terminal.scrollback.description": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How many lines of past output each session keeps for scroll-back. New sessions and live sessions both pick up the change immediately. Range: %d–%d lines."
+          }
+        }
+      }
     }
   },
   "version": "1.1"

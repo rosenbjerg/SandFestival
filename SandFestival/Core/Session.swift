@@ -51,16 +51,9 @@ final class Session: Identifiable {
 
     var id: Project.ID { project.id }
 
-    /// Scrollback line count for each session's normal buffer. SwiftTerm's
-    /// default of 500 only covers a screen or two of Claude's output —
-    /// large file dumps or tool transcripts vanish off the top before the
-    /// user can scroll back to them.
-    private static let scrollbackLines = 10_000
-
     init(project: Project) {
         self.project = project
         let view = SessionTerminalView(frame: .zero)
-        view.getTerminal().changeScrollback(Session.scrollbackLines)
         self.terminalView = view
         let bridge = ProcessBridge()
         self.processBridge = bridge
