@@ -93,9 +93,10 @@ final class AttentionNotifier: NSObject {
     private func handleStateChange(session: Session, from old: SessionState, to new: SessionState) {
         updateDockBadge()
 
+        let event = AttentionEvent.from(transition: old, to: new)
         let decision = AttentionDecision.decide(
-            wasAttention: old.needsAttention,
-            isAttention: new.needsAttention,
+            event: event,
+            enabledEvents: preferences.enabledEvents,
             appIsFrontmost: NSApp.isActive,
             isInFocusMode: isInFocusMode(),
             notificationsEnabled: preferences.notificationsEnabled,
@@ -105,10 +106,13 @@ final class AttentionNotifier: NSObject {
         if decision.shouldBounce {
             issueBounce()
         }
-        if decision.shouldNotify {
-            postNotification(for: session, state: new)
+        if decision.shouldNotify, let event {
+            postNotification(for: session, event: event, state: new)
         }
-        if !new.needsAttention {
+        // Only clean up when the user has *resolved* an attention state —
+        // `working → idle` (a finishedOutputting notification we just
+        // posted) must not be withdrawn the same tick.
+        if old.needsAttention, !new.needsAttention {
             cancelBounceIfNoAttentionRemains()
             withdrawNotification(for: session.project.id)
         }
@@ -146,10 +150,10 @@ final class AttentionNotifier: NSObject {
 
     // MARK: - Notifications
 
-    private func postNotification(for session: Session, state: SessionState) {
+    private func postNotification(for session: Session, event: AttentionEvent, state: SessionState) {
         let content = UNMutableNotificationContent()
         content.title = session.project.name
-        content.body = Self.notificationBody(for: state)
+        content.body = Self.notificationBody(for: event, state: state)
         content.sound = .default
         content.userInfo = [Self.projectIDKey: session.project.id.uuidString]
         // One identifier per project means a subsequent transition (e.g.
@@ -176,18 +180,23 @@ final class AttentionNotifier: NSObject {
 
     nonisolated static let projectIDKey = "projectID"
 
-    private static func notificationBody(for state: SessionState) -> String {
-        switch state {
-        case .waitingForPermission:
+    private static func notificationBody(for event: AttentionEvent, state: SessionState) -> String {
+        switch event {
+        case .permissionRequested:
             return String(localized: "notification.body.waiting_permission")
-        case .waitingForIdle:
+        case .inputRequested:
             return String(localized: "notification.body.waiting_idle")
         case .blockedByAutoMode:
             return String(localized: "notification.body.blocked_auto_mode")
-        case .errored(let reason):
-            return String(format: String(localized: "notification.body.errored"), reason)
-        case .starting, .idle, .working, .stopped:
+        case .errored:
+            if case .errored(let reason) = state {
+                return String(format: String(localized: "notification.body.errored"), reason)
+            }
             return String(localized: "notification.body.generic")
+        case .finishedOutputting:
+            return String(localized: "notification.body.finished_outputting")
+        case .stopped:
+            return String(localized: "notification.body.stopped")
         }
     }
 
@@ -237,18 +246,19 @@ struct AttentionDecision: Equatable, Sendable {
     var shouldNotify: Bool
 
     static func decide(
-        wasAttention: Bool,
-        isAttention: Bool,
+        event: AttentionEvent?,
+        enabledEvents: Set<AttentionEvent>,
         appIsFrontmost: Bool,
         isInFocusMode: Bool,
         notificationsEnabled: Bool,
         notificationTrigger: NotificationTrigger
     ) -> AttentionDecision {
-        let transitionIn = isAttention && !wasAttention
-        let shouldBounce = transitionIn && !appIsFrontmost && !isInFocusMode
+        guard let event, enabledEvents.contains(event) else {
+            return AttentionDecision(shouldBounce: false, shouldNotify: false)
+        }
+        let shouldBounce = !appIsFrontmost && !isInFocusMode
         let shouldNotify =
-            transitionIn
-            && notificationsEnabled
+            notificationsEnabled
             && (notificationTrigger == .always || !appIsFrontmost)
         return AttentionDecision(shouldBounce: shouldBounce, shouldNotify: shouldNotify)
     }
