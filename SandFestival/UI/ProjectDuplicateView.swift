@@ -198,14 +198,26 @@ struct ProjectDuplicateView: View {
         let sourceRepoPath = source.path
         let newPath = URL(fileURLWithPath: trimmedPath)
 
+        // Only manage the gitignore when the worktree lands inside the
+        // source repo's default `.worktrees/` directory. If the user
+        // pointed it elsewhere (a sibling dir, a totally separate path)
+        // we don't know what pattern to ignore, and guessing would pollute
+        // their gitignore.
+        let worktreesDir = sourceRepoPath.appendingPathComponent(".worktrees").path + "/"
+        let shouldUpdateGitignore = newPath.path.hasPrefix(worktreesDir)
+
         Task {
             let result = await Task.detached {
-                GitWorktree.addWorktree(
+                let outcome = GitWorktree.addWorktree(
                     newBranch: trimmedBranch,
                     newPath: newPath,
                     base: base,
                     sourceRepoPath: sourceRepoPath
                 )
+                if case .success = outcome, shouldUpdateGitignore {
+                    GitWorktree.ensureWorktreesIgnored(at: sourceRepoPath)
+                }
+                return outcome
             }.value
 
             await MainActor.run {

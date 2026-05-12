@@ -94,6 +94,78 @@ struct GitWorktreeTests {
         }
     }
 
+    @Test("ensureWorktreesIgnored creates .gitignore when missing")
+    func ensureWorktreesIgnoredCreatesFile() throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let gitignore = dir.appendingPathComponent(".gitignore")
+        #expect(!FileManager.default.fileExists(atPath: gitignore.path))
+
+        GitWorktree.ensureWorktreesIgnored(at: dir)
+
+        let contents = try String(contentsOf: gitignore, encoding: .utf8)
+        #expect(contents == ".worktrees/\n")
+    }
+
+    @Test("ensureWorktreesIgnored appends when existing gitignore lacks entry")
+    func ensureWorktreesIgnoredAppendsEntry() throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let gitignore = dir.appendingPathComponent(".gitignore")
+        try "build/\n*.log\n".write(to: gitignore, atomically: true, encoding: .utf8)
+
+        GitWorktree.ensureWorktreesIgnored(at: dir)
+
+        let contents = try String(contentsOf: gitignore, encoding: .utf8)
+        #expect(contents == "build/\n*.log\n.worktrees/\n")
+    }
+
+    @Test("ensureWorktreesIgnored inserts a newline before appending when missing")
+    func ensureWorktreesIgnoredFixesMissingTrailingNewline() throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let gitignore = dir.appendingPathComponent(".gitignore")
+        // No trailing newline — common when the file was hand-edited.
+        try "build/".write(to: gitignore, atomically: true, encoding: .utf8)
+
+        GitWorktree.ensureWorktreesIgnored(at: dir)
+
+        let contents = try String(contentsOf: gitignore, encoding: .utf8)
+        #expect(contents == "build/\n.worktrees/\n")
+    }
+
+    @Test("ensureWorktreesIgnored is a no-op when entry already present")
+    func ensureWorktreesIgnoredIsIdempotent() throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let gitignore = dir.appendingPathComponent(".gitignore")
+        let original = "build/\n.worktrees/\n*.log\n"
+        try original.write(to: gitignore, atomically: true, encoding: .utf8)
+
+        GitWorktree.ensureWorktreesIgnored(at: dir)
+        // Run a second time to confirm idempotency under back-to-back calls.
+        GitWorktree.ensureWorktreesIgnored(at: dir)
+
+        let contents = try String(contentsOf: gitignore, encoding: .utf8)
+        #expect(contents == original)
+    }
+
+    @Test("ensureWorktreesIgnored recognizes equivalent ignore patterns")
+    func ensureWorktreesIgnoredRecognizesVariants() throws {
+        for variant in [".worktrees", "/.worktrees/", "/.worktrees"] {
+            let dir = try makeTempDir()
+            defer { try? FileManager.default.removeItem(at: dir) }
+            let gitignore = dir.appendingPathComponent(".gitignore")
+            let original = "build/\n\(variant)\n"
+            try original.write(to: gitignore, atomically: true, encoding: .utf8)
+
+            GitWorktree.ensureWorktreesIgnored(at: dir)
+
+            let contents = try String(contentsOf: gitignore, encoding: .utf8)
+            #expect(contents == original, "variant \(variant) should be recognized as already covered")
+        }
+    }
+
     // MARK: - Helpers
 
     private func hasGit() -> Bool {

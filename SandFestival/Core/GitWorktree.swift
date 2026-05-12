@@ -50,6 +50,34 @@ enum GitWorktree {
         return runChecked(args, at: sourceRepoPath)
     }
 
+    /// Idempotently ensures `.worktrees/` is listed in the source repo's
+    /// `.gitignore`. Creates the file if missing, leaves it alone if a
+    /// covering entry is already present, and is silent on I/O failure —
+    /// gitignore hygiene is a nicety, not load-bearing for the worktree
+    /// itself, so we don't want to surface errors that would block the
+    /// project creation flow.
+    nonisolated static func ensureWorktreesIgnored(at repoPath: URL) {
+        let gitignore = repoPath.appendingPathComponent(".gitignore")
+        let existing: String
+        if let data = try? Data(contentsOf: gitignore),
+           let text = String(data: data, encoding: .utf8) {
+            existing = text
+            // Accept any of the common shapes that already cover us so we
+            // don't pile on duplicate entries.
+            let covered: Set<String> = [".worktrees", ".worktrees/", "/.worktrees", "/.worktrees/"]
+            let alreadyHas = text
+                .split(whereSeparator: \.isNewline)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .contains(where: { covered.contains($0) })
+            if alreadyHas { return }
+        } else {
+            existing = ""
+        }
+        let separator = existing.isEmpty || existing.hasSuffix("\n") ? "" : "\n"
+        let appended = existing + separator + ".worktrees/\n"
+        try? appended.write(to: gitignore, atomically: true, encoding: .utf8)
+    }
+
     /// `git worktree remove [--force] <worktreePath>` from `sourceRepoPath`.
     /// Run from the source repo because the worktree dir may be gone already.
     nonisolated static func removeWorktree(
