@@ -1,0 +1,100 @@
+name: Bug report
+description: Report something that's broken in Sand Festival
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug! Please fill in what you can — the more we know, the faster it gets fixed.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected to happen instead.
+      placeholder: |
+        I clicked Start on a project and ...
+        I expected ...
+        Instead, ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps that reliably trigger the bug.
+      placeholder: |
+        1. Open Sand Festival
+        2. Add a project at ~/code/foo
+        3. Click Start
+        4. ...
+    validations:
+      required: true
+
+  - type: input
+    id: sandfestival-version
+    attributes:
+      label: Sand Festival version
+      description: See **Sand Festival → About** in the menu bar.
+      placeholder: e.g. 0.4.2
+    validations:
+      required: true
+
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version
+      description: Run `sw_vers -productVersion` in Terminal.
+      placeholder: e.g. 26.1
+    validations:
+      required: true
+
+  - type: input
+    id: claude-version
+    attributes:
+      label: Claude Code version
+      description: Run `claude --version`.
+      placeholder: e.g. 1.0.42
+    validations:
+      required: false
+
+  - type: input
+    id: nono-version
+    attributes:
+      label: nono version (if used)
+      description: Run `nono --version`. Leave blank if you've changed the spawn command to not use nono.
+      placeholder: e.g. 0.7.1
+    validations:
+      required: false
+
+  - type: textarea
+    id: spawn-command
+    attributes:
+      label: Project spawn command
+      description: The `command` and `args` from the affected project's settings, if you've changed them from the default.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs / Console output
+      description: |
+        - Terminal scrollback from the affected session, if relevant.
+        - `log show --predicate 'subsystem == "app.sandfestival"' --last 10m` for app-side logs.
+        Strip anything sensitive before pasting.
+      render: text
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submit checks
+      options:
+        - label: I searched existing issues and didn't find a duplicate.
+          required: true
+        - label: I'm on the latest released version (or a recent build from source).
+          required: false

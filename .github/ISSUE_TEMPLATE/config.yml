@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Claude Code documentation
+    url: https://docs.claude.com/en/docs/claude-code/
+    about: Questions about Claude Code itself (not Sand Festival) belong upstream.
+  - name: nono sandbox
+    url: https://github.com/always-further/nono
+    about: Issues with the nono sandbox wrapper belong in the nono repo.
