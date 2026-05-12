@@ -151,8 +151,6 @@ struct AttentionPreferencesView: View {
             return String(localized: "preferences.events.errored")
         case .finishedOutputting:
             return String(localized: "preferences.events.finished_outputting")
-        case .stopped:
-            return String(localized: "preferences.events.stopped")
         }
     }
 

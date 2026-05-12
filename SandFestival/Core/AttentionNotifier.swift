@@ -195,8 +195,6 @@ final class AttentionNotifier: NSObject {
             return String(localized: "notification.body.generic")
         case .finishedOutputting:
             return String(localized: "notification.body.finished_outputting")
-        case .stopped:
-            return String(localized: "notification.body.stopped")
         }
     }
 

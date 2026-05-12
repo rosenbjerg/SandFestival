@@ -17,14 +17,13 @@ struct AttentionPreferencesTests {
         #expect(prefs.enabledEvents == AttentionPreferences.defaultEnabledEvents)
     }
 
-    @Test("Default enabled-events covers every attention state and finishedOutputting; stopped opt-in")
+    @Test("Default enabled-events covers every attention state and finishedOutputting")
     func defaultEnabledEventsContents() {
         #expect(AttentionPreferences.defaultEnabledEvents.contains(.permissionRequested))
         #expect(AttentionPreferences.defaultEnabledEvents.contains(.inputRequested))
         #expect(AttentionPreferences.defaultEnabledEvents.contains(.blockedByAutoMode))
         #expect(AttentionPreferences.defaultEnabledEvents.contains(.errored))
         #expect(AttentionPreferences.defaultEnabledEvents.contains(.finishedOutputting))
-        #expect(AttentionPreferences.defaultEnabledEvents.contains(.stopped) == false)
     }
 
     @Test("Mutations persist to the same UserDefaults suite")
@@ -36,14 +35,14 @@ struct AttentionPreferencesTests {
         first.notificationsEnabled = true
         first.notificationTrigger = .always
         first.autoSurfaceActiveProject = true
-        first.enabledEvents = [.permissionRequested, .stopped]
+        first.enabledEvents = [.permissionRequested, .errored]
 
         let second = AttentionPreferences(defaults: defaults)
         #expect(second.dockBounceStyle == .critical)
         #expect(second.notificationsEnabled == true)
         #expect(second.notificationTrigger == .always)
         #expect(second.autoSurfaceActiveProject == true)
-        #expect(second.enabledEvents == [.permissionRequested, .stopped])
+        #expect(second.enabledEvents == [.permissionRequested, .errored])
     }
 
     @Test("Enabled-events insertion through the property fires didSet")

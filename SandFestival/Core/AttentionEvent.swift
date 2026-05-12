@@ -10,7 +10,6 @@ enum AttentionEvent: String, CaseIterable, Identifiable, Sendable {
     case blockedByAutoMode
     case errored
     case finishedOutputting
-    case stopped
 
     var id: String { rawValue }
 }
@@ -38,9 +37,10 @@ extension AttentionEvent {
         case .idle:
             if case .working = old { return .finishedOutputting }
             return nil
-        case .stopped:
-            return .stopped
-        case .starting, .working:
+        case .starting, .working, .stopped:
+            // .stopped is almost always user-initiated (Stop button, /exit
+            // in the terminal); surfacing a notification would alert the
+            // user about an action they just took.
             return nil
         }
     }
