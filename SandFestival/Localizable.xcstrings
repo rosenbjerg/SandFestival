@@ -587,50 +587,6 @@
         }
       }
     },
-    "menubar.action.quit": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Quit Sand Festival"
-          }
-        }
-      }
-    },
-    "menubar.action.show": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Show Sand Festival"
-          }
-        }
-      }
-    },
-    "menubar.no_attention": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No sessions need attention"
-          }
-        }
-      }
-    },
-    "menubar.section.attention": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Needs attention"
-          }
-        }
-      }
-    },
     "notification.body.blocked_auto_mode": {
       "extractionState": "manual",
       "localizations": {
