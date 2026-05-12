@@ -801,6 +801,28 @@
         }
       }
     },
+    "notification.body.finished_outputting": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude finished its turn."
+          }
+        }
+      }
+    },
+    "notification.body.stopped": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session stopped."
+          }
+        }
+      }
+    },
     "notification.body.errored": {
       "extractionState": "manual",
       "localizations": {
@@ -933,6 +955,72 @@
         }
       }
     },
+    "preferences.events.blocked_auto_mode": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-mode blocked"
+          }
+        }
+      }
+    },
+    "preferences.events.errored": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session errored"
+          }
+        }
+      }
+    },
+    "preferences.events.finished_outputting": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude finished its turn"
+          }
+        }
+      }
+    },
+    "preferences.events.input_requested": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude is asking for input"
+          }
+        }
+      }
+    },
+    "preferences.events.permission_requested": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude is asking for permission"
+          }
+        }
+      }
+    },
+    "preferences.events.stopped": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session stopped"
+          }
+        }
+      }
+    },
     "preferences.notifications.enabled": {
       "extractionState": "manual",
       "localizations": {
@@ -984,6 +1072,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Only when Sand Festival isn't focused"
+          }
+        }
+      }
+    },
+    "preferences.section.events": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notify me when"
+          }
+        }
+      }
+    },
+    "preferences.section.events.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "These transitions trigger a dock bounce and (if enabled below) a banner notification."
           }
         }
       }

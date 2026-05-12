@@ -36,6 +36,17 @@ final class AttentionPreferences {
         }
     }
 
+    /// Which session-state transitions should pull the user's attention
+    /// (dock bounce + banner notification). Persisted as the raw-value
+    /// strings of `AttentionEvent`. Unknown stored values are dropped on
+    /// load — older builds writing this key won't poison a newer schema.
+    var enabledEvents: Set<AttentionEvent> {
+        didSet {
+            guard enabledEvents != oldValue else { return }
+            defaults.set(enabledEvents.map(\.rawValue), forKey: Keys.enabledEvents)
+        }
+    }
+
     @ObservationIgnored private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
@@ -45,6 +56,7 @@ final class AttentionPreferences {
             Keys.notificationsEnabled: false,
             Keys.notificationTrigger: NotificationTrigger.unfocusedOnly.rawValue,
             Keys.autoSurfaceActiveProject: false,
+            Keys.enabledEvents: AttentionPreferences.defaultEnabledEvents.map(\.rawValue),
         ])
         self.dockBounceStyle =
             DockBounceStyle(rawValue: defaults.string(forKey: Keys.dockBounceStyle) ?? "")
@@ -54,13 +66,28 @@ final class AttentionPreferences {
             NotificationTrigger(rawValue: defaults.string(forKey: Keys.notificationTrigger) ?? "")
             ?? .unfocusedOnly
         self.autoSurfaceActiveProject = defaults.bool(forKey: Keys.autoSurfaceActiveProject)
+        let storedEvents = (defaults.array(forKey: Keys.enabledEvents) as? [String]) ?? []
+        self.enabledEvents = Set(storedEvents.compactMap(AttentionEvent.init(rawValue:)))
     }
+
+    /// What ships on for a fresh install: every existing attention state
+    /// plus the new `finishedOutputting` cue (the headline reason for
+    /// adding per-event control). `stopped` stays off by default — it's
+    /// the noisiest signal and easily inferred from the dock.
+    static let defaultEnabledEvents: Set<AttentionEvent> = [
+        .permissionRequested,
+        .inputRequested,
+        .blockedByAutoMode,
+        .errored,
+        .finishedOutputting,
+    ]
 
     private enum Keys {
         static let dockBounceStyle = "attention.dockBounceStyle"
         static let notificationsEnabled = "attention.notificationsEnabled"
         static let notificationTrigger = "attention.notificationTrigger"
         static let autoSurfaceActiveProject = "attention.autoSurfaceActiveProject"
+        static let enabledEvents = "attention.enabledEvents"
     }
 }
 

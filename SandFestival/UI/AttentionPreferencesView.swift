@@ -11,6 +11,20 @@ struct AttentionPreferencesView: View {
 
     var body: some View {
         Form {
+            Section(String(localized: "preferences.section.events")) {
+                ForEach(AttentionEvent.allCases) { event in
+                    Toggle(
+                        label(for: event),
+                        isOn: binding(for: event)
+                    )
+                }
+
+                Text(String(localized: "preferences.section.events.description"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             Section(String(localized: "preferences.section.dock")) {
                 Picker(
                     String(localized: "preferences.dock.bounce_style"),
@@ -109,6 +123,36 @@ struct AttentionPreferencesView: View {
                 .foregroundStyle(.secondary)
         @unknown default:
             EmptyView()
+        }
+    }
+
+    private func binding(for event: AttentionEvent) -> Binding<Bool> {
+        Binding(
+            get: { preferences.enabledEvents.contains(event) },
+            set: { isOn in
+                if isOn {
+                    preferences.enabledEvents.insert(event)
+                } else {
+                    preferences.enabledEvents.remove(event)
+                }
+            }
+        )
+    }
+
+    private func label(for event: AttentionEvent) -> String {
+        switch event {
+        case .permissionRequested:
+            return String(localized: "preferences.events.permission_requested")
+        case .inputRequested:
+            return String(localized: "preferences.events.input_requested")
+        case .blockedByAutoMode:
+            return String(localized: "preferences.events.blocked_auto_mode")
+        case .errored:
+            return String(localized: "preferences.events.errored")
+        case .finishedOutputting:
+            return String(localized: "preferences.events.finished_outputting")
+        case .stopped:
+            return String(localized: "preferences.events.stopped")
         }
     }
 

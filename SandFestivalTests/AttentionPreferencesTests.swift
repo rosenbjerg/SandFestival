@@ -14,6 +14,17 @@ struct AttentionPreferencesTests {
         #expect(prefs.notificationsEnabled == false)
         #expect(prefs.notificationTrigger == .unfocusedOnly)
         #expect(prefs.autoSurfaceActiveProject == false)
+        #expect(prefs.enabledEvents == AttentionPreferences.defaultEnabledEvents)
+    }
+
+    @Test("Default enabled-events covers every attention state and finishedOutputting; stopped opt-in")
+    func defaultEnabledEventsContents() {
+        #expect(AttentionPreferences.defaultEnabledEvents.contains(.permissionRequested))
+        #expect(AttentionPreferences.defaultEnabledEvents.contains(.inputRequested))
+        #expect(AttentionPreferences.defaultEnabledEvents.contains(.blockedByAutoMode))
+        #expect(AttentionPreferences.defaultEnabledEvents.contains(.errored))
+        #expect(AttentionPreferences.defaultEnabledEvents.contains(.finishedOutputting))
+        #expect(AttentionPreferences.defaultEnabledEvents.contains(.stopped) == false)
     }
 
     @Test("Mutations persist to the same UserDefaults suite")
@@ -25,12 +36,25 @@ struct AttentionPreferencesTests {
         first.notificationsEnabled = true
         first.notificationTrigger = .always
         first.autoSurfaceActiveProject = true
+        first.enabledEvents = [.permissionRequested, .stopped]
 
         let second = AttentionPreferences(defaults: defaults)
         #expect(second.dockBounceStyle == .critical)
         #expect(second.notificationsEnabled == true)
         #expect(second.notificationTrigger == .always)
         #expect(second.autoSurfaceActiveProject == true)
+        #expect(second.enabledEvents == [.permissionRequested, .stopped])
+    }
+
+    @Test("Enabled-events insertion through the property fires didSet")
+    func enabledEventsMutationPersists() {
+        let defaults = makeDefaults()
+        let prefs = AttentionPreferences(defaults: defaults)
+        prefs.enabledEvents = []
+        prefs.enabledEvents.insert(.finishedOutputting)
+
+        let reloaded = AttentionPreferences(defaults: defaults)
+        #expect(reloaded.enabledEvents == [.finishedOutputting])
     }
 
     @Test("Unrecognised stored raw values fall back to safe defaults")
@@ -42,6 +66,15 @@ struct AttentionPreferencesTests {
         let prefs = AttentionPreferences(defaults: defaults)
         #expect(prefs.dockBounceStyle == .informational)
         #expect(prefs.notificationTrigger == .unfocusedOnly)
+    }
+
+    @Test("Stored event rawValues that no longer exist are dropped without poisoning the set")
+    func unknownEventRawValuesAreDropped() {
+        let defaults = makeDefaults()
+        defaults.set(["permissionRequested", "from_a_future_version"], forKey: "attention.enabledEvents")
+
+        let prefs = AttentionPreferences(defaults: defaults)
+        #expect(prefs.enabledEvents == [.permissionRequested])
     }
 
     // MARK: - Helpers
