@@ -6,6 +6,8 @@ struct ContentView: View {
     @Bindable var claudeCodeAdapter: ClaudeCodeAdapter
     @Binding var manualHookSheet: Bool
     @State private var editorTarget: ProjectEditorTarget?
+    @State private var duplicateTarget: Project?
+    @State private var removalTarget: Project?
     @State private var hookSheetSkipped = false
 
     var body: some View {
@@ -13,7 +15,12 @@ struct ContentView: View {
             StatusBannerStack(banners: banners)
 
             NavigationSplitView {
-                SidebarView(manager: manager, editorTarget: $editorTarget)
+                SidebarView(
+                    manager: manager,
+                    editorTarget: $editorTarget,
+                    duplicateTarget: $duplicateTarget,
+                    removalTarget: $removalTarget
+                )
             } detail: {
                 DetailPaneView(manager: manager, editorTarget: $editorTarget)
             }
@@ -37,6 +44,23 @@ struct ContentView: View {
                     editorTarget = nil
                 },
                 onCancel: { editorTarget = nil }
+            )
+        }
+        .sheet(item: $duplicateTarget) { source in
+            ProjectDuplicateView(
+                source: source,
+                onCreate: { project in
+                    manager.addProject(project)
+                    duplicateTarget = nil
+                },
+                onCancel: { duplicateTarget = nil }
+            )
+        }
+        .sheet(item: $removalTarget) { project in
+            ProjectRemovalView(
+                project: project,
+                onRemove: { manager.removeProject(id: project.id) },
+                onClose: { removalTarget = nil }
             )
         }
         .sheet(isPresented: hookSheetBinding) {

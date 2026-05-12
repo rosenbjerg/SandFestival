@@ -3,6 +3,8 @@ import SwiftUI
 struct SidebarView: View {
     @Bindable var manager: SessionManager
     @Binding var editorTarget: ProjectEditorTarget?
+    @Binding var duplicateTarget: Project?
+    @Binding var removalTarget: Project?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -22,9 +24,13 @@ struct SidebarView: View {
                                     editorTarget = .edit(project)
                                 }
                             }
+                            Button(String(localized: "sidebar.row.duplicate")) {
+                                duplicateTarget = project
+                            }
+                            .disabled(!GitWorktree.isGitRepo(at: project.path))
                             Button(role: .destructive) {
                                 DispatchQueue.main.async {
-                                    manager.removeProject(id: project.id)
+                                    requestRemoval(project: project)
                                 }
                             } label: {
                                 Text(String(localized: "sidebar.row.remove"))
@@ -51,6 +57,18 @@ struct SidebarView: View {
             }
         }
         .navigationSplitViewColumnWidth(min: 220, ideal: 260)
+    }
+
+    /// Plain projects skip the confirmation sheet and remove immediately
+    /// (preserves the pre-duplicate behavior). Worktree-backed projects
+    /// route through `removalTarget` so ContentView can ask whether to also
+    /// run `git worktree remove`.
+    private func requestRemoval(project: Project) {
+        if project.worktreeInfo != nil {
+            removalTarget = project
+        } else {
+            manager.removeProject(id: project.id)
+        }
     }
 
     @ViewBuilder
