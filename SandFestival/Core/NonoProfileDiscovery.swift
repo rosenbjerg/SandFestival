@@ -18,6 +18,15 @@ enum NonoProfileDiscovery {
         return profilesFromFilesystem()
     }
 
+    /// Async wrapper that runs the (subprocess-spawning) discovery off the
+    /// main actor. Call sites in SwiftUI views block view construction
+    /// otherwise, which makes the project editor sheet feel sluggish.
+    static func availableProfilesAsync() async -> [String] {
+        await Task.detached(priority: .userInitiated) {
+            availableProfiles()
+        }.value
+    }
+
     // MARK: - CLI
 
     private static func profilesFromCLI() -> [String]? {
