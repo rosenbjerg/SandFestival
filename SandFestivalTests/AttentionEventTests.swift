@@ -56,11 +56,11 @@ struct AttentionEventTests {
         #expect(AttentionEvent.from(transition: .blockedByAutoMode, to: .idle) == nil)
     }
 
-    @Test("Entering stopped maps to stopped, regardless of source state")
-    func stopped() {
-        #expect(AttentionEvent.from(transition: .working, to: .stopped) == .stopped)
-        #expect(AttentionEvent.from(transition: .idle, to: .stopped) == .stopped)
-        #expect(AttentionEvent.from(transition: .errored(reason: "x"), to: .stopped) == .stopped)
+    @Test("Entering stopped is silent — almost always user-initiated")
+    func stoppedIsSilent() {
+        #expect(AttentionEvent.from(transition: .working, to: .stopped) == nil)
+        #expect(AttentionEvent.from(transition: .idle, to: .stopped) == nil)
+        #expect(AttentionEvent.from(transition: .errored(reason: "x"), to: .stopped) == nil)
     }
 
     @Test("Transitions that just resume work don't fire an event")

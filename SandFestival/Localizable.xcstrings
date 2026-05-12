@@ -812,17 +812,6 @@
         }
       }
     },
-    "notification.body.stopped": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Session stopped."
-          }
-        }
-      }
-    },
     "notification.body.errored": {
       "extractionState": "manual",
       "localizations": {
@@ -1006,17 +995,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude is asking for permission"
-          }
-        }
-      }
-    },
-    "preferences.events.stopped": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Session stopped"
           }
         }
       }
