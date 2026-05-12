@@ -143,7 +143,9 @@ final class SessionManager {
 
     func removeProject(id: Project.ID) {
         if let session = sessions[id], session.state.isRunning {
-            session.stop()
+            // Hard-kill: the project is going away, so nono's
+            // post-kill confirmation prompt has no one to answer it.
+            session.forceStop()
         }
         if let project = projects.first(where: { $0.id == id }) {
             adapter?.willTerminateSession(handle(for: project))
