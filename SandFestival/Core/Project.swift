@@ -15,6 +15,12 @@ struct Project: Codable, Identifiable, Hashable {
     /// `nil` for plain projects (the common case) — synthesized Codable uses
     /// `decodeIfPresent`, so existing projects.json files keep loading.
     var worktreeInfo: WorktreeInfo?
+    /// When this project was created via "Duplicate…", points at the
+    /// originating `Project.id`. The sidebar uses it to indent the row
+    /// underneath its parent. `nil` for top-level projects (the common
+    /// case); synthesized Codable uses `decodeIfPresent`, so legacy
+    /// projects.json files keep loading.
+    var parentProjectID: UUID?
 
     init(
         id: UUID = UUID(),
@@ -25,7 +31,8 @@ struct Project: Codable, Identifiable, Hashable {
         args: [String] = Project.defaultArgs,
         env: [String: String] = [:],
         autoStart: Bool = false,
-        worktreeInfo: WorktreeInfo? = nil
+        worktreeInfo: WorktreeInfo? = nil,
+        parentProjectID: UUID? = nil
     ) {
         self.id = id
         self.name = name
@@ -36,6 +43,7 @@ struct Project: Codable, Identifiable, Hashable {
         self.env = env
         self.autoStart = autoStart
         self.worktreeInfo = worktreeInfo
+        self.parentProjectID = parentProjectID
     }
 }
 
