@@ -25,6 +25,17 @@ enum GitWorktree {
             .filter { !$0.isEmpty }
     }
 
+    /// Async wrapper that runs the (subprocess-spawning) branch listing
+    /// off the main actor. SwiftUI view construction blocks on
+    /// `waitUntilExit()` otherwise, jamming the runloop while the system
+    /// is trying to present the sheet — same shape as the
+    /// `NonoProfileDiscovery.availableProfilesAsync` fix.
+    static func listLocalBranchesAsync(at path: URL) async -> [String] {
+        await Task.detached(priority: .userInitiated) {
+            listLocalBranches(at: path)
+        }.value
+    }
+
     /// `git worktree add -b <newBranch> <newPath> [<base>]` from `sourceRepoPath`.
     nonisolated static func addWorktree(
         newBranch: String,

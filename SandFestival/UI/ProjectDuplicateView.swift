@@ -87,6 +87,11 @@ struct ProjectDuplicateView: View {
         }
         .frame(minWidth: 540, minHeight: 360)
         .navigationTitle(String(localized: "duplicate.title"))
+        .task {
+            guard draft.isGitRepo, draft.availableBranches.isEmpty else { return }
+            let branches = await GitWorktree.listLocalBranchesAsync(at: source.path)
+            draft.availableBranches = branches
+        }
     }
 
     @ViewBuilder
@@ -247,7 +252,11 @@ struct ProjectDuplicateDraft {
 
     let sourceName: String
     let parentDir: String
-    let availableBranches: [String]
+    let sourcePath: URL
+    /// Populated asynchronously by the view's `.task` so sheet construction
+    /// doesn't block on a `git branch` subprocess on the main thread — same
+    /// pattern as `ProjectEditorView`'s `discoveredProfiles`.
+    var availableBranches: [String]
     let isGitRepo: Bool
 
     init(
@@ -260,7 +269,10 @@ struct ProjectDuplicateDraft {
         let resolvedIsGitRepo = isGitRepo ?? GitWorktree.isGitRepo(at: source.path)
         self.sourceName = source.name
         self.parentDir = parent
-        self.availableBranches = availableBranches ?? (resolvedIsGitRepo ? GitWorktree.listLocalBranches(at: source.path) : [])
+        self.sourcePath = source.path
+        // Branches start empty; the view's `.task` swaps them in once the
+        // off-main-thread subprocess returns.
+        self.availableBranches = availableBranches ?? []
         self.isGitRepo = resolvedIsGitRepo
         self.name = source.name
         self.branchName = ""
