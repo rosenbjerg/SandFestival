@@ -95,13 +95,21 @@ struct DetailPaneView: View {
 
             Button {
                 if session.state.isRunning {
-                    session.stop()
+                    if session.softStopRequested {
+                        session.forceStop()
+                    } else {
+                        session.stop()
+                    }
                 } else {
                     session.start()
                 }
             } label: {
                 if session.state.isRunning {
-                    Label(String(localized: "detail.toolbar.stop"), systemImage: "stop.fill")
+                    if session.softStopRequested {
+                        Label(String(localized: "detail.toolbar.force_stop"), systemImage: "xmark.octagon.fill")
+                    } else {
+                        Label(String(localized: "detail.toolbar.stop"), systemImage: "stop.fill")
+                    }
                 } else {
                     Label(String(localized: "detail.toolbar.start"), systemImage: "play.fill")
                 }

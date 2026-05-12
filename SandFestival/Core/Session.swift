@@ -8,6 +8,10 @@ import SwiftTerm
 final class Session: Identifiable {
     var project: Project
     private(set) var state: SessionState = .stopped
+    /// True between the first soft-stop (`stop()` / `restart()`) and the
+    /// process actually exiting. The toolbar reads this to flip the Stop
+    /// button to "Force Stop" so a second click escalates to SIGKILL.
+    private(set) var softStopRequested: Bool = false
     /// Wall-clock instant the session entered its current state. The sidebar
     /// uses this to display "waiting Xm" while in attention states; it is
     /// **not** bumped by heartbeats or other same-state events, so the count
@@ -83,6 +87,7 @@ final class Session: Identifiable {
         lastError = nil
         terminalTitle = nil
         wantsStop = false
+        softStopRequested = false
         transition(to: .starting)
         terminalView.startProcess(
             executable: executable,
@@ -111,6 +116,7 @@ final class Session: Identifiable {
         let pid = terminalView.process.shellPid
         guard pid != 0 else { return }
         wantsStop = true
+        softStopRequested = true
         kill(pid, SIGINT)
     }
 
@@ -120,10 +126,26 @@ final class Session: Identifiable {
             guard pid != 0 else { return }
             wantsStop = true
             wantsRestart = true
+            softStopRequested = true
             kill(pid, SIGINT)
         } else {
             start()
         }
+    }
+
+    /// Hard stop: SIGKILL the wrapper PID. Unblocks the "nono is wedged on
+    /// its prompt and won't quit" case after a soft stop. nono can't trap
+    /// SIGKILL, so the OS-level process death is guaranteed and the
+    /// existing `childMonitor` → `handleProcessTerminated` path runs
+    /// normally — we don't have to yank the PTY ourselves. Cancels any
+    /// queued restart so "Force Stop" really means stop, not restart.
+    func forceStop() {
+        guard state.isRunning else { return }
+        let pid = terminalView.process.shellPid
+        guard pid != 0 else { return }
+        wantsStop = true
+        wantsRestart = false
+        kill(pid, SIGKILL)
     }
 
     @ObservationIgnored private var wantsRestart = false
@@ -160,6 +182,7 @@ final class Session: Identifiable {
         let userInitiated = wantsStop
         let runDuration = processStartedAt.map { Date().timeIntervalSince($0) } ?? .infinity
         wantsStop = false
+        softStopRequested = false
         processStartedAt = nil
 
         // Surface unexpected exits (non-zero status, or any exit within the
