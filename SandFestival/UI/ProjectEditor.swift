@@ -81,6 +81,10 @@ struct ProjectEditorView: View {
         }
         .frame(minWidth: 540, minHeight: 480)
         .navigationTitle(target.title)
+        .task {
+            let profiles = await NonoProfileDiscovery.availableProfilesAsync()
+            draft.discoveredProfiles = profiles
+        }
     }
 
     @ViewBuilder
@@ -176,7 +180,9 @@ private struct ProjectDraft {
     var nonoProfile: String?
     /// Discovered profiles plus the current selection, so a value not in
     /// the discovered list still renders rather than silently resetting.
-    private let discoveredProfiles: [String]
+    /// Populated asynchronously by the editor view so the sheet can open
+    /// without waiting on a `nono profile list` subprocess.
+    var discoveredProfiles: [String] = []
 
     init() {
         self.name = ""
@@ -189,7 +195,6 @@ private struct ProjectDraft {
         self.envEntries = []
         self.autoStart = false
         self.nonoProfile = extracted.profile
-        self.discoveredProfiles = NonoProfileDiscovery.availableProfiles()
     }
 
     init(project: Project) {
@@ -205,7 +210,6 @@ private struct ProjectDraft {
             .map { EnvEntry(key: $0.key, value: $0.value) }
         self.autoStart = project.autoStart
         self.nonoProfile = extracted.profile
-        self.discoveredProfiles = NonoProfileDiscovery.availableProfiles()
     }
 
     var isNonoCommand: Bool {

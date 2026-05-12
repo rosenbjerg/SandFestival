@@ -11,11 +11,21 @@ struct SidebarView: View {
                     sidebarRow(project: project)
                         .tag(project.id)
                         .contextMenu {
+                            // Action closures run inside the menu's event-
+                            // tracking runloop mode; setting @State here
+                            // leaves the resulting `.sheet` queued until the
+                            // runloop returns to default — which used to
+                            // wait until the app lost focus. Async hop lets
+                            // the menu tear down first.
                             Button(String(localized: "sidebar.row.edit")) {
-                                editorTarget = .edit(project)
+                                DispatchQueue.main.async {
+                                    editorTarget = .edit(project)
+                                }
                             }
                             Button(role: .destructive) {
-                                manager.removeProject(id: project.id)
+                                DispatchQueue.main.async {
+                                    manager.removeProject(id: project.id)
+                                }
                             } label: {
                                 Text(String(localized: "sidebar.row.remove"))
                             }
