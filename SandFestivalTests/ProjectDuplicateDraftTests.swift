@@ -5,12 +5,12 @@ import Testing
 @Suite("ProjectDuplicateDraft auto-derivation")
 struct ProjectDuplicateDraftTests {
 
-    @Test("initial draft seeds name with source name and path with parent dir")
+    @Test("initial draft seeds name with source name and path with .worktrees dir")
     func initialDraftDefaults() {
         let draft = makeDraft(sourcePath: "/Users/me/repo", sourceName: "Demo")
         #expect(draft.name == "Demo")
         #expect(draft.branchName == "")
-        #expect(draft.pathString == "/Users/me")
+        #expect(draft.pathString == "/Users/me/repo/.worktrees")
         #expect(draft.baseBranch == nil)
     }
 
@@ -20,7 +20,7 @@ struct ProjectDuplicateDraftTests {
         draft.branchName = "new-feature"
         draft.refreshDerivedFields()
         #expect(draft.name == "Demo (new-feature)")
-        #expect(draft.pathString == "/Users/me/new-feature")
+        #expect(draft.pathString == "/Users/me/repo/.worktrees/new-feature")
     }
 
     @Test("clearing the branch reverts derived fields when user hasn't edited them")
@@ -31,7 +31,7 @@ struct ProjectDuplicateDraftTests {
         draft.branchName = ""
         draft.refreshDerivedFields()
         #expect(draft.name == "Demo")
-        #expect(draft.pathString == "/Users/me")
+        #expect(draft.pathString == "/Users/me/repo/.worktrees")
     }
 
     @Test("manually editing the name pins it — later branch changes don't clobber it")
@@ -47,7 +47,7 @@ struct ProjectDuplicateDraftTests {
         draft.refreshDerivedFields()
         #expect(draft.name == "My Custom Name")
         // Path still tracks because the user didn't touch it.
-        #expect(draft.pathString == "/Users/me/other-feature")
+        #expect(draft.pathString == "/Users/me/repo/.worktrees/other-feature")
     }
 
     @Test("manually editing the path pins it — later branch changes don't clobber it")
@@ -81,7 +81,7 @@ struct ProjectDuplicateDraftTests {
         draft.branchName = "  spaced  "
         draft.refreshDerivedFields()
         #expect(draft.name == "Demo (spaced)")
-        #expect(draft.pathString == "/Users/me/spaced")
+        #expect(draft.pathString == "/Users/me/repo/.worktrees/spaced")
     }
 
     @Test("autoStart carries over from the source project")

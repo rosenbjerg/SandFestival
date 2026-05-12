@@ -264,7 +264,13 @@ struct ProjectDuplicateDraft {
         availableBranches: [String]? = nil,
         isGitRepo: Bool? = nil
     ) {
-        let parent = source.path.deletingLastPathComponent().path
+        // Default to `<source>/.worktrees/<branch>` — matches the
+        // convention most worktree tooling (Cursor, recent VSCode
+        // extensions, etc.) defaults to, and keeps each repo's worktrees
+        // grouped under the repo itself rather than scattering them
+        // across the source's parent directory. Users still get a path
+        // field they can edit if they want a different location.
+        let parent = source.path.appendingPathComponent(".worktrees").path
         // Tests inject overrides to avoid shelling out to git.
         let resolvedIsGitRepo = isGitRepo ?? GitWorktree.isGitRepo(at: source.path)
         self.sourceName = source.name
