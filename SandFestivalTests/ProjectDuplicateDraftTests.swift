@@ -118,6 +118,35 @@ struct ProjectDuplicateDraftTests {
         #expect(draft.isValid)
     }
 
+    @Test("resolvedPathString expands a leading tilde to the user's home")
+    func resolvedPathExpandsTilde() {
+        var draft = makeDraft(sourcePath: "/Users/me/repo", sourceName: "Demo")
+        draft.pathString = "~/elsewhere/twin"
+        draft.pathUserEdited = true
+        let expected = (("~/elsewhere/twin") as NSString).expandingTildeInPath
+        #expect(draft.resolvedPathString == expected)
+        // Sanity: the expansion actually changed something — guards against
+        // a test environment where `~` doesn't expand (would let a regression
+        // slip through silently).
+        #expect(!draft.resolvedPathString.hasPrefix("~"))
+    }
+
+    @Test("resolvedPathString trims whitespace before expanding")
+    func resolvedPathTrimsWhitespace() {
+        var draft = makeDraft(sourcePath: "/Users/me/repo", sourceName: "Demo")
+        draft.pathString = "   /tmp/twin   "
+        draft.pathUserEdited = true
+        #expect(draft.resolvedPathString == "/tmp/twin")
+    }
+
+    @Test("resolvedPathString leaves non-tilde absolute paths unchanged")
+    func resolvedPathLeavesAbsolutePathsAlone() {
+        var draft = makeDraft(sourcePath: "/Users/me/repo", sourceName: "Demo")
+        draft.pathString = "/elsewhere/twin"
+        draft.pathUserEdited = true
+        #expect(draft.resolvedPathString == "/elsewhere/twin")
+    }
+
     @Test("turning createWorktree off resets the auto-derived name back to the source name")
     func togglingWorktreeOffRevertsTrackingName() {
         var draft = makeDraft(sourcePath: "/Users/me/repo", sourceName: "Demo", isGitRepo: true)

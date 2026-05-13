@@ -190,13 +190,13 @@ struct ProjectDuplicateView: View {
         }
 
         let trimmedBranch = snapshot.branchName.trimmingCharacters(in: .whitespaces)
-        let trimmedPath = snapshot.pathString.trimmingCharacters(in: .whitespaces)
+        let resolvedPath = snapshot.resolvedPathString
         let base = snapshot.baseBranch?.trimmingCharacters(in: .whitespaces)
 
         isCreating = true
 
         let sourceRepoPath = source.path
-        let newPath = URL(fileURLWithPath: trimmedPath)
+        let newPath = URL(fileURLWithPath: resolvedPath)
 
         // Only manage the gitignore when the worktree lands inside the
         // source repo's default `.worktrees/` directory. If the user
@@ -308,6 +308,18 @@ struct ProjectDuplicateDraft {
         guard createWorktree else { return true }
         return !branchName.trimmingCharacters(in: .whitespaces).isEmpty &&
             !pathString.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    /// The path the user typed, trimmed and tilde-expanded. The text
+    /// field accepts shell-style paths like `~/code/foo` because that's
+    /// what people type into a path field — but `URL(fileURLWithPath:)`
+    /// doesn't expand `~`, so we'd otherwise create a directory literally
+    /// named `~`. Run expansion once here so both the URL we pass to
+    /// `git worktree add` and the prefix check against the source's
+    /// `.worktrees/` directory see the resolved path.
+    var resolvedPathString: String {
+        let trimmed = pathString.trimmingCharacters(in: .whitespaces)
+        return (trimmed as NSString).expandingTildeInPath
     }
 
     /// Auto-fills `name` and `pathString` from the current branch name, but
