@@ -15,6 +15,74 @@ struct GitWorktreeTests {
         #expect(GitWorktree.isGitRepo(at: dir) == false)
     }
 
+    @Test("isGitRepo is false when .git is a gitlink pointing at a missing gitdir")
+    func isGitRepoRejectsStaleGitlink() throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let gitFile = dir.appendingPathComponent(".git")
+        try "gitdir: /tmp/definitely-not-a-real-worktree-gitdir-\(UUID())\n"
+            .write(to: gitFile, atomically: true, encoding: .utf8)
+        #expect(GitWorktree.isGitRepo(at: dir) == false)
+    }
+
+    @Test("isGitRepo is false when .git is an unrelated file with no gitdir line")
+    func isGitRepoRejectsNonGitlinkFile() throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try "not a gitlink\n".write(
+            to: dir.appendingPathComponent(".git"),
+            atomically: true,
+            encoding: .utf8
+        )
+        #expect(GitWorktree.isGitRepo(at: dir) == false)
+    }
+
+    @Test("isGitRepo follows a relative gitlink to a valid gitdir")
+    func isGitRepoAcceptsRelativeGitlink() throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        // Synthesize the shape `git worktree add` produces: a sibling
+        // gitdir containing a HEAD file, and a relative gitlink pointing
+        // at it from the worktree dir.
+        let gitdir = dir.appendingPathComponent("siblingdir", isDirectory: true)
+        try FileManager.default.createDirectory(at: gitdir, withIntermediateDirectories: true)
+        try "ref: refs/heads/main\n".write(
+            to: gitdir.appendingPathComponent("HEAD"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try "gitdir: siblingdir\n".write(
+            to: dir.appendingPathComponent(".git"),
+            atomically: true,
+            encoding: .utf8
+        )
+        #expect(GitWorktree.isGitRepo(at: dir))
+    }
+
+    @Test("isGitRepo recognizes a real worktree added via git")
+    func isGitRepoTrueForRealWorktree() throws {
+        guard hasGit() else { return }
+        let workspace = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workspace) }
+        let sourceRepo = workspace.appendingPathComponent("source", isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceRepo, withIntermediateDirectories: true)
+        try runGit(["init", "-b", "main"], at: sourceRepo)
+        try runGit(["commit", "--allow-empty", "-m", "initial"], at: sourceRepo, withIdentity: true)
+
+        let worktreePath = workspace.appendingPathComponent("twin", isDirectory: true)
+        let addResult = GitWorktree.addWorktree(
+            newBranch: "feature/twin",
+            newPath: worktreePath,
+            base: "main",
+            sourceRepoPath: sourceRepo
+        )
+        guard case .success = addResult else {
+            Issue.record("addWorktree failed: \(addResult)")
+            return
+        }
+        #expect(GitWorktree.isGitRepo(at: worktreePath))
+    }
+
     @Test("end-to-end: init repo, list branches, add worktree, remove worktree")
     func endToEnd() throws {
         guard hasGit() else { return }
