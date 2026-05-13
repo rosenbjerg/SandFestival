@@ -243,20 +243,32 @@ final class Session: Identifiable {
     }
 
     private func composedEnvironment(extra: [String: String]) -> [String] {
-        Session.composeEnvironment(
-            inherited: Terminal.getEnvironmentVariables(),
+        var inherited = Terminal.getEnvironmentVariables()
+        if let shellPath = UserShellPath.current() {
+            // Launchd hands GUI apps a minimal PATH that omits mise/asdf
+            // shims, ~/.cargo/bin, fnm, and similar — so nono spawns
+            // claude with a PATH that can't see tools the user expects.
+            // Overlay the resolved interactive-shell PATH so the sandbox
+            // child sees what Terminal would.
+            inherited.removeAll { $0.hasPrefix("PATH=") }
+            inherited.append("PATH=\(shellPath)")
+        }
+        return Session.composeEnvironment(
+            inherited: inherited,
             projectEnv: project.env,
             extra: extra
         )
     }
 
-    /// PATH precedence is: explicit project/adapter override → inherited from
-    /// the parent process (the user's shell PATH) → `CommandResolver`'s
-    /// hardcoded fallback. Older behavior replaced every inherited PATH with
-    /// the fallback unconditionally, which silently broke setups that put
-    /// `claude` / `nono` in non-system locations (mise, asdf, ~/.cargo/bin,
-    /// etc.). Extracted as a pure static so the precedence rules can be
-    /// tested without spinning up a Session.
+    /// PATH precedence is: explicit project/adapter override → inherited
+    /// PATH (the user's resolved shell PATH from `UserShellPath`, or the
+    /// parent process PATH if resolution hasn't completed) →
+    /// `CommandResolver`'s hardcoded fallback. Older behavior replaced
+    /// every inherited PATH with the fallback unconditionally, which
+    /// silently broke setups that put `claude` / `nono` in non-system
+    /// locations (mise, asdf, ~/.cargo/bin, etc.). Extracted as a pure
+    /// static so the precedence rules can be tested without spinning up
+    /// a Session.
     static func composeEnvironment(
         inherited: [String],
         projectEnv: [String: String],
