@@ -1161,13 +1161,46 @@
         }
       }
     },
+    "removal.action.acknowledge": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        }
+      }
+    },
+    "removal.error.branch_after_removal": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The worktree was removed but the branch could not be deleted: %@"
+          }
+        }
+      }
+    },
+    "removal.option.delete_branch": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Also delete branch %@"
+          }
+        }
+      }
+    },
     "removal.option.force": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Force (discard uncommitted changes)"
+            "value": "Force (discard uncommitted changes, allow unmerged branches)"
           }
         }
       }
