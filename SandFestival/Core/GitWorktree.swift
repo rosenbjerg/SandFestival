@@ -6,10 +6,39 @@ import Foundation
 /// `Process.waitUntilExit()`.
 enum GitWorktree {
     /// True when `path` looks like a git working tree (regular repo *or*
-    /// an existing worktree — both have a `.git` entry, file or dir).
+    /// an existing worktree). A regular repo has `.git` as a directory
+    /// containing `HEAD`; a linked worktree has `.git` as a gitlink file
+    /// `gitdir: <path>` pointing at the worktree's per-worktree gitdir,
+    /// which also contains `HEAD`. We resolve the gitlink and verify a
+    /// `HEAD` exists at the target so stale gitlinks (worktree gitdir
+    /// deleted out from under us) and unrelated `.git` files don't pass.
     static func isGitRepo(at path: URL) -> Bool {
-        let gitPath = path.appendingPathComponent(".git").path
-        return FileManager.default.fileExists(atPath: gitPath)
+        let fm = FileManager.default
+        let gitURL = path.appendingPathComponent(".git")
+        var isDir: ObjCBool = false
+        guard fm.fileExists(atPath: gitURL.path, isDirectory: &isDir) else { return false }
+
+        let gitDir: URL
+        if isDir.boolValue {
+            gitDir = gitURL
+        } else {
+            guard let contents = try? String(contentsOf: gitURL, encoding: .utf8) else {
+                return false
+            }
+            let prefix = "gitdir:"
+            let target = contents
+                .split(whereSeparator: \.isNewline)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .first { $0.hasPrefix(prefix) }
+                .map { String($0.dropFirst(prefix.count)).trimmingCharacters(in: .whitespaces) }
+            guard let target, !target.isEmpty else { return false }
+            if target.hasPrefix("/") {
+                gitDir = URL(fileURLWithPath: target)
+            } else {
+                gitDir = URL(fileURLWithPath: target, relativeTo: path).standardizedFileURL
+            }
+        }
+        return fm.fileExists(atPath: gitDir.appendingPathComponent("HEAD").path)
     }
 
     /// Local branch names in sidebar order (whatever `git branch` returns).
