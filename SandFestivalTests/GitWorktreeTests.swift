@@ -220,7 +220,17 @@ struct GitWorktreeTests {
 
     @Test("ensureWorktreesIgnored recognizes equivalent ignore patterns")
     func ensureWorktreesIgnoredRecognizesVariants() throws {
-        for variant in [".worktrees", "/.worktrees/", "/.worktrees"] {
+        let variants = [
+            ".worktrees",
+            ".worktrees/",
+            "/.worktrees",
+            "/.worktrees/",
+            ".worktrees/*",
+            ".worktrees/**",
+            "/.worktrees/*",
+            "/.worktrees/**",
+        ]
+        for variant in variants {
             let dir = try makeTempDir()
             defer { try? FileManager.default.removeItem(at: dir) }
             let gitignore = dir.appendingPathComponent(".gitignore")
@@ -232,6 +242,36 @@ struct GitWorktreeTests {
             let contents = try String(contentsOf: gitignore, encoding: .utf8)
             #expect(contents == original, "variant \(variant) should be recognized as already covered")
         }
+    }
+
+    @Test("ensureWorktreesIgnored ignores commented-out entries")
+    func ensureWorktreesIgnoredSkipsCommentedEntries() throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let gitignore = dir.appendingPathComponent(".gitignore")
+        // The comment looks like a covering pattern but git ignores it,
+        // so we should still append a real entry.
+        try "# .worktrees/\nbuild/\n".write(to: gitignore, atomically: true, encoding: .utf8)
+
+        GitWorktree.ensureWorktreesIgnored(at: dir)
+
+        let contents = try String(contentsOf: gitignore, encoding: .utf8)
+        #expect(contents == "# .worktrees/\nbuild/\n.worktrees/\n")
+    }
+
+    @Test("ensureWorktreesIgnored does not accept unrelated patterns starting with .worktrees")
+    func ensureWorktreesIgnoredRejectsNearMisses() throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let gitignore = dir.appendingPathComponent(".gitignore")
+        // Suffix is part of the path segment, so this only ignores a
+        // specifically-named file — not the directory we want to cover.
+        try ".worktrees-backup/\n".write(to: gitignore, atomically: true, encoding: .utf8)
+
+        GitWorktree.ensureWorktreesIgnored(at: dir)
+
+        let contents = try String(contentsOf: gitignore, encoding: .utf8)
+        #expect(contents == ".worktrees-backup/\n.worktrees/\n")
     }
 
     // MARK: - Helpers
