@@ -91,13 +91,18 @@ enum GitWorktree {
         if let data = try? Data(contentsOf: gitignore),
            let text = String(data: data, encoding: .utf8) {
             existing = text
-            // Accept any of the common shapes that already cover us so we
-            // don't pile on duplicate entries.
-            let covered: Set<String> = [".worktrees", ".worktrees/", "/.worktrees", "/.worktrees/"]
+            // Match the shapes that effectively ignore `.worktrees/` at the
+            // repo root: bare, slash-prefixed, trailing slash, and the
+            // `/*`/`/**` glob suffixes people use when their tooling prefers
+            // explicit children. Comment lines are skipped before matching.
+            let pattern = /^\/?\.worktrees(?:\/(?:\*{1,2})?)?$/
             let alreadyHas = text
                 .split(whereSeparator: \.isNewline)
                 .map { $0.trimmingCharacters(in: .whitespaces) }
-                .contains(where: { covered.contains($0) })
+                .contains(where: { line in
+                    guard !line.isEmpty, !line.hasPrefix("#") else { return false }
+                    return line.wholeMatch(of: pattern) != nil
+                })
             if alreadyHas { return }
         } else {
             existing = ""
