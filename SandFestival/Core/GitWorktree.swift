@@ -125,6 +125,20 @@ enum GitWorktree {
         return runChecked(args, at: sourceRepoPath)
     }
 
+    /// `git branch -d|-D <name>` from `sourceRepoPath`. `force: false` uses
+    /// `-d` so git refuses to delete an unmerged branch; `force: true` uses
+    /// `-D` and discards unmerged work. Callers should only invoke this
+    /// once the worktree that held the branch has been removed — `-d`
+    /// refuses to delete a branch that's currently checked out elsewhere.
+    nonisolated static func deleteBranch(
+        name: String,
+        sourceRepoPath: URL,
+        force: Bool
+    ) -> Result<Void, GitWorktreeError> {
+        let flag = force ? "-D" : "-d"
+        return runChecked(["branch", flag, name], at: sourceRepoPath)
+    }
+
     // MARK: - Internals
 
     nonisolated private static func runChecked(

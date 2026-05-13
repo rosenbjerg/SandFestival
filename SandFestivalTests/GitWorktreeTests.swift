@@ -128,6 +128,108 @@ struct GitWorktreeTests {
         #expect(!FileManager.default.fileExists(atPath: worktreePath.path))
     }
 
+    @Test("deleteBranch removes a branch after its worktree is gone")
+    func deleteBranchAfterWorktreeRemoval() throws {
+        guard hasGit() else { return }
+        let workspace = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workspace) }
+
+        let sourceRepo = workspace.appendingPathComponent("source", isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceRepo, withIntermediateDirectories: true)
+        try runGit(["init", "-b", "main"], at: sourceRepo)
+        try runGit(["commit", "--allow-empty", "-m", "initial"], at: sourceRepo, withIdentity: true)
+
+        let worktreePath = workspace.appendingPathComponent("twin", isDirectory: true)
+        let addResult = GitWorktree.addWorktree(
+            newBranch: "feature/twin",
+            newPath: worktreePath,
+            base: "main",
+            sourceRepoPath: sourceRepo
+        )
+        guard case .success = addResult else {
+            Issue.record("addWorktree failed: \(addResult)")
+            return
+        }
+        // Worktree must go away first — git refuses `branch -d` for a
+        // branch that's checked out somewhere.
+        let removeResult = GitWorktree.removeWorktree(
+            worktreePath: worktreePath,
+            sourceRepoPath: sourceRepo,
+            force: false
+        )
+        guard case .success = removeResult else {
+            Issue.record("removeWorktree failed: \(removeResult)")
+            return
+        }
+        // A freshly-created branch with no commits beyond the base is
+        // considered merged, so the non-force `-d` should accept it.
+        let deleteResult = GitWorktree.deleteBranch(
+            name: "feature/twin",
+            sourceRepoPath: sourceRepo,
+            force: false
+        )
+        if case .failure(let err) = deleteResult {
+            Issue.record("deleteBranch failed: \(err)")
+        }
+        let branches = GitWorktree.listLocalBranches(at: sourceRepo)
+        #expect(!branches.contains("feature/twin"))
+    }
+
+    @Test("deleteBranch with force removes an unmerged branch")
+    func deleteBranchForceRemovesUnmerged() throws {
+        guard hasGit() else { return }
+        let workspace = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workspace) }
+
+        let sourceRepo = workspace.appendingPathComponent("source", isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceRepo, withIntermediateDirectories: true)
+        try runGit(["init", "-b", "main"], at: sourceRepo)
+        try runGit(["commit", "--allow-empty", "-m", "initial"], at: sourceRepo, withIdentity: true)
+
+        let worktreePath = workspace.appendingPathComponent("twin", isDirectory: true)
+        _ = GitWorktree.addWorktree(
+            newBranch: "feature/twin",
+            newPath: worktreePath,
+            base: "main",
+            sourceRepoPath: sourceRepo
+        )
+        // Add an unmerged commit to the worktree so non-force delete refuses.
+        try Data("hello".utf8).write(to: worktreePath.appendingPathComponent("note.txt"))
+        try runGit(["add", "note.txt"], at: worktreePath)
+        try runGit(["commit", "-m", "diverge"], at: worktreePath, withIdentity: true)
+
+        // Removing the worktree needs --force because of the new commit.
+        let removed = GitWorktree.removeWorktree(
+            worktreePath: worktreePath,
+            sourceRepoPath: sourceRepo,
+            force: true
+        )
+        guard case .success = removed else {
+            Issue.record("removeWorktree --force failed: \(removed)")
+            return
+        }
+        // Non-force branch delete must refuse the unmerged branch.
+        let softDelete = GitWorktree.deleteBranch(
+            name: "feature/twin",
+            sourceRepoPath: sourceRepo,
+            force: false
+        )
+        if case .success = softDelete {
+            Issue.record("expected non-force deleteBranch to refuse unmerged branch")
+        }
+        // Force should succeed.
+        let forced = GitWorktree.deleteBranch(
+            name: "feature/twin",
+            sourceRepoPath: sourceRepo,
+            force: true
+        )
+        if case .failure(let err) = forced {
+            Issue.record("force deleteBranch failed: \(err)")
+        }
+        let branches = GitWorktree.listLocalBranches(at: sourceRepo)
+        #expect(!branches.contains("feature/twin"))
+    }
+
     @Test("addWorktree surfaces git stderr when the target path already exists")
     func addWorktreeReportsConflict() throws {
         guard hasGit() else { return }
