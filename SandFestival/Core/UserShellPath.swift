@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Resolves the user's interactive shell `$PATH` so spawned tools see
 /// the same binaries the user sees in Terminal. macOS GUI apps inherit
@@ -12,6 +13,7 @@ import Foundation
 /// cached and read synchronously from any thread. If resolution hasn't
 /// completed yet (or failed), callers get `nil` and should fall back.
 enum UserShellPath {
+    nonisolated private static let log = Logger(subsystem: "app.sandfestival", category: "UserShellPath")
     private static let lock = NSLock()
     nonisolated(unsafe) private static var cached: String?
     nonisolated(unsafe) private static var resolutionStarted = false
@@ -85,13 +87,20 @@ enum UserShellPath {
             "-ilc",
             "printf '%s' '\(begin)'; /usr/bin/printenv PATH; printf '%s' '\(end)'",
         ]
-        return runShellAndExtractPath(
+        let resolved = runShellAndExtractPath(
             executable: URL(fileURLWithPath: shell),
             arguments: arguments,
             begin: begin,
             end: end,
             timeout: 3.0
         )
+        if let resolved {
+            // Don't log the PATH itself — directory names can leak
+            // usernames and project paths. Byte count is enough to
+            // confirm a non-trivial value arrived.
+            log.info("resolved PATH from \(shell, privacy: .public) (\(resolved.utf8.count) bytes)")
+        }
+        return resolved
     }
 
     /// Runs an arbitrary shell command and extracts the PATH value
@@ -125,18 +134,35 @@ enum UserShellPath {
         do {
             try process.run()
         } catch {
+            log.error("failed to launch \(executable.path, privacy: .public): \(error.localizedDescription, privacy: .public)")
             return nil
         }
 
         if done.wait(timeout: .now() + timeout) == .timedOut {
             kill(process.processIdentifier, SIGKILL)
             done.wait()
+            log.error("\(executable.path, privacy: .public) exceeded \(timeout)s and was killed")
             return nil
         }
 
-        guard process.terminationStatus == 0 else { return nil }
+        guard process.terminationStatus == 0 else {
+            log.error("\(executable.path, privacy: .public) exited with code \(process.terminationStatus)")
+            return nil
+        }
         let data = stdout.fileHandleForReading.readDataToEndOfFile()
-        guard let output = String(data: data, encoding: .utf8) else { return nil }
-        return extractPath(from: output, begin: begin, end: end)
+        guard let output = String(data: data, encoding: .utf8) else {
+            log.error("\(executable.path, privacy: .public) produced non-UTF-8 stdout (\(data.count) bytes)")
+            return nil
+        }
+        guard let extracted = extractPath(from: output, begin: begin, end: end) else {
+            // Markers missing or value empty. Sample a short prefix so
+            // logs say *why* without dumping the whole init banner —
+            // mark private because shell init output can echo paths
+            // and tokens.
+            let sample = String(output.prefix(200))
+            log.error("marker pair not found in stdout from \(executable.path, privacy: .public); first 200 chars: \(sample, privacy: .private)")
+            return nil
+        }
+        return extracted
     }
 }
