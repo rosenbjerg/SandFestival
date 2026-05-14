@@ -167,14 +167,12 @@ final class Session: Identifiable {
         }
     }
 
-    /// Called when the user types into this session's terminal. Used as a
-    /// fallback for `waitingForIdle` because Claude Code doesn't fire any
-    /// hook when the user dismisses an interactive prompt (e.g. cancelling
-    /// `AskUserQuestion` with Ctrl+C). Other waiting states have their own
-    /// resolution paths and aren't affected.
+    /// Called when the user types into this session's terminal. Routed
+    /// through the state machine so the guard ("only `.waitingForIdle`
+    /// reacts") lives in one place — every other state ignores the event.
+    /// See `AgentEvent.userInteracted` for the rationale.
     func handleUserKeystroke() {
-        guard state == .waitingForIdle else { return }
-        transition(to: .idle)
+        apply(event: .userInteracted)
     }
 
     private func handleProcessTerminated(exitCode: Int32?) {

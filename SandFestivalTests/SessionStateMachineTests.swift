@@ -88,4 +88,27 @@ struct SessionStateMachineTests {
             #expect(SessionStateMachine.next(from: .starting, event: event) == .starting)
         }
     }
+
+    // MARK: - User interaction
+
+    @Test("waitingForIdle + .userInteracted → idle")
+    func waitingForIdleResolvesOnUserInteraction() {
+        // Claude Code emits no hook when the user dismisses AskUserQuestion
+        // with Ctrl+C, so terminal input is the fallback resolution signal.
+        #expect(SessionStateMachine.next(from: .waitingForIdle, event: .userInteracted) == .idle)
+    }
+
+    @Test(".userInteracted is ignored in every other state")
+    func userInteractedIgnoredOutsideWaitingForIdle() {
+        // Typing during e.g. waitingForPermission must not fake a grant —
+        // those states have their own resolution paths.
+        let ignoringStates: [SessionState] = [
+            .starting, .idle, .working,
+            .waitingForPermission, .blockedByAutoMode,
+            .errored(reason: "x"), .stopped,
+        ]
+        for state in ignoringStates {
+            #expect(SessionStateMachine.next(from: state, event: .userInteracted) == state)
+        }
+    }
 }
