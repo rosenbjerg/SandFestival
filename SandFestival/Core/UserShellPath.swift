@@ -56,11 +56,13 @@ enum UserShellPath {
         return trimmed.isEmpty ? nil : trimmed
     }
 
-    private static let markerBegin = "__SAND_FESTIVAL_PATH_BEGIN__"
-    private static let markerEnd = "__SAND_FESTIVAL_PATH_END__"
-
     nonisolated private static func resolveBlocking() -> String? {
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        // Fresh markers per resolution so a hardcoded literal in the
+        // user's PATH or shell init can't be mistaken for our fence.
+        let token = UUID().uuidString.replacingOccurrences(of: "-", with: "")
+        let markerBegin = "__SF_PATH_BEGIN_\(token)__"
+        let markerEnd = "__SF_PATH_END_\(token)__"
         let process = Process()
         process.executableURL = URL(fileURLWithPath: shell)
         // `-il` makes the shell source both login (`.zprofile`) and
