@@ -9,11 +9,15 @@ struct DetailPaneView: View {
         ZStack {
             // Hosting all sessions in a ZStack keeps every terminal view in the
             // view hierarchy regardless of selection, preserving scrollback.
+            // Visibility is signalled via NSView.isHidden inside TerminalPaneView
+            // so AppKit skips drawing for non-selected sessions instead of
+            // compositing a fully transparent layer.
             ForEach(manager.projects) { project in
                 if let session = manager.session(for: project.id) {
-                    sessionPane(session: session)
-                        .opacity(manager.selectedProjectID == project.id ? 1 : 0)
-                        .allowsHitTesting(manager.selectedProjectID == project.id)
+                    sessionPane(
+                        session: session,
+                        isVisible: manager.selectedProjectID == project.id
+                    )
                 }
             }
 
@@ -29,16 +33,18 @@ struct DetailPaneView: View {
     }
 
     @ViewBuilder
-    private func sessionPane(session: Session) -> some View {
+    private func sessionPane(session: Session, isVisible: Bool) -> some View {
         ZStack {
-            TerminalPaneView(terminalView: session.terminalView)
+            TerminalPaneView(terminalView: session.terminalView, isVisible: isVisible)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(.leading, 4)
 
-            if !session.state.isRunning {
+            if isVisible, !session.state.isRunning {
                 notRunningOverlay(session: session)
             }
         }
+        .opacity(isVisible ? 1 : 0)
+        .allowsHitTesting(isVisible)
     }
 
     private func notRunningOverlay(session: Session) -> some View {
