@@ -4,6 +4,7 @@ struct TerminalPreferencesView: View {
     let manager: SessionManager
 
     @State private var draft: Int = SessionManager.defaultScrollback
+    @State private var useMetalDraft: Bool = false
 
     var body: some View {
         Form {
@@ -26,14 +27,27 @@ struct TerminalPreferencesView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            Section(String(localized: "preferences.terminal.metal.section")) {
+                Toggle(String(localized: "preferences.terminal.metal.label"), isOn: $useMetalDraft)
+
+                Text(String(localized: "preferences.terminal.metal.description"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .formStyle(.grouped)
         .frame(width: 480)
         .onAppear {
             draft = manager.terminalScrollback
+            useMetalDraft = manager.useMetalRenderer
         }
         .onChange(of: draft) { _, newValue in
             manager.applyTerminalScrollback(newValue)
+        }
+        .onChange(of: useMetalDraft) { _, newValue in
+            manager.applyMetalRenderer(newValue)
         }
     }
 

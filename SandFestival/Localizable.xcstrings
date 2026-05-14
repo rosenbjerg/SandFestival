@@ -1550,6 +1550,36 @@
           }
         }
       }
+    },
+    "preferences.terminal.metal.section": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GPU Rendering"
+          }
+        }
+      }
+    },
+    "preferences.terminal.metal.label": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Render terminals with Metal"
+          }
+        }
+      }
+    },
+    "preferences.terminal.metal.description": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Offload terminal rendering to the GPU. Lowers CPU use on busy multi-session setups but is experimental — inline images and unusual styling may render differently than the default CoreGraphics path. Applies to every session immediately."
+          }
+        }
+      }
     }
   },
   "version": "1.1"
