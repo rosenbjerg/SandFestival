@@ -61,20 +61,42 @@ enum UserShellPath {
         // Fresh markers per resolution so a hardcoded literal in the
         // user's PATH or shell init can't be mistaken for our fence.
         let token = UUID().uuidString.replacingOccurrences(of: "-", with: "")
-        let markerBegin = "__SF_PATH_BEGIN_\(token)__"
-        let markerEnd = "__SF_PATH_END_\(token)__"
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: shell)
+        let begin = "__SF_PATH_BEGIN_\(token)__"
+        let end = "__SF_PATH_END_\(token)__"
         // `-il` makes the shell source both login (`.zprofile`) and
         // interactive (`.zshrc`) init files, covering wherever users
         // typically extend PATH. `/usr/bin/printenv PATH` is absolute
         // so it resolves even if the user's init mangles PATH itself.
         // Markers fence the value off from any noise the shell init
         // prints (p10k instant prompt, nvm chatter, etc.).
-        process.arguments = [
+        let arguments = [
             "-ilc",
-            "printf '%s' '\(markerBegin)'; /usr/bin/printenv PATH; printf '%s' '\(markerEnd)'",
+            "printf '%s' '\(begin)'; /usr/bin/printenv PATH; printf '%s' '\(end)'",
         ]
+        return runShellAndExtractPath(
+            executable: URL(fileURLWithPath: shell),
+            arguments: arguments,
+            begin: begin,
+            end: end,
+            timeout: 3.0
+        )
+    }
+
+    /// Runs an arbitrary shell command and extracts the PATH value
+    /// between `begin` and `end` from its stdout. Factored out of
+    /// `resolveBlocking` so the subprocess behavior (timeout, exit
+    /// handling, marker parsing) can be tested with `/bin/sh -c '…'`
+    /// scripts instead of relying on the user's real shell.
+    nonisolated static func runShellAndExtractPath(
+        executable: URL,
+        arguments: [String],
+        begin: String,
+        end: String,
+        timeout: TimeInterval
+    ) -> String? {
+        let process = Process()
+        process.executableURL = executable
+        process.arguments = arguments
         process.standardInput = FileHandle.nullDevice
         let stdout = Pipe()
         process.standardOutput = stdout
@@ -88,11 +110,9 @@ enum UserShellPath {
             return nil
         }
 
-        // 3s ceiling — a healthy shell init returns in tens of ms;
-        // anything slower is a misconfigured rc file we don't want to
-        // wait on. Poll Process.isRunning rather than blocking on
-        // waitUntilExit so we can bail out with SIGKILL.
-        let deadline = Date().addingTimeInterval(3.0)
+        // Poll Process.isRunning rather than blocking on waitUntilExit
+        // so we can bail out with SIGKILL once the deadline passes.
+        let deadline = Date().addingTimeInterval(timeout)
         while process.isRunning && Date() < deadline {
             Thread.sleep(forTimeInterval: 0.02)
         }
@@ -105,6 +125,6 @@ enum UserShellPath {
         guard process.terminationStatus == 0 else { return nil }
         let data = stdout.fileHandleForReading.readDataToEndOfFile()
         guard let output = String(data: data, encoding: .utf8) else { return nil }
-        return extractPath(from: output, begin: markerBegin, end: markerEnd)
+        return extractPath(from: output, begin: begin, end: end)
     }
 }

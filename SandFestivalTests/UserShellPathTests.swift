@@ -41,3 +41,79 @@ struct UserShellPathTests {
         #expect(UserShellPath.extractPath(from: output, begin: "__B__", end: "__E__") == "/the:/real/path")
     }
 }
+
+@Suite("UserShellPath.runShellAndExtractPath")
+struct UserShellPathSubprocessTests {
+
+    private static let sh = URL(fileURLWithPath: "/bin/sh")
+    private static let begin = "__B__"
+    private static let end = "__E__"
+
+    @Test("returns the value between markers from a healthy script")
+    func happyPath() {
+        let path = UserShellPath.runShellAndExtractPath(
+            executable: Self.sh,
+            arguments: ["-c", "printf '%s%s%s' '\(Self.begin)' '/a:/b:/c' '\(Self.end)'"],
+            begin: Self.begin,
+            end: Self.end,
+            timeout: 2.0
+        )
+        #expect(path == "/a:/b:/c")
+    }
+
+    @Test("returns nil when the script exits non-zero")
+    func nonZeroExitReturnsNil() {
+        let path = UserShellPath.runShellAndExtractPath(
+            executable: Self.sh,
+            arguments: ["-c", "printf '%s%s%s' '\(Self.begin)' '/a:/b' '\(Self.end)'; exit 7"],
+            begin: Self.begin,
+            end: Self.end,
+            timeout: 2.0
+        )
+        #expect(path == nil)
+    }
+
+    @Test("returns nil when the end marker is missing from stdout")
+    func missingEndMarkerReturnsNil() {
+        let path = UserShellPath.runShellAndExtractPath(
+            executable: Self.sh,
+            arguments: ["-c", "printf '%s%s' '\(Self.begin)' '/a:/b'"],
+            begin: Self.begin,
+            end: Self.end,
+            timeout: 2.0
+        )
+        #expect(path == nil)
+    }
+
+    @Test("kills the subprocess and returns nil after the timeout")
+    func timeoutReturnsNilAndKillsProcess() {
+        let start = Date()
+        let path = UserShellPath.runShellAndExtractPath(
+            executable: Self.sh,
+            arguments: ["-c", "sleep 5"],
+            begin: Self.begin,
+            end: Self.end,
+            timeout: 0.3
+        )
+        let elapsed = Date().timeIntervalSince(start)
+        #expect(path == nil)
+        // Should return shortly after the deadline, not after the full 5s
+        // sleep. The polling tick is 20 ms, so allow generous headroom.
+        #expect(elapsed < 1.5)
+    }
+
+    @Test("stderr noise does not pollute stdout parsing")
+    func stderrIsIgnored() {
+        let path = UserShellPath.runShellAndExtractPath(
+            executable: Self.sh,
+            arguments: [
+                "-c",
+                "echo noise >&2; printf '%s%s%s' '\(Self.begin)' '/x' '\(Self.end)'",
+            ],
+            begin: Self.begin,
+            end: Self.end,
+            timeout: 2.0
+        )
+        #expect(path == "/x")
+    }
+}
