@@ -56,8 +56,20 @@ enum UserShellPath {
         return trimmed.isEmpty ? nil : trimmed
     }
 
+    /// Picks the shell binary to drive resolution. Trusts `$SHELL` only
+    /// when it points at an executable file — otherwise falls back to
+    /// `/bin/zsh` (the modern macOS default). Guards against pathological
+    /// environments like `SHELL=/usr/bin/env`, `SHELL=`, or a removed
+    /// shell binary, where launching would either fail or run the wrong
+    /// program. Exposed for testing.
+    nonisolated static func resolveShellExecutable(env: [String: String]) -> String {
+        let fallback = "/bin/zsh"
+        guard let candidate = env["SHELL"], !candidate.isEmpty else { return fallback }
+        return FileManager.default.isExecutableFile(atPath: candidate) ? candidate : fallback
+    }
+
     nonisolated private static func resolveBlocking() -> String? {
-        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        let shell = resolveShellExecutable(env: ProcessInfo.processInfo.environment)
         // Fresh markers per resolution so a hardcoded literal in the
         // user's PATH or shell init can't be mistaken for our fence.
         let token = UUID().uuidString.replacingOccurrences(of: "-", with: "")
