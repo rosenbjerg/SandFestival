@@ -14,16 +14,42 @@ import os
 /// completed yet (or failed), callers get `nil` and should fall back.
 enum UserShellPath {
     nonisolated private static let log = Logger(subsystem: "app.sandfestival", category: "UserShellPath")
-    private static let lock = NSLock()
+    nonisolated private static let lock = NSLock()
+    // DispatchGroup acts as a one-shot latch: `enter()` once when
+    // resolution kicks off, `leave()` once when it finishes. Multiple
+    // callers can `wait(timeout:)` without consuming signals; after
+    // the group is balanced, `wait` returns immediately.
+    nonisolated private static let resolutionGroup = DispatchGroup()
     nonisolated(unsafe) private static var cached: String?
     nonisolated(unsafe) private static var resolutionStarted = false
+    nonisolated(unsafe) private static var resolutionFinished = false
 
-    /// Returns the resolved shell PATH, or nil if resolution hasn't
-    /// completed or failed. Safe from any thread; never blocks.
-    nonisolated static func current() -> String? {
+    /// Returns the resolved shell PATH. If resolution is still in flight
+    /// and `timeout > 0`, blocks the calling thread for up to that long
+    /// before returning whatever's cached (which may still be nil on
+    /// timeout or resolution failure). Safe from any thread.
+    ///
+    /// The first session start after launch typically hits this before
+    /// background resolution has finished — a brief block is worth a
+    /// deterministic PATH versus silently falling back to the
+    /// launchd-minimal one.
+    nonisolated static func current(blockingUpTo timeout: TimeInterval = 0) -> String? {
         lock.lock()
-        defer { lock.unlock() }
-        return cached
+        if resolutionFinished {
+            let value = cached
+            lock.unlock()
+            return value
+        }
+        let shouldWait = resolutionStarted && timeout > 0
+        lock.unlock()
+
+        if shouldWait {
+            _ = resolutionGroup.wait(timeout: .now() + timeout)
+            lock.lock()
+            defer { lock.unlock() }
+            return cached
+        }
+        return nil
     }
 
     /// Starts a one-shot background resolution. No-op on subsequent
@@ -36,13 +62,16 @@ enum UserShellPath {
             return
         }
         resolutionStarted = true
+        resolutionGroup.enter()
         lock.unlock()
 
         DispatchQueue.global(qos: .userInitiated).async {
             let resolved = resolveBlocking()
             lock.lock()
             cached = resolved
+            resolutionFinished = true
             lock.unlock()
+            resolutionGroup.leave()
         }
     }
 

@@ -244,7 +244,10 @@ final class Session: Identifiable {
 
     private func composedEnvironment(extra: [String: String]) -> [String] {
         var inherited = Terminal.getEnvironmentVariables()
-        if let shellPath = UserShellPath.current() {
+        // Block briefly on first call after launch so the very first
+        // session start picks up the real shell PATH instead of racing
+        // background resolution and silently falling back.
+        if let shellPath = UserShellPath.current(blockingUpTo: 0.8) {
             // Launchd hands GUI apps a minimal PATH that omits mise/asdf
             // shims, ~/.cargo/bin, fnm, and similar — so nono spawns
             // claude with a PATH that can't see tools the user expects.
