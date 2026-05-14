@@ -35,7 +35,15 @@ enum SessionStateMachine {
             default: return current
             }
 
-        case .waitingForPermission, .waitingForIdle, .blockedByAutoMode:
+        case .waitingForIdle:
+            switch event {
+            case .working: return .working
+            case .idle, .userInteracted: return .idle
+            case .errored(let reason): return .errored(reason: reason)
+            default: return current
+            }
+
+        case .waitingForPermission, .blockedByAutoMode:
             switch event {
             case .working: return .working
             case .idle: return .idle
