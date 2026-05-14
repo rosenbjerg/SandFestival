@@ -298,8 +298,23 @@ final class SessionManager {
             guard let self, let session else { return }
             self.surfaceIfActivityTrigger(projectID: session.id, to: new)
             self.sessionStateObserver?(session, old, new)
+            self.refocusIfStartTransition(projectID: session.id, from: old, to: new)
         }
         return session
+    }
+
+    /// The notRunningOverlay's Start button (and the toolbar Start when
+    /// stopped) holds first-responder when clicked; when the overlay drops
+    /// out of the hierarchy on the start transition, AppKit doesn't promote
+    /// the now-visible terminal, so the next keystroke goes nowhere. Hop
+    /// first-responder back to the terminal whenever the selected session
+    /// enters a running state — `focusSelectedTerminal` already dispatches
+    /// async, so the responder change lands after SwiftUI removes the
+    /// overlay subtree.
+    private func refocusIfStartTransition(projectID: Project.ID, from old: SessionState, to new: SessionState) {
+        guard projectID == selectedProjectID else { return }
+        guard !old.isRunning, new.isRunning else { return }
+        focusSelectedTerminal()
     }
 
     /// Lifts `projectID` to row 0 when Claude reports activity worth surfacing,
