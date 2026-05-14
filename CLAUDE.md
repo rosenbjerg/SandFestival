@@ -72,7 +72,7 @@ PATH precedence in `Session.composeEnvironment(inherited:projectEnv:extra:)`: pr
 
 ## Terminal lifetime
 
-Each `Session` owns its `LocalProcessTerminalView` for the whole app lifetime. `DetailPaneView` ZStacks every session's view and toggles `.opacity` per selection — **never** swap views by selection, that destroys scrollback.
+Each `Session` owns its `LocalProcessTerminalView` for the whole app lifetime. `DetailPaneView` ZStacks every session's view and `TerminalPaneView` flips `NSView.isHidden` per selection (not `.opacity` — at alpha 0 the layer is still asked to paint dirty rects on every PTY update). **Never** swap views by selection, that destroys scrollback.
 
 ## Persistence
 
