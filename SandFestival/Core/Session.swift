@@ -14,9 +14,9 @@ final class Session: Identifiable {
     private(set) var softStopRequested: Bool = false
     /// Wall-clock instant the session entered its current state. The sidebar
     /// uses this to display "waiting Xm" while in attention states; it is
-    /// **not** bumped by heartbeats or other same-state events, so the count
-    /// reflects "how long has Claude been waiting on you" rather than "when
-    /// did the last hook fire".
+    /// **not** bumped by same-state events, so the count reflects "how long
+    /// has Claude been waiting on you" rather than "when did the last hook
+    /// fire".
     private(set) var enteredCurrentStateAt: Date = Date()
     private(set) var lastError: String?
     /// Latest terminal title emitted by the child process (claude sets this
@@ -44,9 +44,9 @@ final class Session: Identifiable {
     @ObservationIgnored var onDidTerminate: ((Project) -> Void)?
 
     /// Fires when the session moves from one state to another. Same-state
-    /// "transitions" don't fire — heartbeats stay quiet. Wired by SessionManager
-    /// so cross-session coordinators (attention notifier, etc.) can react
-    /// without each owning a separate observation tracker.
+    /// "transitions" don't fire. Wired by SessionManager so cross-session
+    /// coordinators (attention notifier, etc.) can react without each owning
+    /// a separate observation tracker.
     @ObservationIgnored var onStateChanged: ((SessionState, SessionState) -> Void)?
 
     var id: Project.ID { project.id }
@@ -160,7 +160,7 @@ final class Session: Identifiable {
 
     func apply(event: AgentEvent) {
         let next = SessionStateMachine.next(from: state, event: event)
-        guard next != state else { return }  // Heartbeats and other same-state events are intentional no-ops here.
+        guard next != state else { return }  // Same-state events are intentional no-ops here.
         transition(to: next)
         if case .errored(let reason) = next {
             lastError = reason

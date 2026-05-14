@@ -66,7 +66,6 @@ final class MockAdapter: AgentAdapter {
     static let defaultScript: [ScriptStep] = [
         ScriptStep(delay: .milliseconds(200), event: .started),
         ScriptStep(delay: .milliseconds(400), event: .working),
-        ScriptStep(delay: .seconds(2), event: .heartbeat),
         ScriptStep(delay: .seconds(3), event: .waitingForPermission),
         ScriptStep(delay: .seconds(5), event: .working),
         ScriptStep(delay: .seconds(2), event: .idle),

@@ -26,7 +26,7 @@ enum SessionStateMachine {
 
         case .working:
             switch event {
-            case .heartbeat, .working: return .working
+            case .working: return .working
             case .idle: return .idle
             case .waitingForPermission: return .waitingForPermission
             case .waitingForInput: return .waitingForIdle
