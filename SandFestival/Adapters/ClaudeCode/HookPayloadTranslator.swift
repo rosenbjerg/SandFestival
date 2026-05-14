@@ -18,10 +18,12 @@ enum HookPayloadTranslator {
             return preToolUseEvent(toolName: payload.toolName)
         case HookEvent.postToolUse.rawValue:
             // AskUserQuestion's PostToolUse fires once the user has answered,
-            // so treat it as a definite "back to working" signal rather than
-            // the generic heartbeat — otherwise waitingForIdle would linger.
+            // so emit .working to lift waitingForIdle. Every other tool's
+            // PostToolUse carries no state signal — Session.apply already
+            // short-circuits same-state events, so dropping the event here
+            // is equivalent to the old "heartbeat" no-op.
             if payload.toolName == Self.askUserQuestionTool { return .working }
-            return .heartbeat
+            return nil
         case HookEvent.notification.rawValue:
             return notificationEvent(message: payload.notificationMessage)
         case HookEvent.stop.rawValue:

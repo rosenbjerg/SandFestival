@@ -16,11 +16,6 @@ struct SessionStateMachineTests {
         #expect(SessionStateMachine.next(from: .idle, event: .working) == .working)
     }
 
-    @Test("working + .heartbeat stays working")
-    func workingHeartbeatStaysWorking() {
-        #expect(SessionStateMachine.next(from: .working, event: .heartbeat) == .working)
-    }
-
     @Test("working + .idle → idle")
     func workingPlusIdleGoesIdle() {
         #expect(SessionStateMachine.next(from: .working, event: .idle) == .idle)
@@ -86,24 +81,11 @@ struct SessionStateMachineTests {
 
     // MARK: - No-op edges
 
-    @Test("idle + .heartbeat is a no-op")
-    func idleHeartbeatIsNoOp() {
-        #expect(SessionStateMachine.next(from: .idle, event: .heartbeat) == .idle)
-    }
-
     @Test("starting + unrelated events stay in starting")
     func startingIgnoresUnrelatedEvents() {
-        let unrelated: [AgentEvent] = [.heartbeat, .idle, .waitingForPermission, .blockedByAutoMode]
+        let unrelated: [AgentEvent] = [.idle, .waitingForPermission, .blockedByAutoMode]
         for event in unrelated {
             #expect(SessionStateMachine.next(from: .starting, event: event) == .starting)
-        }
-    }
-
-    @Test("attention states ignore .heartbeat")
-    func attentionStatesIgnoreHeartbeat() {
-        let attentionStates: [SessionState] = [.waitingForPermission, .waitingForIdle, .blockedByAutoMode]
-        for state in attentionStates {
-            #expect(SessionStateMachine.next(from: state, event: .heartbeat) == state)
         }
     }
 }

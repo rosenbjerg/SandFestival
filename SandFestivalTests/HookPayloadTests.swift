@@ -79,9 +79,13 @@ struct HookPayloadTranslatorTests {
         #expect(HookPayloadTranslator.translate(makePayload(event: "UserPromptSubmit")) == .working)
     }
 
-    @Test("PostToolUse maps to .heartbeat")
-    func postToolUseMapsToHeartbeat() {
-        #expect(HookPayloadTranslator.translate(makePayload(event: "PostToolUse")) == .heartbeat)
+    @Test("PostToolUse for non-AskUserQuestion tools yields no event")
+    func postToolUseYieldsNil() {
+        // The state machine already short-circuits same-state events, so
+        // there's nothing for a generic PostToolUse to do — emit nothing
+        // rather than carry a placeholder event through the sink.
+        #expect(HookPayloadTranslator.translate(makePayload(event: "PostToolUse")) == nil)
+        #expect(HookPayloadTranslator.translate(makePayload(event: "PostToolUse", toolName: "Bash")) == nil)
     }
 
     @Test("PreToolUse for AskUserQuestion maps to .waitingForInput")
