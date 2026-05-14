@@ -42,6 +42,35 @@ struct UserShellPathTests {
     }
 }
 
+@Suite("UserShellPath.resolveShellExecutable")
+struct UserShellPathShellPickerTests {
+
+    @Test("returns the SHELL value when it is an executable file")
+    func returnsExecutableShell() {
+        // /bin/sh is guaranteed to be an executable on every macOS host.
+        let picked = UserShellPath.resolveShellExecutable(env: ["SHELL": "/bin/sh"])
+        #expect(picked == "/bin/sh")
+    }
+
+    @Test("falls back to /bin/zsh when SHELL is unset")
+    func fallsBackWhenUnset() {
+        let picked = UserShellPath.resolveShellExecutable(env: [:])
+        #expect(picked == "/bin/zsh")
+    }
+
+    @Test("falls back to /bin/zsh when SHELL is empty")
+    func fallsBackWhenEmpty() {
+        let picked = UserShellPath.resolveShellExecutable(env: ["SHELL": ""])
+        #expect(picked == "/bin/zsh")
+    }
+
+    @Test("falls back to /bin/zsh when SHELL is not an executable file")
+    func fallsBackWhenNotExecutable() {
+        let picked = UserShellPath.resolveShellExecutable(env: ["SHELL": "/this/path/does/not/exist"])
+        #expect(picked == "/bin/zsh")
+    }
+}
+
 @Suite("UserShellPath.runShellAndExtractPath")
 struct UserShellPathSubprocessTests {
 
