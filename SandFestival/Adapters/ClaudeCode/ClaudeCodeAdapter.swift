@@ -127,7 +127,7 @@ final class ClaudeCodeAdapter: AgentAdapter {
         guard let projectID else { return }
 
         if let event = HookPayloadTranslator.translate(payload) {
-            eventSink?.report(matching: .projectID(projectID), event: event)
+            eventSink?.report(projectID: projectID, event: event)
         }
 
         if payload.hookEventName == HookEvent.sessionEnd.rawValue {

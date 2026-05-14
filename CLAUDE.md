@@ -62,12 +62,12 @@ PATH precedence in `Session.composeEnvironment(inherited:projectEnv:extra:)`: pr
 - `SessionEnd` is **not** a `.stopped` signal — process death comes from the OS-level termination callback in `Session.handleProcessTerminated`. `SessionEnd` fires for `/resume` and `/clear` over a live process, so translating it would push a running session into the "not running" overlay
 - Subsequent non-SessionStart events route by `session_id` only — `cd` mid-session can't detach a session
 - Unknown session_ids are silently dropped (claude run from elsewhere)
-- Adapters emit only `.projectID(uuid)` matchers to the sink — the sink doesn't resolve session_ids
+- Adapters resolve to a `Project.ID` before reporting — `AgentEventSink.report(projectID:event:)` takes the resolved id directly. Per-agent mapping logic (cwd, session_id, etc.) stays inside the adapter
 
 ## State machine
 
 - `SessionStateMachine.next(from:event:)` is pure — test without a live process
-- `Session.enteredCurrentStateAt` is stamped on transitions, **not** on heartbeats. Sidebar reads it as "waiting Xm"
+- `Session.enteredCurrentStateAt` is stamped on transitions, **not** on same-state events. Sidebar reads it as "waiting Xm"
 - Same-state events in `Session.apply(event:)` are no-ops
 
 ## Terminal lifetime

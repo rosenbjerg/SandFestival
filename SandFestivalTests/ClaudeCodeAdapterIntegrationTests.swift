@@ -27,7 +27,7 @@ struct ClaudeCodeAdapterIntegrationTests {
 
         try await env.sink.waitForEvents(1)
         let received = try #require(env.sink.events.first)
-        #expect(received.matcher == .projectID(project.id))
+        #expect(received.projectID == project.id)
         #expect(received.event == .started)
     }
 
@@ -56,7 +56,7 @@ struct ClaudeCodeAdapterIntegrationTests {
         ])
         try await env.sink.waitForEvents(1)
         let received = try #require(env.sink.events.first)
-        #expect(received.matcher == .projectID(project.id))
+        #expect(received.projectID == project.id)
         #expect(received.event == .waitingForPermission)
     }
 
@@ -104,7 +104,7 @@ struct ClaudeCodeAdapterIntegrationTests {
         // .started (from the resumed SessionStart) and .working (from the
         // follow-up UserPromptSubmit). Crucially: no .stopped.
         let events = env.sink.events
-        #expect(events.allSatisfy { $0.matcher == .projectID(project.id) })
+        #expect(events.allSatisfy { $0.projectID == project.id })
         #expect(events.contains { $0.event == .started })
         #expect(events.contains { $0.event == .working })
         #expect(!events.contains { $0.event == .stopped })
@@ -199,10 +199,10 @@ private struct InMemoryTokenStore: TokenStore {
 
 @MainActor
 private final class RecordingSink: AgentEventSink {
-    private(set) var events: [(matcher: SessionMatcher, event: AgentEvent)] = []
+    private(set) var events: [(projectID: Project.ID, event: AgentEvent)] = []
 
-    func report(matching: SessionMatcher, event: AgentEvent) {
-        events.append((matching, event))
+    func report(projectID: Project.ID, event: AgentEvent) {
+        events.append((projectID, event))
     }
 
     func drainEvents() { events.removeAll() }

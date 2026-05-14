@@ -1,9 +1,10 @@
 import Foundation
 
 /// Interface adapters use to push observations back into the core. Adapters
-/// don't know which Project a hook event belongs to — they describe what they
-/// know via the matcher and let the core resolve.
+/// own whatever mapping they need from agent-side identifiers (cwd,
+/// session_id, PID, etc.) to the project — by the time they call the sink,
+/// they already know which Project the event belongs to.
 @MainActor
 protocol AgentEventSink: AnyObject {
-    func report(matching: SessionMatcher, event: AgentEvent)
+    func report(projectID: Project.ID, event: AgentEvent)
 }
