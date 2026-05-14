@@ -104,21 +104,21 @@ enum UserShellPath {
         // the buffer and stall the shell waiting for someone to read it.
         process.standardError = FileHandle.nullDevice
 
+        // Termination signals a semaphore so we wake immediately on
+        // exit instead of polling on a 20 ms quantum. Wait with the
+        // deadline; on timeout SIGKILL and wait once more to reap.
+        let done = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in done.signal() }
+
         do {
             try process.run()
         } catch {
             return nil
         }
 
-        // Poll Process.isRunning rather than blocking on waitUntilExit
-        // so we can bail out with SIGKILL once the deadline passes.
-        let deadline = Date().addingTimeInterval(timeout)
-        while process.isRunning && Date() < deadline {
-            Thread.sleep(forTimeInterval: 0.02)
-        }
-        if process.isRunning {
+        if done.wait(timeout: .now() + timeout) == .timedOut {
             kill(process.processIdentifier, SIGKILL)
-            process.waitUntilExit()
+            done.wait()
             return nil
         }
 
