@@ -34,17 +34,16 @@ struct DetailPaneView: View {
 
     @ViewBuilder
     private func sessionPane(session: Session, isVisible: Bool) -> some View {
-        ZStack {
-            TerminalPaneView(terminalView: session.terminalView, isVisible: isVisible)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.leading, 4)
-
-            if isVisible, !session.state.isRunning {
-                notRunningOverlay(session: session)
+        TerminalPaneView(terminalView: session.terminalView, isVisible: isVisible)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.leading, 4)
+            .overlay {
+                if isVisible, !session.state.isRunning {
+                    notRunningOverlay(session: session)
+                }
             }
-        }
-        .opacity(isVisible ? 1 : 0)
-        .allowsHitTesting(isVisible)
+            .opacity(isVisible ? 1 : 0)
+            .allowsHitTesting(isVisible)
     }
 
     private func notRunningOverlay(session: Session) -> some View {
