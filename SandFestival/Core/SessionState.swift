@@ -38,11 +38,16 @@ extension SessionState {
         }
     }
 
+    /// True when there's an OS-level process behind the session that the UI
+    /// should treat as alive (toolbar shows Stop, no "not running" overlay).
+    /// `.errored` joins `.stopped` because the only path to errored today is
+    /// `Session.start()` failing to resolve the command — no process was
+    /// spawned, so Stop would be a no-op and the overlay should offer Start.
     var isRunning: Bool {
         switch self {
-        case .stopped:
+        case .stopped, .errored:
             return false
-        case .starting, .idle, .working, .waitingForPermission, .waitingForIdle, .blockedByAutoMode, .errored:
+        case .starting, .idle, .working, .waitingForPermission, .waitingForIdle, .blockedByAutoMode:
             return true
         }
     }
