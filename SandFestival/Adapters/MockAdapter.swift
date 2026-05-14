@@ -54,7 +54,7 @@ final class MockAdapter: AgentAdapter {
         for step in script {
             try? await Task.sleep(for: step.delay)
             if Task.isCancelled { return }
-            sink.report(matching: .projectID(session.projectID), event: step.event)
+            sink.report(projectID: session.projectID, event: step.event)
         }
     }
 

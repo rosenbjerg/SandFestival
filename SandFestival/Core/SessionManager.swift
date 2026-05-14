@@ -245,18 +245,6 @@ final class SessionManager {
         session.restart()
     }
 
-    // MARK: - Matcher resolution
-
-    func resolveProjectID(_ matcher: SessionMatcher) -> Project.ID? {
-        switch matcher {
-        case .projectID(let id):
-            return projects.contains(where: { $0.id == id }) ? id : nil
-        case .workingDirectory(let url):
-            let target = url.standardizedFileURL.path
-            return projects.first { $0.path.standardizedFileURL.path == target }?.id
-        }
-    }
-
     // MARK: - Internal
 
     private func autoStartIfNeeded() {

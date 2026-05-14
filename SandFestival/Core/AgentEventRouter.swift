@@ -8,9 +8,11 @@ final class AgentEventRouter: AgentEventSink {
         self.manager = manager
     }
 
-    func report(matching matcher: SessionMatcher, event: AgentEvent) {
+    func report(projectID: Project.ID, event: AgentEvent) {
         guard let manager else { return }
-        guard let projectID = manager.resolveProjectID(matcher) else { return }
-        manager.session(for: projectID)?.apply(event: event)
+        // Drop reports for projects the user has since removed — the adapter
+        // may still have an in-flight binding for them.
+        guard let session = manager.session(for: projectID) else { return }
+        session.apply(event: event)
     }
 }
