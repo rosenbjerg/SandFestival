@@ -12,6 +12,11 @@ final class SessionManager {
     private(set) var lastPersistError: String?
     private(set) var terminalFontSize: CGFloat = SessionManager.defaultFontSize
     private(set) var terminalScrollback: Int = SessionManager.defaultScrollback
+    /// Opt-in flag mirroring SwiftTerm's `setUseMetal`. The GPU path can shave
+    /// real CPU on busy multi-session setups but the SwiftTerm docs flag it as
+    /// "still evolving" — we keep it off by default and let the user flip it
+    /// from preferences.
+    private(set) var useMetalRenderer: Bool = false
 
     static let defaultFontSize: CGFloat = 13
     static let minFontSize: CGFloat = 9
@@ -26,6 +31,7 @@ final class SessionManager {
     static let minScrollback: Int = 500
     static let maxScrollback: Int = 50_000
     private static let scrollbackKey = "terminal.scrollback"
+    private static let useMetalKey = "terminal.useMetal"
 
     @ObservationIgnored private let store: ProjectStore
     @ObservationIgnored private(set) var adapter: (any AgentAdapter)?
@@ -54,11 +60,13 @@ final class SessionManager {
         UserDefaults.standard.register(defaults: [
             SessionManager.fontSizeKey: Double(SessionManager.defaultFontSize),
             SessionManager.scrollbackKey: SessionManager.defaultScrollback,
+            SessionManager.useMetalKey: false,
         ])
         let storedFontSize = CGFloat(UserDefaults.standard.double(forKey: SessionManager.fontSizeKey))
         terminalFontSize = SessionManager.clampFontSize(storedFontSize)
         let storedScrollback = UserDefaults.standard.integer(forKey: SessionManager.scrollbackKey)
         terminalScrollback = SessionManager.clampScrollback(storedScrollback)
+        useMetalRenderer = UserDefaults.standard.bool(forKey: SessionManager.useMetalKey)
 
         do {
             projects = try resolvedStore.load()
@@ -261,6 +269,13 @@ final class SessionManager {
         let session = Session(project: project)
         session.terminalView.font = currentTerminalFont()
         session.terminalView.getTerminal().changeScrollback(terminalScrollback)
+        // Provider rather than a snapshot so a session created before the user
+        // flips the preference still applies the latest value when its view
+        // enters a window. `applyMetalRenderer` handles live transitions for
+        // sessions already on screen.
+        session.terminalView.useMetalProvider = { [weak self] in
+            self?.useMetalRenderer ?? false
+        }
         // Pure black + ANSI "white" (≈ light gray) is what makes plain text
         // look dull. A near-black background (Terminal.app's Pro theme is
         // similar) and an off-white default foreground push contrast back up
@@ -366,6 +381,21 @@ final class SessionManager {
 
     private static func clampScrollback(_ lines: Int) -> Int {
         min(max(lines, minScrollback), maxScrollback)
+    }
+
+    // MARK: - GPU rendering
+
+    /// Flips the SwiftTerm Metal renderer on every live session. `try?` because
+    /// `setUseMetal` throws on hosts without a Metal device — silently falling
+    /// back to CoreGraphics matches what `viewDidMoveToWindow` does for new
+    /// sessions and avoids surfacing an error path users can't act on.
+    func applyMetalRenderer(_ enabled: Bool) {
+        guard enabled != useMetalRenderer else { return }
+        useMetalRenderer = enabled
+        UserDefaults.standard.set(enabled, forKey: SessionManager.useMetalKey)
+        for session in sessions.values {
+            try? session.terminalView.setUseMetal(enabled)
+        }
     }
 
     private func handle(for project: Project) -> SessionHandle {
