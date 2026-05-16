@@ -84,6 +84,12 @@ struct DetailPaneView: View {
             Text(String(localized: "detail.empty.title"))
                 .font(.title3)
                 .foregroundStyle(.secondary)
+            if manager.projects.isEmpty {
+                Button(String(localized: "detail.empty.add_project")) {
+                    editorTarget = .add(seedFolder: nil)
+                }
+                .padding(.top, 4)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
