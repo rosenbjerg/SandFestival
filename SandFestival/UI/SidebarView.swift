@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct SidebarView: View {
@@ -6,9 +7,15 @@ struct SidebarView: View {
     @Binding var duplicateTarget: Project?
     @Binding var removalTarget: Project?
 
-    /// In-memory only — collapse state resets every app launch. Parents
-    /// default to expanded; this set holds the ids the user has folded up.
-    @State private var collapsedParents: Set<Project.ID> = []
+    /// Persisted across launches as a comma-joined list of UUID strings.
+    /// Parents default to expanded; this holds the ids the user folded up.
+    @AppStorage("sidebar.collapsedParents") private var collapsedParentsStorage: String = ""
+
+    private var collapsedParents: Set<Project.ID> {
+        Set(collapsedParentsStorage
+            .split(separator: ",")
+            .compactMap { UUID(uuidString: String($0)) })
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -86,6 +93,14 @@ struct SidebarView: View {
         // mode; setting @State here leaves the resulting `.sheet` queued
         // until the runloop returns to default — which used to wait until
         // the app lost focus. Async hop lets the menu tear down first.
+        // Plain NSWorkspace calls don't present a sheet, so they skip it.
+        Button(String(localized: "sidebar.row.open_in_finder")) {
+            NSWorkspace.shared.open(project.path)
+        }
+        Button(String(localized: "sidebar.row.open_in_terminal")) {
+            openInTerminal(project)
+        }
+        Divider()
         Button(String(localized: "sidebar.row.edit")) {
             DispatchQueue.main.async {
                 editorTarget = .edit(project)
@@ -118,11 +133,13 @@ struct SidebarView: View {
     }
 
     private func toggleCollapse(_ id: Project.ID) {
-        if collapsedParents.contains(id) {
-            collapsedParents.remove(id)
+        var ids = collapsedParents
+        if ids.contains(id) {
+            ids.remove(id)
         } else {
-            collapsedParents.insert(id)
+            ids.insert(id)
         }
+        collapsedParentsStorage = ids.map(\.uuidString).joined(separator: ",")
     }
 
     /// A dropped item seeds a project only when it's an actual directory —
@@ -130,6 +147,20 @@ struct SidebarView: View {
     /// project rooted at a non-folder path.
     private func isDirectory(_ url: URL) -> Bool {
         (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+    }
+
+    /// Opens a new Terminal.app session rooted at the project folder. Silent
+    /// no-op if Terminal can't be resolved — there's no sensible fallback.
+    private func openInTerminal(_ project: Project) {
+        guard let terminalURL = NSWorkspace.shared.urlForApplication(
+            withBundleIdentifier: "com.apple.Terminal"
+        ) else { return }
+        NSWorkspace.shared.open(
+            [project.path],
+            withApplicationAt: terminalURL,
+            configuration: NSWorkspace.OpenConfiguration(),
+            completionHandler: nil
+        )
     }
 
     // MARK: - Row
