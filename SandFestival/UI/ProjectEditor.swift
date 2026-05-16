@@ -232,9 +232,20 @@ private struct ProjectDraft {
     }
 
     var isValid: Bool {
-        !name.trimmingCharacters(in: .whitespaces).isEmpty &&
-        !pathString.trimmingCharacters(in: .whitespaces).isEmpty &&
-        !command.trimmingCharacters(in: .whitespaces).isEmpty
+        let trimmedPath = pathString.trimmingCharacters(in: .whitespaces)
+        return !name.trimmingCharacters(in: .whitespaces).isEmpty &&
+            !command.trimmingCharacters(in: .whitespaces).isEmpty &&
+            ProjectDraft.isExistingDirectory(trimmedPath)
+    }
+
+    /// `materialize` builds the path with `URL(fileURLWithPath:)`, which
+    /// doesn't expand `~` — so this check stays literal too, keeping
+    /// `isValid` an honest predictor of whether the saved path resolves.
+    private static func isExistingDirectory(_ path: String) -> Bool {
+        guard !path.isEmpty else { return false }
+        var isDirectory: ObjCBool = false
+        return FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory)
+            && isDirectory.boolValue
     }
 
     private static func tokens(_ text: String) -> [String] {
