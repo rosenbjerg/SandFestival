@@ -8,13 +8,15 @@ struct SandFestivalApp: App {
     @State private var attentionPreferences = AttentionPreferences()
     @State private var attentionNotifier: AttentionNotifier?
     @State private var manualHookSheet = false
+    @State private var editorTarget: ProjectEditorTarget?
 
     var body: some Scene {
         WindowGroup {
             ContentView(
                 manager: manager,
                 claudeCodeAdapter: claudeCodeAdapter,
-                manualHookSheet: $manualHookSheet
+                manualHookSheet: $manualHookSheet,
+                editorTarget: $editorTarget
             )
                 .frame(minWidth: 900, minHeight: 600)
                 .task {
@@ -31,6 +33,13 @@ struct SandFestivalApp: App {
                 }
         }
         .commands {
+            CommandGroup(replacing: .newItem) {
+                Button(String(localized: "menu.new_project")) {
+                    editorTarget = .add(seedFolder: nil)
+                }
+                .keyboardShortcut("n", modifiers: .command)
+            }
+
             CommandGroup(after: .appSettings) {
                 Button(String(localized: "menu.manage_hooks")) {
                     manualHookSheet = true

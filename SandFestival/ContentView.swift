@@ -5,7 +5,7 @@ struct ContentView: View {
     @Bindable var manager: SessionManager
     @Bindable var claudeCodeAdapter: ClaudeCodeAdapter
     @Binding var manualHookSheet: Bool
-    @State private var editorTarget: ProjectEditorTarget?
+    @Binding var editorTarget: ProjectEditorTarget?
     @State private var duplicateTarget: Project?
     @State private var removalTarget: Project?
     @State private var hookSheetSkipped = false
@@ -145,6 +145,7 @@ struct ContentView: View {
     ContentView(
         manager: SessionManager(),
         claudeCodeAdapter: ClaudeCodeAdapter(),
-        manualHookSheet: .constant(false)
+        manualHookSheet: .constant(false),
+        editorTarget: .constant(nil)
     )
 }
