@@ -2,7 +2,9 @@ import AppKit
 import SwiftUI
 
 enum ProjectEditorTarget: Identifiable {
-    case add
+    /// `seedFolder` pre-fills name + path when the editor is opened from a
+    /// folder drop; nil for the plain "Add project" button.
+    case add(seedFolder: URL?)
     case edit(Project)
 
     var id: String {
@@ -25,8 +27,8 @@ struct ProjectEditorView: View {
         self.onSave = onSave
         self.onCancel = onCancel
         switch target {
-        case .add:
-            _draft = State(initialValue: ProjectDraft())
+        case .add(let seedFolder):
+            _draft = State(initialValue: ProjectDraft(seedFolder: seedFolder))
         case .edit(let project):
             _draft = State(initialValue: ProjectDraft(project: project))
         }
@@ -184,9 +186,9 @@ private struct ProjectDraft {
     /// without waiting on a `nono profile list` subprocess.
     var discoveredProfiles: [String] = []
 
-    init() {
-        self.name = ""
-        self.pathString = ""
+    init(seedFolder: URL? = nil) {
+        self.name = seedFolder?.lastPathComponent ?? ""
+        self.pathString = seedFolder?.path ?? ""
         self.command = Project.defaultCommand
         let split = ArgsSplitter.split(Project.defaultArgs)
         let extracted = NonoProfileArgs.extract(from: split.wrapper)

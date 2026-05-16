@@ -31,12 +31,17 @@ struct SidebarView: View {
                 }
             }
             .listStyle(.sidebar)
+            .dropDestination(for: URL.self) { urls, _ in
+                guard let folder = urls.first(where: isDirectory) else { return false }
+                editorTarget = .add(seedFolder: folder)
+                return true
+            }
 
             Divider()
 
             HStack {
                 Button {
-                    editorTarget = .add
+                    editorTarget = .add(seedFolder: nil)
                 } label: {
                     Label(String(localized: "sidebar.add_project"), systemImage: "plus")
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -118,6 +123,13 @@ struct SidebarView: View {
         } else {
             collapsedParents.insert(id)
         }
+    }
+
+    /// A dropped item seeds a project only when it's an actual directory —
+    /// dropping a file onto the sidebar is rejected rather than creating a
+    /// project rooted at a non-folder path.
+    private func isDirectory(_ url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
     }
 
     // MARK: - Row
