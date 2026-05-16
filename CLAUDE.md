@@ -70,6 +70,13 @@ PATH precedence in `Session.composeEnvironment(inherited:projectEnv:extra:)`: pr
 - `Session.enteredCurrentStateAt` is stamped on transitions, **not** on same-state events. Sidebar reads it as "waiting Xm"
 - Same-state events in `Session.apply(event:)` are no-ops
 
+## Attention surfaces
+
+- `AttentionNotifier` is the single sink turning session-state transitions into dock badge, dock bounce, and user notifications. It's wired once via `SessionManager.sessionStateObserver` — don't add a second observer for the same purpose
+- `AttentionDecision.decide` is pure — no AppKit, no Focus center. Same split as `SessionStateMachine.next`: `decide` answers "what should fire?", the notifier owns the side effects. Test the policy without spinning up AppKit
+- Dock badge always mirrors `attentionSessions.count`. Dock bounce fires only on transitions *into* an attention state, only when SandFestival isn't frontmost, and only when system Focus is off (Focus is treated as off when `INFocusStatusCenter` authorization hasn't been granted — bouncing is the conservative default)
+- Notifications are opt-in (`AttentionPreferences`). One notification identifier **per project**, so a later transition updates the same banner instead of stacking; resolving the attention state withdraws it. Clicking a notification routes through `SessionManager.focus(projectID:)`
+
 ## Terminal lifetime
 
 Each `Session` owns its `LocalProcessTerminalView` for the whole app lifetime. `DetailPaneView` ZStacks every session's view and `TerminalPaneView` flips `NSView.isHidden` per selection (not `.opacity` — at alpha 0 the layer is still asked to paint dirty rects on every PTY update). **Never** swap views by selection, that destroys scrollback.
