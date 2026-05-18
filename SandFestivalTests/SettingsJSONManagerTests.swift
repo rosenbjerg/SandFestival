@@ -141,6 +141,28 @@ struct SettingsJSONManagerTests {
         }
     }
 
+    @Test("an unreadable settings.json makes install throw instead of overwriting it")
+    func unreadableSettingsThrows() throws {
+        let url = temporaryURL()
+        try seed(url: url, content: #"{ "theme": "dark" }"#)
+        let fileManager = FileManager.default
+        // Drop all permissions: the file exists but can't be read. `try?` used
+        // to swallow that and treat the file as empty — which then wiped it.
+        try fileManager.setAttributes([.posixPermissions: 0], ofItemAtPath: url.path)
+        defer { try? fileManager.setAttributes([.posixPermissions: 0o644], ofItemAtPath: url.path) }
+
+        let manager = SettingsJSONManager(fileURL: url)
+        #expect(throws: SettingsJSONManagerError.self) {
+            try manager.install(port: 51789)
+        }
+
+        // Restore read access and confirm the user's content survived untouched.
+        try fileManager.setAttributes([.posixPermissions: 0o644], ofItemAtPath: url.path)
+        let json = try parsedSettings(at: url)
+        #expect(json["theme"] as? String == "dark")
+        #expect(json["hooks"] == nil)
+    }
+
     @Test("preview computes before/after without writing to disk")
     func previewDoesNotWriteDisk() throws {
         let url = temporaryURL()
