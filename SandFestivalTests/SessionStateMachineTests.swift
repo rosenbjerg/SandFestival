@@ -79,6 +79,20 @@ struct SessionStateMachineTests {
         #expect(SessionStateMachine.next(from: .errored(reason: "x"), event: .started) == .idle)
     }
 
+    @Test(".sessionRestarted drives the same transitions as .started")
+    func sessionRestartedMirrorsStarted() {
+        // `.sessionRestarted` is `/resume` / `/clear` — the side effect lives
+        // in Session.apply (drop the stale terminal title); state-machine
+        // transitions are identical to `.started`.
+        #expect(SessionStateMachine.next(from: .starting, event: .sessionRestarted) == .idle)
+        #expect(SessionStateMachine.next(from: .errored(reason: "x"), event: .sessionRestarted) == .idle)
+        #expect(SessionStateMachine.next(from: .stopped, event: .sessionRestarted) == .idle)
+        // On a live session it's a no-op, same as `.started`.
+        for state in [SessionState.idle, .working, .waitingForPermission, .waitingForIdle, .blockedByAutoMode] {
+            #expect(SessionStateMachine.next(from: state, event: .sessionRestarted) == state)
+        }
+    }
+
     // MARK: - No-op edges
 
     @Test("starting + unrelated events stay in starting")

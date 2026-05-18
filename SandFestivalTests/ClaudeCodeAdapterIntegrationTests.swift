@@ -101,12 +101,15 @@ struct ClaudeCodeAdapterIntegrationTests {
         try await env.sink.waitForEvents(2)
 
         // SessionEnd no longer emits anything, so the only events we expect are
-        // .started (from the resumed SessionStart) and .working (from the
-        // follow-up UserPromptSubmit). Crucially: no .stopped.
+        // .sessionRestarted (the resumed SessionStart, distinguished from a
+        // fresh-spawn .started so Session drops the stale conversation title)
+        // and .working (from the follow-up UserPromptSubmit). Crucially: no
+        // .stopped, and no fresh-spawn .started either.
         let events = env.sink.events
         #expect(events.allSatisfy { $0.projectID == project.id })
-        #expect(events.contains { $0.event == .started })
+        #expect(events.contains { $0.event == .sessionRestarted })
         #expect(events.contains { $0.event == .working })
+        #expect(!events.contains { $0.event == .started })
         #expect(!events.contains { $0.event == .stopped })
     }
 
