@@ -376,6 +376,116 @@ struct GitWorktreeTests {
         #expect(contents == ".worktrees-backup/\n.worktrees/\n")
     }
 
+    @Test("listInUseBranches returns the primary repo's HEAD branch")
+    func listInUseBranchesIncludesPrimary() throws {
+        guard hasGit() else { return }
+        let workspace = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workspace) }
+
+        let sourceRepo = workspace.appendingPathComponent("source", isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceRepo, withIntermediateDirectories: true)
+        try runGit(["init", "-b", "main"], at: sourceRepo)
+        try runGit(["commit", "--allow-empty", "-m", "initial"], at: sourceRepo, withIdentity: true)
+
+        let inUse = GitWorktree.listInUseBranches(at: sourceRepo)
+        #expect(inUse.contains("main"))
+    }
+
+    @Test("listInUseBranches sees branches checked out in linked worktrees too")
+    func listInUseBranchesIncludesLinkedWorktrees() throws {
+        guard hasGit() else { return }
+        let workspace = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workspace) }
+
+        let sourceRepo = workspace.appendingPathComponent("source", isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceRepo, withIntermediateDirectories: true)
+        try runGit(["init", "-b", "main"], at: sourceRepo)
+        try runGit(["commit", "--allow-empty", "-m", "initial"], at: sourceRepo, withIdentity: true)
+
+        let worktreePath = workspace.appendingPathComponent("twin", isDirectory: true)
+        let addResult = GitWorktree.addWorktree(
+            newBranch: "feature/twin",
+            newPath: worktreePath,
+            base: "main",
+            sourceRepoPath: sourceRepo
+        )
+        guard case .success = addResult else {
+            Issue.record("addWorktree failed: \(addResult)")
+            return
+        }
+
+        let inUse = GitWorktree.listInUseBranches(at: sourceRepo)
+        #expect(inUse.contains("main"))
+        #expect(inUse.contains("feature/twin"))
+
+        // A branch that exists locally but isn't checked out anywhere
+        // shouldn't appear.
+        try runGit(["branch", "parked"], at: sourceRepo)
+        let inUseAfter = GitWorktree.listInUseBranches(at: sourceRepo)
+        #expect(!inUseAfter.contains("parked"))
+    }
+
+    @Test("checkoutWorktree creates a worktree for an existing branch without changing HEAD")
+    func checkoutWorktreeExistingBranch() throws {
+        guard hasGit() else { return }
+        let workspace = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workspace) }
+
+        let sourceRepo = workspace.appendingPathComponent("source", isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceRepo, withIntermediateDirectories: true)
+        try runGit(["init", "-b", "main"], at: sourceRepo)
+        try runGit(["commit", "--allow-empty", "-m", "initial"], at: sourceRepo, withIdentity: true)
+        // A branch that's NOT currently checked out anywhere — the duplicate
+        // flow's "continue work on an existing branch" path is exactly this.
+        try runGit(["branch", "feature/parked"], at: sourceRepo)
+
+        let worktreePath = workspace.appendingPathComponent("twin", isDirectory: true)
+        let result = GitWorktree.checkoutWorktree(
+            existingBranch: "feature/parked",
+            newPath: worktreePath,
+            sourceRepoPath: sourceRepo
+        )
+        guard case .success = result else {
+            Issue.record("checkoutWorktree failed: \(result)")
+            return
+        }
+        #expect(FileManager.default.fileExists(atPath: worktreePath.path))
+        // listLocalBranches shouldn't gain a new branch — we checked out an
+        // existing one, not created a new one.
+        let branches = GitWorktree.listLocalBranches(at: sourceRepo)
+        #expect(branches.contains("feature/parked"))
+        #expect(branches.count == 2) // main + feature/parked
+        // And feature/parked is now in use.
+        let inUse = GitWorktree.listInUseBranches(at: sourceRepo)
+        #expect(inUse.contains("feature/parked"))
+    }
+
+    @Test("checkoutWorktree refuses a branch that's already checked out elsewhere")
+    func checkoutWorktreeRefusesInUseBranch() throws {
+        guard hasGit() else { return }
+        let workspace = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workspace) }
+
+        let sourceRepo = workspace.appendingPathComponent("source", isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceRepo, withIntermediateDirectories: true)
+        try runGit(["init", "-b", "main"], at: sourceRepo)
+        try runGit(["commit", "--allow-empty", "-m", "initial"], at: sourceRepo, withIdentity: true)
+
+        // `main` is the primary worktree's HEAD — git should refuse.
+        let worktreePath = workspace.appendingPathComponent("twin", isDirectory: true)
+        let result = GitWorktree.checkoutWorktree(
+            existingBranch: "main",
+            newPath: worktreePath,
+            sourceRepoPath: sourceRepo
+        )
+        switch result {
+        case .success:
+            Issue.record("expected checkoutWorktree to fail for in-use branch")
+        case .failure(let err):
+            #expect(err.errorDescription?.isEmpty == false)
+        }
+    }
+
     // MARK: - Helpers
 
     private func hasGit() -> Bool {
