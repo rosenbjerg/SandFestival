@@ -48,9 +48,14 @@ struct ProjectDuplicateView: View {
                                 basePicker
                             } else {
                                 BranchPickerField(
+                                    label: String(localized: "duplicate.field.existing_branch"),
                                     branches: draft.availableBranches,
                                     inUse: draft.branchesInUse,
-                                    selection: branchBinding
+                                    empty: .placeholder(
+                                        text: String(localized: "duplicate.field.existing_branch.placeholder"),
+                                        loading: String(localized: "duplicate.field.existing_branch.loading")
+                                    ),
+                                    selection: existingBranchBinding
                                 )
                             }
                             HStack {
@@ -119,13 +124,12 @@ struct ProjectDuplicateView: View {
 
     @ViewBuilder
     private var basePicker: some View {
-        Picker(String(localized: "duplicate.field.base_branch"), selection: $draft.baseBranch) {
-            Text(String(localized: "duplicate.field.base_branch.current"))
-                .tag(String?.none)
-            ForEach(draft.availableBranches, id: \.self) { branch in
-                Text(branch).tag(String?.some(branch))
-            }
-        }
+        BranchPickerField(
+            label: String(localized: "duplicate.field.base_branch"),
+            branches: draft.availableBranches,
+            empty: .sentinel(label: String(localized: "duplicate.field.base_branch.current")),
+            selection: $draft.baseBranch
+        )
     }
 
     // The name and path fields keep tracking the branch name until the user
@@ -136,6 +140,19 @@ struct ProjectDuplicateView: View {
             get: { draft.branchName },
             set: { newValue in
                 draft.branchName = newValue
+                draft.refreshDerivedFields()
+            }
+        )
+    }
+
+    // The existing-branch picker models "no branch picked" as nil; bridge that
+    // onto the draft's non-optional branchName. Picking still re-derives the
+    // name and path fields, exactly like typing into the new-branch field.
+    private var existingBranchBinding: Binding<String?> {
+        Binding(
+            get: { draft.branchName.isEmpty ? nil : draft.branchName },
+            set: { newValue in
+                draft.branchName = newValue ?? ""
                 draft.refreshDerivedFields()
             }
         )
