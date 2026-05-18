@@ -158,17 +158,94 @@ struct ProjectDuplicateDraftTests {
         #expect(draft.name == "Demo")
     }
 
+    @Test("default worktree mode is newBranch")
+    func defaultModeIsNewBranch() {
+        let draft = makeDraft(sourcePath: "/Users/me/repo", sourceName: "Demo")
+        #expect(draft.worktreeMode == .newBranch)
+    }
+
+    @Test("existing-branch mode requires the branch to be in availableBranches")
+    func existingModeValidityChecksMembership() {
+        var draft = makeDraft(
+            sourcePath: "/Users/me/repo",
+            sourceName: "Demo",
+            availableBranches: ["main", "feature-x"]
+        )
+        draft.worktreeMode = .existingBranch
+        draft.branchName = "feature-x"
+        draft.refreshDerivedFields()
+        #expect(draft.isValid)
+
+        // A branch that isn't in the local-branch list shouldn't validate —
+        // the picker wouldn't have offered it, and git would just fail.
+        draft.branchName = "ghost-branch"
+        draft.refreshDerivedFields()
+        #expect(!draft.isValid)
+    }
+
+    @Test("existing-branch mode rejects branches already checked out elsewhere")
+    func existingModeRejectsInUseBranches() {
+        var draft = makeDraft(
+            sourcePath: "/Users/me/repo",
+            sourceName: "Demo",
+            availableBranches: ["main", "feature-x"],
+            branchesInUse: ["main"]
+        )
+        draft.worktreeMode = .existingBranch
+        draft.branchName = "main"
+        draft.refreshDerivedFields()
+        #expect(!draft.isValid)
+        draft.branchName = "feature-x"
+        draft.refreshDerivedFields()
+        #expect(draft.isValid)
+    }
+
+    @Test("new-branch mode ignores availableBranches membership")
+    func newModeAllowsArbitraryBranchName() {
+        var draft = makeDraft(
+            sourcePath: "/Users/me/repo",
+            sourceName: "Demo",
+            availableBranches: ["main"],
+            branchesInUse: ["main"]
+        )
+        // New-branch mode is creating a fresh branch, so a name that isn't in
+        // the existing list (or even one that collides with an in-use branch
+        // name — git will be the one to complain) is still considered valid
+        // from the draft's perspective.
+        draft.worktreeMode = .newBranch
+        draft.branchName = "brand-new"
+        draft.refreshDerivedFields()
+        #expect(draft.isValid)
+    }
+
+    @Test("picking an existing branch derives name and path the same way new-branch does")
+    func existingBranchDerivesFields() {
+        var draft = makeDraft(
+            sourcePath: "/Users/me/repo",
+            sourceName: "Demo",
+            availableBranches: ["main", "feature-x"]
+        )
+        draft.worktreeMode = .existingBranch
+        draft.branchName = "feature-x"
+        draft.refreshDerivedFields()
+        #expect(draft.name == "Demo (feature-x)")
+        #expect(draft.pathString == "/Users/me/repo/.worktrees/feature-x")
+    }
+
     // MARK: - Helpers
 
     private func makeDraft(
         sourcePath: String,
         sourceName: String,
-        isGitRepo: Bool = true
+        isGitRepo: Bool = true,
+        availableBranches: [String] = [],
+        branchesInUse: Set<String> = []
     ) -> ProjectDuplicateDraft {
         let source = Project(name: sourceName, path: URL(fileURLWithPath: sourcePath))
         return ProjectDuplicateDraft(
             source: source,
-            availableBranches: [],
+            availableBranches: availableBranches,
+            branchesInUse: branchesInUse,
             isGitRepo: isGitRepo
         )
     }

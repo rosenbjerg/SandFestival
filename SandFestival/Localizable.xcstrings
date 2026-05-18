@@ -296,6 +296,83 @@
         }
       }
     },
+    "duplicate.field.existing_branch": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Branch"
+          }
+        }
+      }
+    },
+    "duplicate.field.existing_branch.in_use": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ (in use)"
+          }
+        }
+      }
+    },
+    "duplicate.field.existing_branch.loading": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loading branches…"
+          }
+        }
+      }
+    },
+    "duplicate.field.existing_branch.placeholder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select branch…"
+          }
+        }
+      }
+    },
+    "duplicate.field.mode": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mode"
+          }
+        }
+      }
+    },
+    "duplicate.field.mode.existing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Existing branch"
+          }
+        }
+      }
+    },
+    "duplicate.field.mode.new": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New branch"
+          }
+        }
+      }
+    },
     "duplicate.field.name": {
       "extractionState": "manual",
       "localizations": {

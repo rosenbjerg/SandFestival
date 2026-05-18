@@ -79,6 +79,50 @@ enum GitWorktree {
         return runChecked(args, at: sourceRepoPath)
     }
 
+    /// `git worktree add <newPath> <existingBranch>` from `sourceRepoPath`.
+    /// Used by the duplicate flow's "continue work on an existing branch" mode.
+    /// Git refuses if the branch is already checked out in another worktree —
+    /// we filter those out in the picker but the caller still surfaces the
+    /// error if a race slips one through.
+    nonisolated static func checkoutWorktree(
+        existingBranch: String,
+        newPath: URL,
+        sourceRepoPath: URL
+    ) -> Result<Void, GitWorktreeError> {
+        let args = ["worktree", "add", newPath.path, existingBranch]
+        return runChecked(args, at: sourceRepoPath)
+    }
+
+    /// Branch short-names currently checked out in any worktree of this repo
+    /// (including the primary working tree). `git worktree add` refuses a
+    /// branch that's in use elsewhere, so the duplicate picker uses this to
+    /// disable those rows. Empty set on parse failure — caller still sees the
+    /// branch as selectable and gets the git error if they actually pick it.
+    nonisolated static func listInUseBranches(at sourceRepoPath: URL) -> Set<String> {
+        guard let result = runGit(["worktree", "list", "--porcelain"], at: sourceRepoPath),
+              result.exitCode == 0
+        else { return [] }
+        // Each `branch refs/heads/<name>` line marks a worktree that has that
+        // branch checked out. Detached-HEAD worktrees produce a `detached`
+        // line instead, which we ignore.
+        let prefix = "branch refs/heads/"
+        var names = Set<String>()
+        for line in result.stdout.split(whereSeparator: \.isNewline) {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard trimmed.hasPrefix(prefix) else { continue }
+            let name = String(trimmed.dropFirst(prefix.count))
+            if !name.isEmpty { names.insert(name) }
+        }
+        return names
+    }
+
+    /// Async wrapper for `listInUseBranches`, mirroring `listLocalBranchesAsync`.
+    static func listInUseBranchesAsync(at sourceRepoPath: URL) async -> Set<String> {
+        await Task.detached(priority: .userInitiated) {
+            listInUseBranches(at: sourceRepoPath)
+        }.value
+    }
+
     /// Idempotently ensures `.worktrees/` is listed in the source repo's
     /// `.gitignore`. Creates the file if missing, leaves it alone if a
     /// covering entry is already present, and is silent on I/O failure —

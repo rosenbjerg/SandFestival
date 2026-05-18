@@ -36,8 +36,19 @@ struct ProjectDuplicateView: View {
                     Section(String(localized: "duplicate.section.worktree")) {
                         Toggle(String(localized: "duplicate.field.create_worktree"), isOn: createWorktreeBinding)
                         if draft.createWorktree {
-                            TextField(String(localized: "duplicate.field.branch"), text: branchBinding)
-                            basePicker
+                            Picker(String(localized: "duplicate.field.mode"), selection: modeBinding) {
+                                Text(String(localized: "duplicate.field.mode.new"))
+                                    .tag(WorktreeMode.newBranch)
+                                Text(String(localized: "duplicate.field.mode.existing"))
+                                    .tag(WorktreeMode.existingBranch)
+                            }
+                            .pickerStyle(.segmented)
+                            if draft.worktreeMode == .newBranch {
+                                TextField(String(localized: "duplicate.field.branch"), text: branchBinding)
+                                basePicker
+                            } else {
+                                existingBranchPicker
+                            }
                             HStack {
                                 TextField(String(localized: "duplicate.field.worktree_path"), text: pathBinding)
                                     .truncationMode(.head)
@@ -89,8 +100,11 @@ struct ProjectDuplicateView: View {
         .navigationTitle(String(localized: "duplicate.title"))
         .task {
             guard draft.isGitRepo, draft.availableBranches.isEmpty else { return }
-            let branches = await GitWorktree.listLocalBranchesAsync(at: source.path)
-            draft.availableBranches = branches
+            async let branches = GitWorktree.listLocalBranchesAsync(at: source.path)
+            async let inUse = GitWorktree.listInUseBranchesAsync(at: source.path)
+            let (resolvedBranches, resolvedInUse) = await (branches, inUse)
+            draft.availableBranches = resolvedBranches
+            draft.branchesInUse = resolvedInUse
         }
     }
 
@@ -102,6 +116,45 @@ struct ProjectDuplicateView: View {
             ForEach(draft.availableBranches, id: \.self) { branch in
                 Text(branch).tag(String?.some(branch))
             }
+        }
+    }
+
+    // Existing-branch picker. Branches checked out in another worktree show
+    // up in the menu with a "(in use)" suffix and are disabled — git would
+    // refuse them, and we want to make that obvious before the user submits.
+    // While the async branch list is still loading we surface a "Loading…"
+    // hint inside the picker label rather than an empty disabled control.
+    @ViewBuilder
+    private var existingBranchPicker: some View {
+        let trimmed = draft.branchName.trimmingCharacters(in: .whitespaces)
+        let menuLabel: String = {
+            if !trimmed.isEmpty { return trimmed }
+            if draft.availableBranches.isEmpty {
+                return String(localized: "duplicate.field.existing_branch.loading")
+            }
+            return String(localized: "duplicate.field.existing_branch.placeholder")
+        }()
+        LabeledContent(String(localized: "duplicate.field.existing_branch")) {
+            Menu {
+                ForEach(draft.availableBranches, id: \.self) { branch in
+                    let inUse = draft.branchesInUse.contains(branch)
+                    Button {
+                        draft.branchName = branch
+                        draft.refreshDerivedFields()
+                    } label: {
+                        if inUse {
+                            Text(String(format: String(localized: "duplicate.field.existing_branch.in_use"), branch))
+                        } else {
+                            Text(branch)
+                        }
+                    }
+                    .disabled(inUse)
+                }
+            } label: {
+                Text(menuLabel)
+                    .foregroundStyle(trimmed.isEmpty ? .secondary : .primary)
+            }
+            .disabled(draft.availableBranches.isEmpty)
         }
     }
 
@@ -148,6 +201,24 @@ struct ProjectDuplicateView: View {
             get: { draft.createWorktree },
             set: { newValue in
                 draft.createWorktree = newValue
+                draft.refreshDerivedFields()
+            }
+        )
+    }
+
+    // The branch field means different things in each mode (text to create
+    // vs. branch to check out), so clear it when the user flips modes —
+    // otherwise typing "feat-x" then switching to "Existing branch" leaves a
+    // value that doesn't match any local branch and disables the confirm
+    // button without explanation.
+    private var modeBinding: Binding<WorktreeMode> {
+        Binding(
+            get: { draft.worktreeMode },
+            set: { newValue in
+                guard newValue != draft.worktreeMode else { return }
+                draft.worktreeMode = newValue
+                draft.branchName = ""
+                draft.baseBranch = nil
                 draft.refreshDerivedFields()
             }
         )
@@ -206,14 +277,26 @@ struct ProjectDuplicateView: View {
         let worktreesDir = sourceRepoPath.appendingPathComponent(".worktrees").path + "/"
         let shouldUpdateGitignore = newPath.path.hasPrefix(worktreesDir)
 
+        let mode = snapshot.worktreeMode
+
         Task {
             let result = await Task.detached {
-                let outcome = GitWorktree.addWorktree(
-                    newBranch: trimmedBranch,
-                    newPath: newPath,
-                    base: base,
-                    sourceRepoPath: sourceRepoPath
-                )
+                let outcome: Result<Void, GitWorktreeError>
+                switch mode {
+                case .newBranch:
+                    outcome = GitWorktree.addWorktree(
+                        newBranch: trimmedBranch,
+                        newPath: newPath,
+                        base: base,
+                        sourceRepoPath: sourceRepoPath
+                    )
+                case .existingBranch:
+                    outcome = GitWorktree.checkoutWorktree(
+                        existingBranch: trimmedBranch,
+                        newPath: newPath,
+                        sourceRepoPath: sourceRepoPath
+                    )
+                }
                 if case .success = outcome, shouldUpdateGitignore {
                     GitWorktree.ensureWorktreesIgnored(at: sourceRepoPath)
                 }
@@ -249,6 +332,13 @@ struct ProjectDuplicateView: View {
 
 // MARK: - Draft
 
+/// Which side of the worktree section the user is interacting with: creating
+/// a brand-new branch or checking out one that already exists in the repo.
+enum WorktreeMode: Hashable {
+    case newBranch
+    case existingBranch
+}
+
 /// View-model for `ProjectDuplicateView`. Lives at module scope (not
 /// fileprivate) so the auto-derivation behavior can be unit-tested without
 /// instantiating the SwiftUI view.
@@ -259,6 +349,7 @@ struct ProjectDuplicateDraft {
     var pathString: String
     var autoStart: Bool
     var createWorktree: Bool
+    var worktreeMode: WorktreeMode
     var nameUserEdited: Bool = false
     var pathUserEdited: Bool = false
 
@@ -269,11 +360,16 @@ struct ProjectDuplicateDraft {
     /// doesn't block on a `git branch` subprocess on the main thread — same
     /// pattern as `ProjectEditorView`'s `discoveredProfiles`.
     var availableBranches: [String]
+    /// Branches currently checked out in another worktree (incl. the source's
+    /// own HEAD). Shown disabled in the existing-branch picker because
+    /// `git worktree add <path> <branch>` refuses them.
+    var branchesInUse: Set<String>
     let isGitRepo: Bool
 
     init(
         source: Project,
         availableBranches: [String]? = nil,
+        branchesInUse: Set<String>? = nil,
         isGitRepo: Bool? = nil
     ) {
         // Default to `<source>/.worktrees/<branch>` — matches the
@@ -291,6 +387,7 @@ struct ProjectDuplicateDraft {
         // Branches start empty; the view's `.task` swaps them in once the
         // off-main-thread subprocess returns.
         self.availableBranches = availableBranches ?? []
+        self.branchesInUse = branchesInUse ?? []
         self.isGitRepo = resolvedIsGitRepo
         self.name = source.name
         self.branchName = ""
@@ -301,13 +398,23 @@ struct ProjectDuplicateDraft {
         // following the duplicate flow usually want. Non-git sources don't
         // get the toggle at all, so this just stays false there.
         self.createWorktree = resolvedIsGitRepo
+        self.worktreeMode = .newBranch
     }
 
     var isValid: Bool {
         guard !name.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
         guard createWorktree else { return true }
-        return !branchName.trimmingCharacters(in: .whitespaces).isEmpty &&
-            !pathString.trimmingCharacters(in: .whitespaces).isEmpty
+        let trimmedBranch = branchName.trimmingCharacters(in: .whitespaces)
+        let trimmedPath = pathString.trimmingCharacters(in: .whitespaces)
+        guard !trimmedBranch.isEmpty, !trimmedPath.isEmpty else { return false }
+        // Existing-branch mode also requires that the selected branch is
+        // actually one of the local branches and isn't currently checked out
+        // somewhere else — otherwise `git worktree add` would just fail.
+        if worktreeMode == .existingBranch {
+            guard availableBranches.contains(trimmedBranch) else { return false }
+            guard !branchesInUse.contains(trimmedBranch) else { return false }
+        }
+        return true
     }
 
     /// The path the user typed, trimmed and tilde-expanded. The text
