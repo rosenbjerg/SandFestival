@@ -122,7 +122,12 @@ final class HookListener: @unchecked Sendable {
                 let bodySoFar = bodyStart < buffer.count ? buffer.suffix(from: bodyStart) : Data()
                 let raw = String(data: headerBytes, encoding: .utf8) ?? ""
                 self.dispatchAfterHeaders(connection: connection, headerString: raw, bodySoFar: bodySoFar)
-            } else if error != nil || isComplete {
+            } else if error != nil || isComplete || buffer.count > HookListener.maxHeaderBytes {
+                // No terminator yet and either the peer stopped sending or it's
+                // flooding us pre-auth — a legitimate hook request's headers
+                // are a few hundred bytes, never anywhere near the cap. Drop
+                // the connection rather than letting `accumulated` grow without
+                // bound.
                 connection.cancel()
             } else {
                 self.readHeaders(connection: connection, accumulated: buffer)
@@ -170,6 +175,11 @@ final class HookListener: @unchecked Sendable {
     }
 
     // MARK: - Helpers
+
+    /// Upper bound on the request-header section. Hook requests carry only a
+    /// handful of short headers, so 64 KB is purely a guard against a runaway
+    /// or hostile local process streaming bytes that never terminate.
+    private static let maxHeaderBytes = 1 << 16
 
     private static let headerTerminator: [UInt8] = [0x0d, 0x0a, 0x0d, 0x0a]
 
