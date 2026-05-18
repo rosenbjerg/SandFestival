@@ -7,6 +7,7 @@ struct SettingsDiffPreview: Equatable {
 
 enum SettingsJSONManagerError: Error, Equatable {
     case malformedJSON
+    case readFailed(String)
     case writeFailed(String)
 }
 
@@ -103,16 +104,24 @@ struct SettingsJSONManager {
     // MARK: - Reading
 
     private func readSettings() throws -> [String: Any] {
-        guard FileManager.default.fileExists(atPath: fileURL.path) else { return [:] }
-        let data = (try? Data(contentsOf: fileURL)) ?? Data()
+        let data: Data
+        do {
+            data = try Data(contentsOf: fileURL)
+        } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
+            // No settings.json yet — a fresh install. Start from an empty object.
+            return [:]
+        } catch {
+            // The file exists but can't be read (permissions, I/O error, an
+            // exclusive lock). Refuse to proceed: writing now would replace
+            // the user's real config with nothing but our hook entries.
+            throw SettingsJSONManagerError.readFailed(String(describing: error))
+        }
         if data.isEmpty { return [:] }
         do {
             guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
                 throw SettingsJSONManagerError.malformedJSON
             }
             return json
-        } catch is SettingsJSONManagerError {
-            throw SettingsJSONManagerError.malformedJSON
         } catch {
             throw SettingsJSONManagerError.malformedJSON
         }

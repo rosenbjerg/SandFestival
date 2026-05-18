@@ -1767,6 +1767,16 @@
           }
         }
       }
+    },
+    "claudecode.error.settings_read_failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn’t read Claude Code’s settings.json. SandFestival won’t modify it until the file is readable."
+          }
+        }
+      }
     }
   },
   "version": "1.1"

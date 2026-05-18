@@ -186,6 +186,8 @@ final class ClaudeCodeAdapter: AgentAdapter {
             switch settingsError {
             case .malformedJSON:
                 return String(localized: "claudecode.error.settings_malformed")
+            case .readFailed(let reason):
+                return String(localized: "claudecode.error.settings_read_failed") + " (\(reason))"
             case .writeFailed(let reason):
                 return String(localized: "claudecode.error.settings_write_failed") + " (\(reason))"
             }
