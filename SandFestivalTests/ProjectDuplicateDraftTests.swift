@@ -261,6 +261,29 @@ struct ProjectDuplicateDraftTests {
         #expect(draft.pathString == "/Users/me/repo/.worktrees/feature-x")
     }
 
+    @Test("duplicating a top-level project anchors the child to that project")
+    func resolvedParentAnchorsToTopLevelSource() {
+        let source = Project(name: "Demo", path: URL(fileURLWithPath: "/Users/me/repo"))
+        let draft = ProjectDuplicateDraft(source: source, isGitRepo: true, isGitInstalled: true)
+        #expect(draft.resolvedParentProjectID == source.id)
+    }
+
+    @Test("duplicating a duplicate anchors the new child to the top-level ancestor")
+    func resolvedParentAnchorsToAncestorNotChild() {
+        // The sidebar renders only two levels, so a duplicate whose parent is
+        // itself a child would render nowhere. A duplicate of a duplicate must
+        // hang off the top-level ancestor, not the intermediate child.
+        let topLevelID = UUID()
+        let childSource = Project(
+            name: "Demo (feature-x)",
+            path: URL(fileURLWithPath: "/Users/me/repo/.worktrees/feature-x"),
+            parentProjectID: topLevelID
+        )
+        let draft = ProjectDuplicateDraft(source: childSource, isGitRepo: true, isGitInstalled: true)
+        #expect(draft.resolvedParentProjectID == topLevelID)
+        #expect(draft.resolvedParentProjectID != childSource.id)
+    }
+
     // MARK: - Helpers
 
     private func makeDraft(
