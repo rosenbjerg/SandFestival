@@ -254,7 +254,7 @@ struct ProjectDuplicateView: View {
                 env: source.env,
                 autoStart: snapshot.autoStart,
                 worktreeInfo: nil,
-                parentProjectID: source.id
+                parentProjectID: snapshot.resolvedParentProjectID
             )
             onCreate(project)
             return
@@ -319,7 +319,7 @@ struct ProjectDuplicateView: View {
                             sourceRepoPath: sourceRepoPath,
                             branch: trimmedBranch
                         ),
-                        parentProjectID: source.id
+                        parentProjectID: snapshot.resolvedParentProjectID
                     )
                     onCreate(project)
                 case .failure(let error):
@@ -356,6 +356,10 @@ struct ProjectDuplicateDraft {
     let sourceName: String
     let parentDir: String
     let sourcePath: URL
+    let sourceID: UUID
+    /// The source project's own parent, set when the source was itself
+    /// created via "Duplicate…". `nil` for top-level sources.
+    let sourceParentID: UUID?
     /// Populated asynchronously by the view's `.task` so sheet construction
     /// doesn't block on a `git branch` subprocess on the main thread — same
     /// pattern as `ProjectEditorView`'s `discoveredProfiles`.
@@ -391,6 +395,8 @@ struct ProjectDuplicateDraft {
         self.sourceName = source.name
         self.parentDir = parent
         self.sourcePath = source.path
+        self.sourceID = source.id
+        self.sourceParentID = source.parentProjectID
         // Branches start empty; the view's `.task` swaps them in once the
         // off-main-thread subprocess returns.
         self.availableBranches = availableBranches ?? []
@@ -425,6 +431,16 @@ struct ProjectDuplicateDraft {
             guard !branchesInUse.contains(trimmedBranch) else { return false }
         }
         return true
+    }
+
+    /// The `parentProjectID` to stamp on the duplicate. The sidebar renders
+    /// only two levels (top-level rows, then one pass of their children), so
+    /// a duplicate whose parent is itself a child would render nowhere —
+    /// orphaned in `projects.json` with no row. Anchoring every duplicate of
+    /// a lineage to the top-level ancestor keeps them visible as siblings
+    /// under that ancestor.
+    var resolvedParentProjectID: UUID {
+        sourceParentID ?? sourceID
     }
 
     /// The path the user typed, trimmed and tilde-expanded. The text
