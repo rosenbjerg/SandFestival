@@ -145,6 +145,18 @@ final class HookListener: @unchecked Sendable {
             return
         }
         let target = headers.contentLength
+        // A negative Content-Length is malformed and would crash `consumeBody`
+        // via `prefix(_:)`; an oversized one would let an authenticated client
+        // force unbounded body buffering. A real hook payload is well under
+        // the cap.
+        guard target >= 0 else {
+            sendResponse(connection: connection, status: 400, reason: "Bad Request")
+            return
+        }
+        guard target <= HookListener.maxBodyBytes else {
+            sendResponse(connection: connection, status: 413, reason: "Payload Too Large")
+            return
+        }
         consumeBody(connection: connection, accumulated: bodySoFar, target: target)
     }
 
@@ -180,6 +192,11 @@ final class HookListener: @unchecked Sendable {
     /// handful of short headers, so 64 KB is purely a guard against a runaway
     /// or hostile local process streaming bytes that never terminate.
     private static let maxHeaderBytes = 1 << 16
+
+    /// Upper bound on the request body. Hook payloads are small JSON objects;
+    /// 1 MB is a generous ceiling that still bounds memory if a client sends
+    /// an absurd Content-Length.
+    private static let maxBodyBytes = 1 << 20
 
     private static let headerTerminator: [UInt8] = [0x0d, 0x0a, 0x0d, 0x0a]
 
