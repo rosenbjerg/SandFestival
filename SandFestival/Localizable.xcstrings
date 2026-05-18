@@ -1747,6 +1747,26 @@
           }
         }
       }
+    },
+    "duplicate.field.existing_branch.search": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search branches"
+          }
+        }
+      }
+    },
+    "duplicate.field.existing_branch.no_matches": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No matching branches"
+          }
+        }
+      }
     }
   },
   "version": "1.1"
