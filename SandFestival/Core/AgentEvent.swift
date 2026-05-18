@@ -2,6 +2,13 @@ import Foundation
 
 enum AgentEvent: Equatable {
     case started
+    /// A SessionStart hook for an OS process that's already live — e.g.
+    /// Claude Code's `/resume` or `/clear`, which mint a new session_id
+    /// without restarting the process. Drives the same state transitions
+    /// as `.started`, but also tells `Session` to drop the previous
+    /// conversation's terminal title so a stale OSC-set summary doesn't
+    /// outlive the conversation it described.
+    case sessionRestarted
     case working
     case idle
     case waitingForPermission

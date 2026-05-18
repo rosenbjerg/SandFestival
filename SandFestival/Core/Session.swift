@@ -159,6 +159,13 @@ final class Session: Identifiable {
     // MARK: - Agent event ingestion
 
     func apply(event: AgentEvent) {
+        // `/resume` and `/clear` mint a new session_id over the live OS
+        // process, so neither `start()` nor `handleProcessTerminated()`
+        // runs to clear the old conversation's OSC-set title. Drop it
+        // here — the next OSC the new conversation emits will repopulate.
+        if case .sessionRestarted = event {
+            terminalTitle = nil
+        }
         let next = SessionStateMachine.next(from: state, event: event)
         guard next != state else { return }  // Same-state events are intentional no-ops here.
         transition(to: next)

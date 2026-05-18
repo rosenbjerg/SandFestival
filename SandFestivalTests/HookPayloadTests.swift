@@ -166,7 +166,7 @@ struct SessionBindingStoreTests {
         store.registerPendingSpawn(projectID: projectID, cwd: cwd)
         let resolved = store.bindOnSessionStart(sessionID: "sess-1", cwd: cwd)
 
-        #expect(resolved == projectID)
+        #expect(resolved == .freshSpawn(projectID))
         #expect(store.projectID(forSession: "sess-1") == projectID)
     }
 
@@ -231,12 +231,15 @@ struct SessionBindingStoreTests {
         let cwd = URL(fileURLWithPath: "/tmp/repo")
 
         store.registerPendingSpawn(projectID: projectID, cwd: cwd)
-        _ = store.bindOnSessionStart(sessionID: "sess-1", cwd: cwd)
+        let first = store.bindOnSessionStart(sessionID: "sess-1", cwd: cwd)
+        #expect(first == .freshSpawn(projectID))
         // /resume mints a new session_id without restarting the process. As
         // long as we haven't been told the project is gone, the new session_id
         // must bind to the same project so subsequent events route correctly.
+        // The outcome distinguishes this from the first SessionStart so the
+        // adapter can react (clearing the previous conversation's title).
         let second = store.bindOnSessionStart(sessionID: "sess-2", cwd: cwd)
-        #expect(second == projectID)
+        #expect(second == .rebound(projectID))
         #expect(store.projectID(forSession: "sess-2") == projectID)
     }
 
@@ -268,7 +271,7 @@ struct SessionBindingStoreTests {
             sessionID: "sess-1",
             cwd: URL(fileURLWithPath: "/tmp/repo")
         )
-        #expect(resolved == projectID)
+        #expect(resolved == .freshSpawn(projectID))
     }
 
     @Test("cwd matching resolves through symlinks")
@@ -290,6 +293,6 @@ struct SessionBindingStoreTests {
         store.registerPendingSpawn(projectID: projectID, cwd: link)
         // …and bind under the resolved path (what Claude's cwd hook reports).
         let resolved = store.bindOnSessionStart(sessionID: "sess-1", cwd: real)
-        #expect(resolved == projectID)
+        #expect(resolved == .freshSpawn(projectID))
     }
 }
