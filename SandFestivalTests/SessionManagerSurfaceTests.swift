@@ -69,6 +69,31 @@ struct SessionManagerSurfaceTests {
         #expect(afterFlush.map(\.id) == [projects[2].id, projects[1].id, projects[0].id])
     }
 
+    @Test("surfacing a child project lifts its whole parent block to the front")
+    func surfacingChildLiftsParentBlock() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SessionManagerSurfaceTests-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("projects.json", isDirectory: false)
+        let store = ProjectStore(fileURL: url)
+        let parent = Project(name: "Parent", path: URL(fileURLWithPath: "/tmp/parent"))
+        let child = Project(
+            name: "Child",
+            path: URL(fileURLWithPath: "/tmp/child"),
+            parentProjectID: parent.id
+        )
+        let other = Project(name: "Other", path: URL(fileURLWithPath: "/tmp/other"))
+        // Parent block sits behind an unrelated top-level project.
+        try store.save([other, parent, child])
+        let manager = SessionManager(store: store)
+        manager.shouldSurfaceOnActivity = { true }
+
+        manager.session(for: child.id)?.apply(event: .working)
+
+        // The parent block moves to the front; the child rides along and
+        // stays contiguous under its parent rather than being orphaned at 0.
+        #expect(manager.projects.map(\.id) == [parent.id, child.id, other.id])
+    }
+
     // MARK: - Helpers
 
     private func makeManager() throws -> (SessionManager, [Project]) {

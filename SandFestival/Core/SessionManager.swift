@@ -314,9 +314,19 @@ final class SessionManager {
     private func surfaceIfActivityTrigger(projectID: Project.ID, to state: SessionState) {
         guard shouldSurfaceOnActivity() else { return }
         guard SessionManager.isActivitySurfaceTrigger(state) else { return }
-        guard let index = projects.firstIndex(where: { $0.id == projectID }), index != 0 else { return }
-        let project = projects.remove(at: index)
-        projects.insert(project, at: 0)
+        guard let triggered = projects.first(where: { $0.id == projectID }) else { return }
+        // The sidebar renders a child project under its parent, so moving a
+        // lone child to row 0 surfaces nothing and splits it from its parent
+        // in the flat array. Resolve to the top-level ancestor and lift that
+        // ancestor together with its children, as one contiguous block.
+        let anchorID = triggered.parentProjectID ?? triggered.id
+        guard let anchorIndex = projects.firstIndex(where: { $0.id == anchorID }),
+              anchorIndex != 0
+        else { return }
+        let block = [projects[anchorIndex]] + projects.filter { $0.parentProjectID == anchorID }
+        let blockIDs = Set(block.map(\.id))
+        projects.removeAll { blockIDs.contains($0.id) }
+        projects.insert(contentsOf: block, at: 0)
         schedulePersist()
     }
 
