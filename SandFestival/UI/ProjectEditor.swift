@@ -9,7 +9,11 @@ enum ProjectEditorTarget: Identifiable {
 
     var id: String {
         switch self {
-        case .add: return "add"
+        // The seed folder is part of the identity: `sheet(item:)` keys on
+        // `id`, so without it a re-seeded `.add` (a folder dropped while the
+        // Add sheet is already open) would look like the same item and be
+        // silently ignored.
+        case .add(let seedFolder): return "add:\(seedFolder?.absoluteString ?? "")"
         case .edit(let project): return project.id.uuidString
         }
     }
