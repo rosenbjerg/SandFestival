@@ -35,17 +35,21 @@ enum NonoProfileDiscovery {
         task.executableURL = URL(fileURLWithPath: nono)
         task.arguments = ["profile", "list"]
         let stdout = Pipe()
-        let stderr = Pipe()
         task.standardOutput = stdout
-        task.standardError = stderr
+        // We never read stderr; leaving it on an unread Pipe would deadlock if
+        // `nono` wrote more than the pipe buffer holds. Discard it instead.
+        task.standardError = FileHandle.nullDevice
         do {
             try task.run()
         } catch {
             return nil
         }
+        // Read stdout to EOF *before* waiting: reading can't deadlock (the
+        // child keeps draining into us), but waiting first while the pipe
+        // fills would.
+        let data = stdout.fileHandleForReading.readDataToEndOfFile()
         task.waitUntilExit()
         guard task.terminationStatus == 0 else { return nil }
-        let data = stdout.fileHandleForReading.readDataToEndOfFile()
         guard let text = String(data: data, encoding: .utf8) else { return nil }
         let parsed = parse(text)
         return parsed.isEmpty ? nil : parsed
