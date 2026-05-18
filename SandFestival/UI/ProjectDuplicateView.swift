@@ -56,6 +56,11 @@ struct ProjectDuplicateView: View {
                                     choosePath()
                                 }
                             }
+                            if let hint = draft.blockingIssue?.inlineMessage {
+                                Label(hint, systemImage: "exclamationmark.triangle")
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }
@@ -339,6 +344,40 @@ enum WorktreeMode: Hashable {
     case existingBranch
 }
 
+/// The first reason the duplicate sheet can't be submitted — used both to
+/// gate the Confirm button and to explain *why* it's disabled. Catches the
+/// cases that would otherwise only surface as a raw `git` error at submit.
+enum DuplicateBlockingIssue: Equatable {
+    case nameEmpty
+    case branchEmpty
+    case pathEmpty
+    case branchNameInvalid
+    case branchAlreadyExists(branch: String)
+    case branchNotLocal
+    case branchInUse
+    case pathOccupied
+
+    /// A user-facing explanation, or `nil` for issues self-evident from a
+    /// blank field — no point captioning an empty box with "Branch is
+    /// required".
+    var inlineMessage: String? {
+        switch self {
+        case .nameEmpty, .branchEmpty, .pathEmpty:
+            return nil
+        case .branchNameInvalid:
+            return String(localized: "duplicate.issue.branch_name_invalid")
+        case .branchAlreadyExists(let branch):
+            return String(format: String(localized: "duplicate.issue.branch_exists"), branch)
+        case .branchNotLocal:
+            return String(localized: "duplicate.issue.branch_not_local")
+        case .branchInUse:
+            return String(localized: "duplicate.issue.branch_in_use")
+        case .pathOccupied:
+            return String(localized: "duplicate.issue.path_occupied")
+        }
+    }
+}
+
 /// View-model for `ProjectDuplicateView`. Lives at module scope (not
 /// fileprivate) so the auto-derivation behavior can be unit-tested without
 /// instantiating the SwiftUI view.
@@ -417,20 +456,51 @@ struct ProjectDuplicateDraft {
         self.worktreeMode = .newBranch
     }
 
-    var isValid: Bool {
-        guard !name.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
-        guard createWorktree else { return true }
+    var isValid: Bool { blockingIssue == nil }
+
+    /// The first problem that blocks submission, or `nil` when the form is
+    /// ready. Catches the doomed cases — invalid branch name, a branch that
+    /// already exists, an occupied target path — that would otherwise only
+    /// surface as a raw `git` error after the user clicks Confirm. The path
+    /// check stats the filesystem; one `stat` per keystroke is cheap and is
+    /// what makes the collision visible up front.
+    var blockingIssue: DuplicateBlockingIssue? {
+        guard !name.trimmingCharacters(in: .whitespaces).isEmpty else { return .nameEmpty }
+        guard createWorktree else { return nil }
         let trimmedBranch = branchName.trimmingCharacters(in: .whitespaces)
-        let trimmedPath = pathString.trimmingCharacters(in: .whitespaces)
-        guard !trimmedBranch.isEmpty, !trimmedPath.isEmpty else { return false }
-        // Existing-branch mode also requires that the selected branch is
-        // actually one of the local branches and isn't currently checked out
-        // somewhere else — otherwise `git worktree add` would just fail.
-        if worktreeMode == .existingBranch {
-            guard availableBranches.contains(trimmedBranch) else { return false }
-            guard !branchesInUse.contains(trimmedBranch) else { return false }
+        guard !trimmedBranch.isEmpty else { return .branchEmpty }
+        guard !pathString.trimmingCharacters(in: .whitespaces).isEmpty else { return .pathEmpty }
+        switch worktreeMode {
+        case .newBranch:
+            guard GitWorktree.isValidBranchName(trimmedBranch) else { return .branchNameInvalid }
+            // `git worktree add -b` refuses a branch name that already exists.
+            // `availableBranches` is empty while still loading — treat that as
+            // "can't tell yet" and let git be the backstop.
+            if availableBranches.contains(trimmedBranch) {
+                return .branchAlreadyExists(branch: trimmedBranch)
+            }
+        case .existingBranch:
+            // The branch must be a real local branch and not already checked
+            // out elsewhere — otherwise `git worktree add` would just fail.
+            guard availableBranches.contains(trimmedBranch) else { return .branchNotLocal }
+            guard !branchesInUse.contains(trimmedBranch) else { return .branchInUse }
         }
-        return true
+        if pathIsOccupied { return .pathOccupied }
+        return nil
+    }
+
+    /// True when something already lives at the resolved worktree path that
+    /// would make `git worktree add` fail. An existing *empty* directory is
+    /// fine — git reuses it — so only a file or a non-empty directory counts.
+    private var pathIsOccupied: Bool {
+        let path = resolvedPathString
+        guard !path.isEmpty else { return false }
+        let fileManager = FileManager.default
+        var isDirectory: ObjCBool = false
+        guard fileManager.fileExists(atPath: path, isDirectory: &isDirectory) else { return false }
+        guard isDirectory.boolValue else { return true }
+        let contents = (try? fileManager.contentsOfDirectory(atPath: path)) ?? []
+        return !contents.isEmpty
     }
 
     /// The `parentProjectID` to stamp on the duplicate. The sidebar renders

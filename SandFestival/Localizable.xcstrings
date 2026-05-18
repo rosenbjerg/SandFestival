@@ -1697,6 +1697,56 @@
           }
         }
       }
+    },
+    "duplicate.issue.branch_name_invalid": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That isn’t a valid git branch name."
+          }
+        }
+      }
+    },
+    "duplicate.issue.branch_exists": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A branch named “%@” already exists — switch to Existing branch to base the worktree on it."
+          }
+        }
+      }
+    },
+    "duplicate.issue.branch_not_local": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That branch is no longer available locally."
+          }
+        }
+      }
+    },
+    "duplicate.issue.branch_in_use": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That branch is already checked out in another worktree."
+          }
+        }
+      }
+    },
+    "duplicate.issue.path_occupied": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A file or non-empty folder already exists at the worktree path."
+          }
+        }
+      }
     }
   },
   "version": "1.1"

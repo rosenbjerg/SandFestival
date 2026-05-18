@@ -15,6 +15,28 @@ enum GitWorktree {
         CommandResolver.resolve("git") != nil
     }
 
+    /// Conservative check that `name` is a usable `git branch` name, so the
+    /// duplicate sheet can reject a doomed name keystroke-by-keystroke
+    /// instead of letting `git worktree add -b` fail at submit. Pure — no
+    /// subprocess. Mirrors the subset of `git check-ref-format` rules a user
+    /// is likely to trip over by hand; `git` itself remains the final word.
+    static func isValidBranchName(_ name: String) -> Bool {
+        guard !name.isEmpty, name != "@" else { return false }
+        guard !name.hasPrefix("-"), !name.hasPrefix("/"), !name.hasSuffix("/") else { return false }
+        guard !name.hasSuffix("."), !name.hasSuffix(".lock") else { return false }
+        guard !name.contains(".."), !name.contains("//"), !name.contains("@{") else { return false }
+        let forbidden: Set<Character> = [" ", "~", "^", ":", "?", "*", "[", "\\", "\u{7f}"]
+        for character in name {
+            if forbidden.contains(character) { return false }
+            if let scalar = character.unicodeScalars.first, scalar.value < 0x20 { return false }
+        }
+        // No slash-separated component may begin with "." or end with ".lock".
+        for component in name.split(separator: "/", omittingEmptySubsequences: false) {
+            if component.hasPrefix(".") || component.hasSuffix(".lock") { return false }
+        }
+        return true
+    }
+
     /// True when `path` looks like a git working tree (regular repo *or*
     /// an existing worktree). A regular repo has `.git` as a directory
     /// containing `HEAD`; a linked worktree has `.git` as a gitlink file
