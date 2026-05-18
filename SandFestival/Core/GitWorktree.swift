@@ -5,6 +5,16 @@ import Foundation
 /// MainActor can hop to a background `Task` for the blocking
 /// `Process.waitUntilExit()`.
 enum GitWorktree {
+    /// True when a `git` binary is reachable on PATH. Cheap — just a
+    /// filesystem stat per search-path entry, no subprocess. Used by the
+    /// duplicate sheet to hide the Worktree section entirely when there's
+    /// no point offering it: every git-backed mutation would fail with
+    /// `.gitNotFound` on submit anyway, and `listLocalBranches` would
+    /// silently return empty in the meantime.
+    static func isGitInstalled() -> Bool {
+        CommandResolver.resolve("git") != nil
+    }
+
     /// True when `path` looks like a git working tree (regular repo *or*
     /// an existing worktree). A regular repo has `.git` as a directory
     /// containing `HEAD`; a linked worktree has `.git` as a gitlink file
