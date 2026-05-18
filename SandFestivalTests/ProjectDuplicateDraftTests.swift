@@ -284,6 +284,76 @@ struct ProjectDuplicateDraftTests {
         #expect(draft.resolvedParentProjectID != childSource.id)
     }
 
+    // MARK: - Pre-flight validation
+
+    @Test("new-branch mode blocks an invalid branch name")
+    func newBranchModeRejectsInvalidName() {
+        var draft = makeDraft(sourcePath: "/Users/me/repo", sourceName: "Demo")
+        draft.branchName = "bad branch name"
+        draft.refreshDerivedFields()
+        #expect(draft.blockingIssue == .branchNameInvalid)
+        #expect(!draft.isValid)
+    }
+
+    @Test("new-branch mode blocks a branch name that already exists")
+    func newBranchModeRejectsExistingBranch() {
+        var draft = makeDraft(
+            sourcePath: "/Users/me/repo",
+            sourceName: "Demo",
+            availableBranches: ["main", "feature-x"]
+        )
+        draft.branchName = "feature-x"
+        draft.refreshDerivedFields()
+        #expect(draft.blockingIssue == .branchAlreadyExists(branch: "feature-x"))
+        #expect(!draft.isValid)
+    }
+
+    @Test("existing-branch mode blocks a branch checked out elsewhere")
+    func existingModeBlockingIssueForInUseBranch() {
+        var draft = makeDraft(
+            sourcePath: "/Users/me/repo",
+            sourceName: "Demo",
+            availableBranches: ["main"],
+            branchesInUse: ["main"]
+        )
+        draft.worktreeMode = .existingBranch
+        draft.branchName = "main"
+        draft.refreshDerivedFields()
+        #expect(draft.blockingIssue == .branchInUse)
+    }
+
+    @Test("a non-empty target path blocks submission; an empty directory doesn't")
+    func occupiedPathBlocksSubmission() throws {
+        let fileManager = FileManager.default
+        let occupied = fileManager.temporaryDirectory
+            .appendingPathComponent("dup-occupied-\(UUID())", isDirectory: true)
+        try fileManager.createDirectory(at: occupied, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: occupied) }
+        try "x".write(
+            to: occupied.appendingPathComponent("file.txt"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        var draft = makeDraft(sourcePath: "/Users/me/repo", sourceName: "Demo")
+        draft.branchName = "new-feature"
+        draft.refreshDerivedFields()
+        // Pin the path at the occupied directory.
+        draft.pathString = occupied.path
+        draft.pathUserEdited = true
+        #expect(draft.blockingIssue == .pathOccupied)
+        #expect(!draft.isValid)
+
+        // An existing *empty* directory is acceptable — git reuses it.
+        let empty = fileManager.temporaryDirectory
+            .appendingPathComponent("dup-empty-\(UUID())", isDirectory: true)
+        try fileManager.createDirectory(at: empty, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: empty) }
+        draft.pathString = empty.path
+        #expect(draft.blockingIssue == nil)
+        #expect(draft.isValid)
+    }
+
     // MARK: - Helpers
 
     private func makeDraft(

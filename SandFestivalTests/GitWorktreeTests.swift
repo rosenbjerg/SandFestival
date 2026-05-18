@@ -8,6 +8,22 @@ import Testing
 @Suite("GitWorktree integration")
 struct GitWorktreeTests {
 
+    @Test("isValidBranchName accepts ordinary names and rejects malformed ones")
+    func branchNameValidation() {
+        // Names a user would plausibly type — all fine.
+        for name in ["main", "feature-x", "fix/bug-123", "release_2.0", "wip"] {
+            #expect(GitWorktree.isValidBranchName(name), "\(name) should be valid")
+        }
+        // Each of these trips a distinct `git check-ref-format` rule.
+        for name in [
+            "", "@", "has space", "-leading-dash", "trailing.lock",
+            "double..dot", "ends-with-dot.", "/leading-slash", "trailing-slash/",
+            "bad~char", "colon:name", "star*name", ".dotcomponent", "a//b",
+        ] {
+            #expect(!GitWorktree.isValidBranchName(name), "\(name) should be rejected")
+        }
+    }
+
     @Test("isGitRepo is false for an unrelated directory")
     func isGitRepoFalseForPlainDir() throws {
         let dir = try makeTempDir()
