@@ -32,7 +32,7 @@ struct ProjectDuplicateView: View {
                     }
                 }
 
-                if draft.isGitRepo {
+                if draft.isGitRepo && draft.isGitInstalled {
                     Section(String(localized: "duplicate.section.worktree")) {
                         Toggle(String(localized: "duplicate.field.create_worktree"), isOn: createWorktreeBinding)
                         if draft.createWorktree {
@@ -99,7 +99,7 @@ struct ProjectDuplicateView: View {
         .frame(minWidth: 540, minHeight: 360)
         .navigationTitle(String(localized: "duplicate.title"))
         .task {
-            guard draft.isGitRepo, draft.availableBranches.isEmpty else { return }
+            guard draft.isGitRepo, draft.isGitInstalled, draft.availableBranches.isEmpty else { return }
             async let branches = GitWorktree.listLocalBranchesAsync(at: source.path)
             async let inUse = GitWorktree.listInUseBranchesAsync(at: source.path)
             let (resolvedBranches, resolvedInUse) = await (branches, inUse)
@@ -365,12 +365,18 @@ struct ProjectDuplicateDraft {
     /// `git worktree add <path> <branch>` refuses them.
     var branchesInUse: Set<String>
     let isGitRepo: Bool
+    /// Whether a `git` binary is on PATH. The Worktree section hides itself
+    /// when this is false even if `isGitRepo` is true — there'd be no way
+    /// to act on it. Kept separate from `isGitRepo` so tests can exercise
+    /// each gate independently.
+    let isGitInstalled: Bool
 
     init(
         source: Project,
         availableBranches: [String]? = nil,
         branchesInUse: Set<String>? = nil,
-        isGitRepo: Bool? = nil
+        isGitRepo: Bool? = nil,
+        isGitInstalled: Bool? = nil
     ) {
         // Default to `<source>/.worktrees/<branch>` — matches the
         // convention most worktree tooling (Cursor, recent VSCode
@@ -381,6 +387,7 @@ struct ProjectDuplicateDraft {
         let parent = source.path.appendingPathComponent(".worktrees").path
         // Tests inject overrides to avoid shelling out to git.
         let resolvedIsGitRepo = isGitRepo ?? GitWorktree.isGitRepo(at: source.path)
+        let resolvedIsGitInstalled = isGitInstalled ?? GitWorktree.isGitInstalled()
         self.sourceName = source.name
         self.parentDir = parent
         self.sourcePath = source.path
@@ -389,15 +396,18 @@ struct ProjectDuplicateDraft {
         self.availableBranches = availableBranches ?? []
         self.branchesInUse = branchesInUse ?? []
         self.isGitRepo = resolvedIsGitRepo
+        self.isGitInstalled = resolvedIsGitInstalled
         self.name = source.name
         self.branchName = ""
         self.baseBranch = nil
         self.pathString = parent
         self.autoStart = source.autoStart
         // Default to "make a worktree" when we can — that's the path users
-        // following the duplicate flow usually want. Non-git sources don't
-        // get the toggle at all, so this just stays false there.
-        self.createWorktree = resolvedIsGitRepo
+        // following the duplicate flow usually want. Sources where the
+        // section won't even be shown (non-git, or git missing entirely)
+        // start with the toggle off so a hidden-but-defaulted-on flag can't
+        // affect validity.
+        self.createWorktree = resolvedIsGitRepo && resolvedIsGitInstalled
         self.worktreeMode = .newBranch
     }
 

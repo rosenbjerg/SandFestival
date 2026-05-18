@@ -91,16 +91,45 @@ struct ProjectDuplicateDraftTests {
             path: URL(fileURLWithPath: "/Users/me/repo"),
             autoStart: true
         )
-        let draft = ProjectDuplicateDraft(source: source, availableBranches: [], isGitRepo: true)
+        let draft = ProjectDuplicateDraft(
+            source: source,
+            availableBranches: [],
+            isGitRepo: true,
+            isGitInstalled: true
+        )
         #expect(draft.autoStart == true)
     }
 
     @Test("non-git sources default to createWorktree == false")
     func nonGitDefaultsOffWorktree() {
         let source = Project(name: "Demo", path: URL(fileURLWithPath: "/Users/me/notes"))
-        let draft = ProjectDuplicateDraft(source: source, availableBranches: [], isGitRepo: false)
+        let draft = ProjectDuplicateDraft(
+            source: source,
+            availableBranches: [],
+            isGitRepo: false,
+            isGitInstalled: true
+        )
         #expect(draft.createWorktree == false)
         #expect(draft.isGitRepo == false)
+    }
+
+    @Test("missing git binary defaults createWorktree off even on a git repo")
+    func missingGitDefaultsOffWorktree() {
+        let source = Project(name: "Demo", path: URL(fileURLWithPath: "/Users/me/repo"))
+        let draft = ProjectDuplicateDraft(
+            source: source,
+            availableBranches: [],
+            isGitRepo: true,
+            isGitInstalled: false
+        )
+        // The view hides the section entirely; the draft should match so a
+        // hidden default-on flag can't influence isValid behind the user's
+        // back.
+        #expect(draft.isGitRepo == true)
+        #expect(draft.isGitInstalled == false)
+        #expect(draft.createWorktree == false)
+        // And a no-worktree duplicate is still valid out of the box.
+        #expect(draft.isValid)
     }
 
     @Test("isValid for a no-worktree duplicate only requires a name")
@@ -238,6 +267,7 @@ struct ProjectDuplicateDraftTests {
         sourcePath: String,
         sourceName: String,
         isGitRepo: Bool = true,
+        isGitInstalled: Bool = true,
         availableBranches: [String] = [],
         branchesInUse: Set<String> = []
     ) -> ProjectDuplicateDraft {
@@ -246,7 +276,8 @@ struct ProjectDuplicateDraftTests {
             source: source,
             availableBranches: availableBranches,
             branchesInUse: branchesInUse,
-            isGitRepo: isGitRepo
+            isGitRepo: isGitRepo,
+            isGitInstalled: isGitInstalled
         )
     }
 }
