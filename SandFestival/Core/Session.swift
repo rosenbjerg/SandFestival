@@ -116,6 +116,9 @@ final class Session: Identifiable {
         let pid = terminalView.process.shellPid
         guard pid != 0 else { return }
         wantsStop = true
+        // Clear any queued restart: a stop after a restart() request must
+        // actually stop. forceStop() already does this; stop() must too.
+        wantsRestart = false
         softStopRequested = true
         kill(pid, SIGINT)
     }
