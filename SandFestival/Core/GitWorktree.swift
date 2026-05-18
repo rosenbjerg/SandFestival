@@ -243,9 +243,13 @@ enum GitWorktree {
         } catch {
             return nil
         }
-        task.waitUntilExit()
+        // Drain both pipes concurrently before waiting. If the child outgrows
+        // the ~64 KB pipe buffer on either stream it blocks on write — and a
+        // `waitUntilExit()` before reading would then deadlock against it.
+        let errDrain = PipeDrain(handle: stderr.fileHandleForReading)
         let outData = stdout.fileHandleForReading.readDataToEndOfFile()
-        let errData = stderr.fileHandleForReading.readDataToEndOfFile()
+        let errData = errDrain.wait()
+        task.waitUntilExit()
         return CommandResult(
             exitCode: task.terminationStatus,
             stdout: String(data: outData, encoding: .utf8) ?? "",
@@ -257,6 +261,26 @@ enum GitWorktree {
         let exitCode: Int32
         let stdout: String
         let stderr: String
+    }
+
+    /// Reads a pipe to EOF on a background queue so a sibling pipe can be
+    /// drained concurrently on the calling thread — neither child stream can
+    /// fill its buffer and wedge the process while the other is read. All
+    /// access to `data` is confined to `queue`, so the `@unchecked` is sound.
+    private final class PipeDrain: @unchecked Sendable {
+        private let handle: FileHandle
+        private var data = Data()
+        private let queue = DispatchQueue(label: "app.sandfestival.gitworktree.pipe-drain")
+
+        init(handle: FileHandle) {
+            self.handle = handle
+            queue.async { self.data = self.handle.readDataToEndOfFile() }
+        }
+
+        /// Blocks until the background read finishes, then returns the bytes.
+        func wait() -> Data {
+            queue.sync { data }
+        }
     }
 }
 
