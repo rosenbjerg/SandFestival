@@ -354,6 +354,21 @@ struct ProjectDuplicateDraftTests {
         #expect(draft.isValid)
     }
 
+    // MARK: - Branch picker filter
+
+    @Test("the branch filter matches case-insensitive substrings")
+    func branchFilterMatching() {
+        let branches = ["main", "develop", "feature/Login", "feature/signup", "hotfix/crash"]
+        // An empty or whitespace filter returns everything, order preserved.
+        #expect(BranchPickerField.matching(branches, filter: "") == branches)
+        #expect(BranchPickerField.matching(branches, filter: "   ") == branches)
+        // Substring match, case-insensitive.
+        #expect(BranchPickerField.matching(branches, filter: "feature") == ["feature/Login", "feature/signup"])
+        #expect(BranchPickerField.matching(branches, filter: "LOGIN") == ["feature/Login"])
+        // No match yields an empty list.
+        #expect(BranchPickerField.matching(branches, filter: "ghost").isEmpty)
+    }
+
     // MARK: - Helpers
 
     private func makeDraft(

@@ -47,7 +47,11 @@ struct ProjectDuplicateView: View {
                                 TextField(String(localized: "duplicate.field.branch"), text: branchBinding)
                                 basePicker
                             } else {
-                                existingBranchPicker
+                                BranchPickerField(
+                                    branches: draft.availableBranches,
+                                    inUse: draft.branchesInUse,
+                                    selection: branchBinding
+                                )
                             }
                             HStack {
                                 TextField(String(localized: "duplicate.field.worktree_path"), text: pathBinding)
@@ -121,45 +125,6 @@ struct ProjectDuplicateView: View {
             ForEach(draft.availableBranches, id: \.self) { branch in
                 Text(branch).tag(String?.some(branch))
             }
-        }
-    }
-
-    // Existing-branch picker. Branches checked out in another worktree show
-    // up in the menu with a "(in use)" suffix and are disabled — git would
-    // refuse them, and we want to make that obvious before the user submits.
-    // While the async branch list is still loading we surface a "Loading…"
-    // hint inside the picker label rather than an empty disabled control.
-    @ViewBuilder
-    private var existingBranchPicker: some View {
-        let trimmed = draft.branchName.trimmingCharacters(in: .whitespaces)
-        let menuLabel: String = {
-            if !trimmed.isEmpty { return trimmed }
-            if draft.availableBranches.isEmpty {
-                return String(localized: "duplicate.field.existing_branch.loading")
-            }
-            return String(localized: "duplicate.field.existing_branch.placeholder")
-        }()
-        LabeledContent(String(localized: "duplicate.field.existing_branch")) {
-            Menu {
-                ForEach(draft.availableBranches, id: \.self) { branch in
-                    let inUse = draft.branchesInUse.contains(branch)
-                    Button {
-                        draft.branchName = branch
-                        draft.refreshDerivedFields()
-                    } label: {
-                        if inUse {
-                            Text(String(format: String(localized: "duplicate.field.existing_branch.in_use"), branch))
-                        } else {
-                            Text(branch)
-                        }
-                    }
-                    .disabled(inUse)
-                }
-            } label: {
-                Text(menuLabel)
-                    .foregroundStyle(trimmed.isEmpty ? .secondary : .primary)
-            }
-            .disabled(draft.availableBranches.isEmpty)
         }
     }
 
