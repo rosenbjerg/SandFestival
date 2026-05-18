@@ -45,8 +45,15 @@ final class HookListener: @unchecked Sendable {
     }
 
     func stop() {
-        listener?.cancel()
-        listener = nil
+        // `listener` is otherwise assigned only from the NWListener state
+        // handler, which runs on `queue`. Route the teardown through the same
+        // serial queue so the two accesses can't race. `stop()` is always
+        // called off `queue` (from the MainActor adapter), so `sync` here
+        // can't deadlock.
+        queue.sync {
+            listener?.cancel()
+            listener = nil
+        }
     }
 
     // MARK: - Listener lifecycle
