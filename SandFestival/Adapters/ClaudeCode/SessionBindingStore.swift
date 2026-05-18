@@ -27,20 +27,31 @@ final class SessionBindingStore {
     /// SessionStart events for the same cwd (e.g. after `/resume` or
     /// `/clear`) fall back to the live-projects map, which lives until
     /// `unbindAll(projectID:)` is called from process-termination cleanup.
-    /// Returns the resolved project ID, or `nil` if nothing matched.
+    /// The outcome distinguishes the two so callers can react differently
+    /// (e.g. clearing per-conversation state on a rebind).
     @discardableResult
-    func bindOnSessionStart(sessionID: String, cwd: URL?) -> UUID? {
+    func bindOnSessionStart(sessionID: String, cwd: URL?) -> BindOutcome? {
         guard let cwd else { return nil }
         let key = Self.key(cwd: cwd)
         if let projectID = pendingSpawns.removeValue(forKey: key) {
             sessionToProject[sessionID] = projectID
-            return projectID
+            return .freshSpawn(projectID)
         }
         if let projectID = liveProjectsByCwd[key] {
             sessionToProject[sessionID] = projectID
-            return projectID
+            return .rebound(projectID)
         }
         return nil
+    }
+
+    enum BindOutcome: Equatable {
+        /// First SessionStart after a SandFestival-initiated spawn —
+        /// consumed the pending entry.
+        case freshSpawn(UUID)
+        /// A later SessionStart for an already-live project: `/resume` or
+        /// `/clear` minted a new session_id while the OS process kept
+        /// running.
+        case rebound(UUID)
     }
 
     func projectID(forSession sessionID: String) -> UUID? {

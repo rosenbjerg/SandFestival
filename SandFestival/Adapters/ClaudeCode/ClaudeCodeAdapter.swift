@@ -117,16 +117,32 @@ final class ClaudeCodeAdapter: AgentAdapter {
         guard let payload = HookPayloadDecoder.decode(body) else { return }
 
         let projectID: UUID?
+        var isRebind = false
         if payload.hookEventName == HookEvent.sessionStart.rawValue {
-            projectID = bindings.bindOnSessionStart(sessionID: payload.sessionID, cwd: payload.cwd)
-            ?? bindings.projectID(forSession: payload.sessionID)
+            switch bindings.bindOnSessionStart(sessionID: payload.sessionID, cwd: payload.cwd) {
+            case .freshSpawn(let id):
+                projectID = id
+            case .rebound(let id):
+                projectID = id
+                isRebind = true
+            case .none:
+                projectID = bindings.projectID(forSession: payload.sessionID)
+            }
         } else {
             projectID = bindings.projectID(forSession: payload.sessionID)
         }
 
         guard let projectID else { return }
 
-        if let event = HookPayloadTranslator.translate(payload) {
+        if var event = HookPayloadTranslator.translate(payload) {
+            // SessionStart after `/resume` or `/clear` arrives as `.started`
+            // from the translator, but the live OS process means we also
+            // need to drop the previous conversation's terminal title.
+            // `.sessionRestarted` carries the same state-machine semantics
+            // and adds that side effect.
+            if isRebind, case .started = event {
+                event = .sessionRestarted
+            }
             eventSink?.report(projectID: projectID, event: event)
         }
 

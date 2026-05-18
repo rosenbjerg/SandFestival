@@ -8,10 +8,14 @@ enum SessionStateMachine {
         // .stopped is a terminal sink from any state.
         if case .stopped = event { return .stopped }
 
+        // `.sessionRestarted` drives the same transitions as `.started`; it
+        // exists as a distinct case so `Session.apply` can react to it (by
+        // clearing the stale terminal title) without the state machine
+        // needing to know about that side effect.
         switch current {
         case .starting:
             switch event {
-            case .started: return .idle
+            case .started, .sessionRestarted: return .idle
             case .working: return .working
             case .errored(let reason): return .errored(reason: reason)
             default: return current
@@ -54,13 +58,13 @@ enum SessionStateMachine {
         case .errored:
             switch event {
             case .working: return .working
-            case .started: return .idle
+            case .started, .sessionRestarted: return .idle
             default: return current
             }
 
         case .stopped:
             switch event {
-            case .started: return .idle
+            case .started, .sessionRestarted: return .idle
             case .working: return .working
             default: return current
             }
