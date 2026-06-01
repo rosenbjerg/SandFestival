@@ -1787,6 +1787,36 @@
           }
         }
       }
+    },
+    "detail.not_running.continue": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue"
+          }
+        }
+      }
+    },
+    "detail.toolbar.continue": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue"
+          }
+        }
+      }
+    },
+    "detail.toolbar.continue.help": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resume the previous conversation"
+          }
+        }
+      }
     }
   },
   "version": "1.1"

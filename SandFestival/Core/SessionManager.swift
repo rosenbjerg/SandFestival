@@ -274,6 +274,9 @@ final class SessionManager {
         session.spawnEnvProvider = { [weak self] project in
             self?.adapter?.prepareSpawn(project: project).additions ?? [:]
         }
+        session.continuationArgsProvider = { [weak self] in
+            self?.adapter?.continuationArgs ?? []
+        }
         session.onDidSpawn = { [weak self] project in
             guard let self else { return }
             self.adapter?.didSpawnSession(self.handle(for: project))

@@ -32,6 +32,24 @@ final class Session: Identifiable {
     /// picks up the current adapter's prepareSpawn output.
     @ObservationIgnored var spawnEnvProvider: ((Project) -> [String: String])?
 
+    /// Returns the agent args that resume the previous conversation (Claude
+    /// Code: `["--continue"]`), or empty when the adapter has no such concept.
+    /// Wired by SessionManager from the active adapter; gates the "Continue"
+    /// affordance via `canContinue`.
+    @ObservationIgnored var continuationArgsProvider: (() -> [String])?
+
+    /// The agent args the current/last launch used (empty for a fresh start,
+    /// the continuation flag for "Continue"). Reused on auto-restart so a
+    /// restart of a continued session continues again rather than starting
+    /// fresh.
+    @ObservationIgnored private var extraAgentArgs: [String] = []
+
+    /// Whether "Continue" is meaningful for this session — true once an
+    /// adapter that supports resuming is wired. Drives the UI affordance.
+    var canContinue: Bool {
+        !(continuationArgsProvider?() ?? []).isEmpty
+    }
+
     /// Called after a successful spawn so adapters can register a handle.
     @ObservationIgnored var onDidSpawn: ((Project) -> Void)?
 
@@ -76,6 +94,17 @@ final class Session: Identifiable {
     // MARK: - Lifecycle
 
     func start() {
+        launch(extraAgentArgs: [])
+    }
+
+    /// Starts the agent so it resumes the previous conversation instead of a
+    /// fresh one (Claude Code: `claude --continue`). No-op when the adapter
+    /// has no continuation concept — `canContinue` gates the UI affordance.
+    func startContinuing() {
+        launch(extraAgentArgs: continuationArgsProvider?() ?? [])
+    }
+
+    private func launch(extraAgentArgs: [String]) {
         guard !state.isRunning else { return }
         guard let executable = CommandResolver.resolve(project.command) else {
             let reason = String(localized: "session.error.command_not_found")
@@ -83,6 +112,7 @@ final class Session: Identifiable {
             lastError = reason
             return
         }
+        self.extraAgentArgs = extraAgentArgs
         let extraEnvironment = spawnEnvProvider?(project) ?? [:]
         lastError = nil
         terminalTitle = nil
@@ -91,7 +121,7 @@ final class Session: Identifiable {
         transition(to: .starting)
         terminalView.startProcess(
             executable: executable,
-            args: project.args,
+            args: Session.composeArgs(base: project.args, extraAgentArgs: extraAgentArgs),
             environment: composedEnvironment(extra: extraEnvironment),
             execName: nil,
             currentDirectory: project.path.path
@@ -102,6 +132,21 @@ final class Session: Identifiable {
         // the state machine treats it as a no-op.
         transition(to: .idle)
         onDidSpawn?(project)
+    }
+
+    /// Builds the argv for a launch, appending `extraAgentArgs` to the agent
+    /// portion. With a `--` separator the extras land after the agent's own
+    /// args (e.g. `nono run … -- claude --enable-auto-mode --continue`);
+    /// without one the command itself is the agent, so they append to the
+    /// whole array. Pure + static so the placement is testable without
+    /// spawning a process.
+    static func composeArgs(base: [String], extraAgentArgs: [String]) -> [String] {
+        guard !extraAgentArgs.isEmpty else { return base }
+        if base.contains("--") {
+            let split = ArgsSplitter.split(base)
+            return ArgsSplitter.join(wrapper: split.wrapper, agent: split.agent + extraAgentArgs)
+        }
+        return base + extraAgentArgs
     }
 
     /// Soft stop: SIGINT the wrapper PID so nono can run its post-kill prompt
@@ -207,7 +252,9 @@ final class Session: Identifiable {
         transition(to: .stopped)
         if wantsRestart {
             wantsRestart = false
-            start()
+            // Preserve the launch flavor: restarting a continued session
+            // continues again rather than dropping back to a fresh start.
+            launch(extraAgentArgs: extraAgentArgs)
         }
     }
 
