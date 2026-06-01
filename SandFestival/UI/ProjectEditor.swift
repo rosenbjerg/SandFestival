@@ -51,6 +51,11 @@ struct ProjectEditorView: View {
                             choosePath()
                         }
                     }
+                    if draft.pathIsMissing {
+                        Label(String(localized: "editor.field.path.not_found"), systemImage: "exclamationmark.triangle")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 Section(String(localized: "editor.section.command")) {
@@ -174,7 +179,10 @@ struct ProjectEditorView: View {
 
 // MARK: - Draft model
 
-private struct ProjectDraft {
+/// View-model for `ProjectEditorView`. Internal (not `fileprivate`) so the
+/// path-resolution and validity behavior can be unit-tested without standing
+/// up the SwiftUI view — same rationale as `ProjectDuplicateDraft`.
+struct ProjectDraft {
     var name: String
     var pathString: String
     var command: String
@@ -236,15 +244,31 @@ private struct ProjectDraft {
     }
 
     var isValid: Bool {
-        let trimmedPath = pathString.trimmingCharacters(in: .whitespaces)
         return !name.trimmingCharacters(in: .whitespaces).isEmpty &&
             !command.trimmingCharacters(in: .whitespaces).isEmpty &&
-            ProjectDraft.isExistingDirectory(trimmedPath)
+            ProjectDraft.isExistingDirectory(resolvedPathString)
     }
 
-    /// `materialize` builds the path with `URL(fileURLWithPath:)`, which
-    /// doesn't expand `~` — so this check stays literal too, keeping
-    /// `isValid` an honest predictor of whether the saved path resolves.
+    /// The path the user typed, trimmed and tilde-expanded. The text field
+    /// accepts shell-style paths like `~/code/foo`, but `URL(fileURLWithPath:)`
+    /// doesn't expand `~` — so resolve it once here and feed the result to
+    /// both the validity check and `materialize`, keeping them in agreement
+    /// (same approach as `ProjectDuplicateDraft.resolvedPathString`).
+    var resolvedPathString: String {
+        let trimmed = pathString.trimmingCharacters(in: .whitespaces)
+        return (trimmed as NSString).expandingTildeInPath
+    }
+
+    /// True when the user has typed a path that isn't an existing directory.
+    /// Drives the inline hint; an empty field shows nothing because the
+    /// disabled Save button is explanation enough.
+    var pathIsMissing: Bool {
+        !pathString.trimmingCharacters(in: .whitespaces).isEmpty
+            && !ProjectDraft.isExistingDirectory(resolvedPathString)
+    }
+
+    /// Checks an already-resolved path. Tilde expansion happens once in
+    /// `resolvedPathString`, so `isValid` and `materialize` see the same path.
     private static func isExistingDirectory(_ path: String) -> Bool {
         guard !path.isEmpty else { return false }
         var isDirectory: ObjCBool = false
@@ -272,7 +296,7 @@ private struct ProjectDraft {
         return Project(
             id: originalID ?? UUID(),
             name: name.trimmingCharacters(in: .whitespaces),
-            path: URL(fileURLWithPath: pathString),
+            path: URL(fileURLWithPath: resolvedPathString),
             command: command.trimmingCharacters(in: .whitespaces),
             args: args,
             env: env,
@@ -281,7 +305,7 @@ private struct ProjectDraft {
     }
 }
 
-private struct EnvEntry: Identifiable {
+struct EnvEntry: Identifiable {
     let id = UUID()
     var key: String = ""
     var value: String = ""
