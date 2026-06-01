@@ -82,6 +82,8 @@ PATH precedence in `Session.composeEnvironment(inherited:projectEnv:extra:)`: pr
 
 Each `Session` owns its `LocalProcessTerminalView` for the whole app lifetime. `DetailPaneView` ZStacks every session's view and `TerminalPaneView` flips `NSView.isHidden` per selection (not `.opacity` — at alpha 0 the layer is still asked to paint dirty rects on every PTY update). **Never** swap views by selection, that destroys scrollback.
 
+`SessionTerminalView.dataReceived` pins the viewport when the user has scrolled up, so streaming output doesn't yank it to the bottom. SwiftTerm's core supports this (`Terminal.scroll` only resets `yDisp` when its `userScrolling` flag is false) but the macOS view layer never sets that flag from the scroll position, and the flag is `internal` to the package — so we save the row before `super.dataReceived` and restore it after (skipping when already at the bottom or in the alternate buffer). PTY data is delivered on `DispatchQueue.main` (LocalProcess's default queue), so the `scrollTo` is main-thread-safe. Exact until the scrollback buffer fills; after that the pinned content drifts toward the bottom because SwiftTerm doesn't expose the trim count. Re-test scrolling after any SwiftTerm bump — the override depends on `dataReceived` staying `open` and the scroll APIs keeping their semantics (and becomes a harmless no-op if upstream ever wires `userScrolling` itself).
+
 ## Persistence
 
 - Projects: `~/Library/Application Support/SandFestival/projects.json` (Codable + atomic write)
