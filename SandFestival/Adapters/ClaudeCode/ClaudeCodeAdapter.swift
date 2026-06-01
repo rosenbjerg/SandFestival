@@ -9,6 +9,8 @@ final class ClaudeCodeAdapter: AgentAdapter {
 
     let defaultCommand = Project.defaultCommand
     let defaultArgs = Project.defaultArgs
+    /// `claude --continue` resumes the most recent conversation in the cwd.
+    let continuationArgs = ["--continue"]
 
     private(set) var needsInstallation = false
     private(set) var lastInstallError: String?

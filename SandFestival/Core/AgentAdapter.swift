@@ -11,6 +11,12 @@ protocol AgentAdapter: AnyObject {
     var defaultCommand: String { get }
     var defaultArgs: [String] { get }
 
+    /// Extra agent args (placed after the `--` separator) that make the agent
+    /// resume its previous conversation instead of starting fresh. Empty when
+    /// the agent has no such concept; Claude Code returns `["--continue"]`.
+    /// `Session.startContinuing()` appends these via `Session.composeArgs`.
+    var continuationArgs: [String] { get }
+
     /// Called once at app startup. The adapter does whatever setup it needs
     /// and routes future observations through `eventSink`.
     func start(eventSink: AgentEventSink) async throws
@@ -34,4 +40,9 @@ protocol AgentAdapter: AnyObject {
     /// Called immediately before a session terminates so the adapter can
     /// release any per-session bindings.
     func willTerminateSession(_ session: SessionHandle)
+}
+
+extension AgentAdapter {
+    /// Most agents have no resume concept; opt in by overriding.
+    var continuationArgs: [String] { [] }
 }

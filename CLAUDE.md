@@ -43,9 +43,13 @@ The token never appears in settings.json. **Don't** add code that logs it.
 
 ## Spawn env injection — every path or none
 
-`Session.spawnEnvProvider` is a closure `SessionManager.makeSession` wires once. Toolbar Start, the not-running overlay's Start, auto-restart-after-stop, and `SessionManager.startSession` all hit `Session.start()`. Removing or bypassing the closure means sessions launch without `SAND_FESTIVAL_TOKEN` and every hook 401s silently.
+`Session.spawnEnvProvider` is a closure `SessionManager.makeSession` wires once. Every launch path — toolbar/overlay Start and Continue, auto-restart-after-stop, `SessionManager.startSession` — funnels through the private `Session.launch(extraAgentArgs:)` (which `start()` and `startContinuing()` both call). Removing or bypassing the closure means sessions launch without `SAND_FESTIVAL_TOKEN` and every hook 401s silently.
 
 PATH precedence in `Session.composeEnvironment(inherited:projectEnv:extra:)`: project/adapter override → inherited parent PATH → `CommandResolver.defaultPathString`. Don't revert to clobbering — that silently breaks mise/asdf/non-default installs.
+
+## Continuation (resume previous conversation)
+
+"Continue" launches the agent with resume flags instead of a fresh start. The flags come from `AgentAdapter.continuationArgs` (Claude Code: `["--continue"]`; default empty, so `Session.canContinue` is false and the UI hides Continue for agents without the concept). `Session.composeArgs(base:extraAgentArgs:)` appends them to the **agent** portion — after the `--` separator when there is one, else to the whole argv. The launch flavor is remembered in `Session.extraAgentArgs` and replayed on auto-restart, so restarting a continued session continues again rather than dropping to a fresh start. If there's no prior conversation, claude exits with its own error, which the startup-failure path surfaces in the not-running overlay.
 
 ## Canonical helpers — don't duplicate
 

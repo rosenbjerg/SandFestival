@@ -62,8 +62,15 @@ struct DetailPaneView: View {
                 .frame(maxWidth: 520, maxHeight: 220)
                 .padding(.horizontal, 24)
             }
-            Button(String(localized: "detail.not_running.start")) {
-                session.start()
+            HStack(spacing: 12) {
+                Button(String(localized: "detail.not_running.start")) {
+                    session.start()
+                }
+                if session.canContinue {
+                    Button(String(localized: "detail.not_running.continue")) {
+                        session.startContinuing()
+                    }
+                }
             }
             .controlSize(.large)
             .pointerStyle(.link)
@@ -97,12 +104,16 @@ struct DetailPaneView: View {
     @ToolbarContentBuilder
     private func toolbarButtons(for session: Session) -> some ToolbarContent {
         ToolbarItemGroup {
-            Button {
-                session.restart()
-            } label: {
-                Label(String(localized: "detail.toolbar.restart"), systemImage: "arrow.clockwise")
+            // Restart only makes sense for a live process; when stopped it
+            // would just duplicate Start, so hide it and offer Continue instead.
+            if session.state.isRunning {
+                Button {
+                    session.restart()
+                } label: {
+                    Label(String(localized: "detail.toolbar.restart"), systemImage: "arrow.clockwise")
+                }
+                .help(String(localized: "detail.toolbar.restart"))
             }
-            .help(String(localized: "detail.toolbar.restart"))
 
             Button {
                 if session.state.isRunning {
@@ -124,6 +135,15 @@ struct DetailPaneView: View {
                 } else {
                     Label(String(localized: "detail.toolbar.start"), systemImage: "play.fill")
                 }
+            }
+
+            if !session.state.isRunning, session.canContinue {
+                Button {
+                    session.startContinuing()
+                } label: {
+                    Label(String(localized: "detail.toolbar.continue"), systemImage: "clock.arrow.circlepath")
+                }
+                .help(String(localized: "detail.toolbar.continue.help"))
             }
 
             Button {
