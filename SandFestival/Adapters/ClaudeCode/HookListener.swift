@@ -23,14 +23,14 @@ final class HookListener: @unchecked Sendable {
     let port: UInt16
 
     private let token: String
-    private let onEvent: @Sendable (Data) -> Void
+    private let onEvent: @Sendable (Data, String?) -> Void
     private let queue = DispatchQueue(label: "app.sandfestival.claudecode.hooks")
     private var listener: NWListener?
 
     init(
         port: UInt16 = HookListener.defaultPort,
         token: String,
-        onEvent: @escaping @Sendable (Data) -> Void
+        onEvent: @escaping @Sendable (Data, String?) -> Void
     ) {
         self.port = port
         self.token = token
@@ -164,13 +164,18 @@ final class HookListener: @unchecked Sendable {
             sendResponse(connection: connection, status: 413, reason: "Payload Too Large")
             return
         }
-        consumeBody(connection: connection, accumulated: bodySoFar, target: target)
+        consumeBody(
+            connection: connection,
+            accumulated: bodySoFar,
+            target: target,
+            projectID: headers.projectID
+        )
     }
 
-    private func consumeBody(connection: NWConnection, accumulated: Data, target: Int) {
+    private func consumeBody(connection: NWConnection, accumulated: Data, target: Int, projectID: String?) {
         if accumulated.count >= target {
             let body = accumulated.prefix(target)
-            onEvent(body)
+            onEvent(body, projectID)
             sendResponse(connection: connection, status: 200, reason: "OK")
             return
         }
@@ -182,7 +187,7 @@ final class HookListener: @unchecked Sendable {
                 connection.cancel()
                 return
             }
-            self.consumeBody(connection: connection, accumulated: buffer, target: target)
+            self.consumeBody(connection: connection, accumulated: buffer, target: target, projectID: projectID)
         }
     }
 

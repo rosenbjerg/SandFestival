@@ -59,11 +59,11 @@ PATH precedence in `Session.composeEnvironment(inherited:projectEnv:extra:)`: pr
 
 ## Session routing (ClaudeCodeAdapter)
 
-- `prepareSpawn` records `(projectID, cwd)` as both a one-shot pending spawn and a longer-lived live-cwd entry
-- First `SessionStart` hook for that cwd consumes the pending entry and binds `session_id → projectID` (`SessionBindingStore`)
-- Later `SessionStart` hooks for the same cwd fall back to the live-cwd entry, so `/resume` and `/clear` rebind the new session_id to the same project while the process is alive
-- `SessionBindingStore.bindOnSessionStart` returns a `BindOutcome` (`.freshSpawn` vs `.rebound`), not a bare id. A `.rebound` SessionStart is `/resume` or `/clear` over a live process, so the adapter translates its `.started` into `.sessionRestarted` — same state-machine transitions, but `Session.apply` also clears the stale OSC-set `terminalTitle` so a previous conversation's summary doesn't outlive it
-- The live-cwd entry is cleared only by `unbindAll(projectID:)`, which is called from `adapter.willTerminateSession`. `Session.onDidTerminate` fires this on natural process exit, so a stray claude run from the same cwd after the process dies doesn't attach to the dead session
+- Routing is keyed by **project id, not cwd**. `prepareSpawn` injects `SAND_FESTIVAL_PROJECT_ID=<project.id>` into the spawn env (alongside the token) and registers the id as a one-shot pending spawn plus a longer-lived live entry. The hook command forwards the id as the `X-Sand-Festival-Project` header (`HookEntryFactory.projectHeaderName`); the shell expands the env var at fire time, just like the bearer token. This is what lets two projects share a cwd — a "Duplicate…" without a worktree points the child at the parent's path — without their sessions colliding. Don't reintroduce cwd-based binding
+- First `SessionStart` for that project id consumes the pending entry and binds `session_id → projectID` (`SessionBindingStore`)
+- Later `SessionStart`s for a still-live project id rebind, so `/resume` and `/clear` (which mint a new session_id over the same live process) attach the new session_id to the same project
+- `SessionBindingStore.bindOnSessionStart(sessionID:projectID:)` returns a `BindOutcome` (`.freshSpawn` vs `.rebound`), not a bare id. A `.rebound` SessionStart is `/resume` or `/clear` over a live process, so the adapter translates its `.started` into `.sessionRestarted` — same state-machine transitions, but `Session.apply` also clears the stale OSC-set `terminalTitle` so a previous conversation's summary doesn't outlive it
+- The live entry is cleared only by `unbindAll(projectID:)`, which is called from `adapter.willTerminateSession`. `Session.onDidTerminate` fires this on natural process exit, so a stray claude run for the same project after the process dies doesn't attach to the dead session
 - `SessionEnd` is **not** a `.stopped` signal — process death comes from the OS-level termination callback in `Session.handleProcessTerminated`. `SessionEnd` fires for `/resume` and `/clear` over a live process, so translating it would push a running session into the "not running" overlay
 - Subsequent non-SessionStart events route by `session_id` only — `cd` mid-session can't detach a session
 - Unknown session_ids are silently dropped (claude run from elsewhere)
