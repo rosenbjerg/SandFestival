@@ -12,6 +12,14 @@ enum HookRequestParser {
         var authorization: String? {
             fields["authorization"]
         }
+
+        /// The spawning project's id, forwarded by the hook command. Empty
+        /// (the shell's expansion of an unset env var) reads as `nil` so a
+        /// claude run outside SandFestival's spawn path doesn't carry one.
+        var projectID: String? {
+            let value = fields[HookEntryFactory.projectHeaderName.lowercased()]
+            return (value?.isEmpty == false) ? value : nil
+        }
     }
 
     /// Parses a CRLF-separated header block (everything before `\r\n\r\n`).

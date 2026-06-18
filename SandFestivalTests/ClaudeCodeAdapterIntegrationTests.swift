@@ -23,7 +23,7 @@ struct ClaudeCodeAdapterIntegrationTests {
             "session_id": "sess-start",
             "hook_event_name": "SessionStart",
             "cwd": project.path.path,
-        ])
+        ], projectID: project.id)
 
         try await env.sink.waitForEvents(1)
         let received = try #require(env.sink.events.first)
@@ -45,7 +45,7 @@ struct ClaudeCodeAdapterIntegrationTests {
             "session_id": "sess-perm",
             "hook_event_name": "SessionStart",
             "cwd": project.path.path,
-        ])
+        ], projectID: project.id)
         try await env.sink.waitForEvents(1)
         env.sink.drainEvents()
 
@@ -73,7 +73,7 @@ struct ClaudeCodeAdapterIntegrationTests {
             "session_id": "sess-original",
             "hook_event_name": "SessionStart",
             "cwd": project.path.path,
-        ])
+        ], projectID: project.id)
         try await env.sink.waitForEvents(1)
         env.sink.drainEvents()
 
@@ -88,7 +88,7 @@ struct ClaudeCodeAdapterIntegrationTests {
             "session_id": "sess-resumed",
             "hook_event_name": "SessionStart",
             "cwd": project.path.path,
-        ])
+        ], projectID: project.id)
 
         // 3. A follow-up event under the new session_id must route to the same
         //    project — this is what proves the rebind worked end-to-end.
@@ -113,6 +113,38 @@ struct ClaudeCodeAdapterIntegrationTests {
         #expect(!events.contains { $0.event == .stopped })
     }
 
+    @Test("two projects sharing a cwd route each SessionStart to its own project")
+    func sharedCwdProjectsRouteIndependently() async throws {
+        let env = try await IntegrationEnvironment.start(port: 51795)
+        defer { env.teardown() }
+
+        // A "Duplicate…" without a worktree gives the child the parent's path.
+        let cwdName = "sf-int-\(UUID().uuidString)"
+        let parent = env.makeProject(cwdName: cwdName)
+        let child = env.makeProject(cwdName: cwdName)
+        #expect(parent.path == child.path)
+        _ = env.adapter.prepareSpawn(project: parent)
+        _ = env.adapter.prepareSpawn(project: child)
+
+        try await env.postHook([
+            "session_id": "sess-parent",
+            "hook_event_name": "SessionStart",
+            "cwd": parent.path.path,
+        ], projectID: parent.id)
+        try await env.postHook([
+            "session_id": "sess-child",
+            "hook_event_name": "SessionStart",
+            "cwd": child.path.path,
+        ], projectID: child.id)
+
+        try await env.sink.waitForEvents(2)
+        let events = env.sink.events
+        // Each session's .started must land on its own project — before the
+        // fix the shared cwd routed both to whichever spawned last.
+        #expect(events.contains { $0.projectID == parent.id && $0.event == .started })
+        #expect(events.contains { $0.projectID == child.id && $0.event == .started })
+    }
+
     @Test("POST without the bearer token is rejected and never reaches the sink")
     func unauthorizedPostIsDropped() async throws {
         let env = try await IntegrationEnvironment.start(port: 51793)
@@ -127,6 +159,7 @@ struct ClaudeCodeAdapterIntegrationTests {
                 "hook_event_name": "SessionStart",
                 "cwd": project.path.path,
             ],
+            projectID: project.id,
             sendAuthHeader: false
         )
         #expect(status == 401)
@@ -174,7 +207,11 @@ private struct IntegrationEnvironment {
     }
 
     @discardableResult
-    func postHook(_ body: [String: Any], sendAuthHeader: Bool = true) async throws -> Int {
+    func postHook(
+        _ body: [String: Any],
+        projectID: Project.ID? = nil,
+        sendAuthHeader: Bool = true
+    ) async throws -> Int {
         let payload = try JSONSerialization.data(withJSONObject: body)
         var request = URLRequest(
             url: URL(string: "http://127.0.0.1:\(port)/event?source=sand-festival")!
@@ -184,6 +221,14 @@ private struct IntegrationEnvironment {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if sendAuthHeader {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        // Mirrors the spawn-injected header the real hook command forwards;
+        // SessionStart routing binds on this rather than the cwd.
+        if let projectID {
+            request.setValue(
+                projectID.uuidString,
+                forHTTPHeaderField: HookEntryFactory.projectHeaderName
+            )
         }
         let (_, response) = try await URLSession.shared.data(for: request)
         return (response as? HTTPURLResponse)?.statusCode ?? -1
