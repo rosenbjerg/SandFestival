@@ -283,7 +283,17 @@ final class Session: Identifiable {
     }
 
     private func updateTerminalTitle(_ title: String) {
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        var trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Claude Code prefixes its title with a status symbol and a space
+        // (e.g. "✳ Summary"). Drop that leading glyph + whitespace so the
+        // sidebar subtitle shows only the summary.
+        if let first = trimmed.unicodeScalars.first,
+           !CharacterSet.alphanumerics.contains(first) {
+            let afterSymbol = trimmed.dropFirst()
+            if afterSymbol.first?.isWhitespace == true {
+                trimmed = afterSymbol.drop { $0.isWhitespace }.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
         terminalTitle = trimmed.isEmpty ? nil : trimmed
     }
 
