@@ -157,50 +157,65 @@ struct HookPayloadTranslatorTests {
 @Suite("SessionBindingStore")
 struct SessionBindingStoreTests {
 
-    @Test("SessionStart binds session_id by matching pending cwd")
-    func bindingMatchesByCwd() {
+    @Test("SessionStart binds session_id to its spawning project")
+    func bindingMatchesByProjectID() {
         let store = SessionBindingStore()
         let projectID = UUID()
-        let cwd = URL(fileURLWithPath: "/tmp/repo")
 
-        store.registerPendingSpawn(projectID: projectID, cwd: cwd)
-        let resolved = store.bindOnSessionStart(sessionID: "sess-1", cwd: cwd)
+        store.registerPendingSpawn(projectID: projectID)
+        let resolved = store.bindOnSessionStart(sessionID: "sess-1", projectID: projectID)
 
         #expect(resolved == .freshSpawn(projectID))
         #expect(store.projectID(forSession: "sess-1") == projectID)
     }
 
-    @Test("subsequent events route by session_id, ignoring cwd")
+    @Test("subsequent events route by session_id")
     func subsequentEventsRouteBySessionID() {
         let store = SessionBindingStore()
         let projectID = UUID()
-        let cwd = URL(fileURLWithPath: "/tmp/repo")
 
-        store.registerPendingSpawn(projectID: projectID, cwd: cwd)
-        store.bindOnSessionStart(sessionID: "sess-1", cwd: cwd)
+        store.registerPendingSpawn(projectID: projectID)
+        store.bindOnSessionStart(sessionID: "sess-1", projectID: projectID)
 
         #expect(store.projectID(forSession: "sess-1") == projectID)
     }
 
-    @Test("SessionStart for an unknown cwd resolves to nil")
-    func unknownCwdResolvesToNil() {
+    @Test("SessionStart for a project that never spawned resolves to nil")
+    func unknownProjectResolvesToNil() {
         let store = SessionBindingStore()
-        store.registerPendingSpawn(projectID: UUID(), cwd: URL(fileURLWithPath: "/tmp/a"))
+        store.registerPendingSpawn(projectID: UUID())
         let resolved = store.bindOnSessionStart(
             sessionID: "sess-1",
-            cwd: URL(fileURLWithPath: "/tmp/b")
+            projectID: UUID()
         )
         #expect(resolved == nil)
+    }
+
+    @Test("two projects sharing a cwd bind to their own ids, not each other's")
+    func sharedCwdProjectsDoNotCollide() {
+        // The bug this fix targets: a "Duplicate…" without a worktree points
+        // the child project at the parent's path. Routing by the injected id
+        // keeps the two sessions distinct even though the cwd is identical.
+        let store = SessionBindingStore()
+        let parent = UUID()
+        let child = UUID()
+
+        store.registerPendingSpawn(projectID: parent)
+        store.registerPendingSpawn(projectID: child)
+
+        #expect(store.bindOnSessionStart(sessionID: "sess-parent", projectID: parent) == .freshSpawn(parent))
+        #expect(store.bindOnSessionStart(sessionID: "sess-child", projectID: child) == .freshSpawn(child))
+        #expect(store.projectID(forSession: "sess-parent") == parent)
+        #expect(store.projectID(forSession: "sess-child") == child)
     }
 
     @Test("unbind clears a specific session_id")
     func unbindClearsSession() {
         let store = SessionBindingStore()
         let projectID = UUID()
-        let cwd = URL(fileURLWithPath: "/tmp/repo")
 
-        store.registerPendingSpawn(projectID: projectID, cwd: cwd)
-        store.bindOnSessionStart(sessionID: "sess-1", cwd: cwd)
+        store.registerPendingSpawn(projectID: projectID)
+        store.bindOnSessionStart(sessionID: "sess-1", projectID: projectID)
         store.unbind(sessionID: "sess-1")
 
         #expect(store.projectID(forSession: "sess-1") == nil)
@@ -210,13 +225,10 @@ struct SessionBindingStoreTests {
     func unbindAllClearsProject() {
         let store = SessionBindingStore()
         let projectID = UUID()
-        let cwdA = URL(fileURLWithPath: "/tmp/a")
-        let cwdB = URL(fileURLWithPath: "/tmp/b")
 
-        store.registerPendingSpawn(projectID: projectID, cwd: cwdA)
-        store.bindOnSessionStart(sessionID: "sess-A", cwd: cwdA)
-        store.registerPendingSpawn(projectID: projectID, cwd: cwdB)
-        store.bindOnSessionStart(sessionID: "sess-B", cwd: cwdB)
+        store.registerPendingSpawn(projectID: projectID)
+        store.bindOnSessionStart(sessionID: "sess-A", projectID: projectID)
+        store.bindOnSessionStart(sessionID: "sess-B", projectID: projectID)
 
         store.unbindAll(projectID: projectID)
 
@@ -224,75 +236,35 @@ struct SessionBindingStoreTests {
         #expect(store.projectID(forSession: "sess-B") == nil)
     }
 
-    @Test("a second SessionStart for the same cwd rebinds while the project is still live (e.g. /resume, /clear)")
+    @Test("a second SessionStart for the same project rebinds while it's still live (e.g. /resume, /clear)")
     func secondSessionStartRebindsLiveProject() {
         let store = SessionBindingStore()
         let projectID = UUID()
-        let cwd = URL(fileURLWithPath: "/tmp/repo")
 
-        store.registerPendingSpawn(projectID: projectID, cwd: cwd)
-        let first = store.bindOnSessionStart(sessionID: "sess-1", cwd: cwd)
+        store.registerPendingSpawn(projectID: projectID)
+        let first = store.bindOnSessionStart(sessionID: "sess-1", projectID: projectID)
         #expect(first == .freshSpawn(projectID))
         // /resume mints a new session_id without restarting the process. As
         // long as we haven't been told the project is gone, the new session_id
         // must bind to the same project so subsequent events route correctly.
         // The outcome distinguishes this from the first SessionStart so the
         // adapter can react (clearing the previous conversation's title).
-        let second = store.bindOnSessionStart(sessionID: "sess-2", cwd: cwd)
+        let second = store.bindOnSessionStart(sessionID: "sess-2", projectID: projectID)
         #expect(second == .rebound(projectID))
         #expect(store.projectID(forSession: "sess-2") == projectID)
     }
 
-    @Test("a SessionStart for a cwd whose project has been unbound is dropped")
+    @Test("a SessionStart for a project that has been unbound is dropped")
     func sessionStartAfterUnbindAllIsDropped() {
         let store = SessionBindingStore()
         let projectID = UUID()
-        let cwd = URL(fileURLWithPath: "/tmp/repo")
 
-        store.registerPendingSpawn(projectID: projectID, cwd: cwd)
-        _ = store.bindOnSessionStart(sessionID: "sess-1", cwd: cwd)
-        // unbindAll fires on process termination — a stray claude run from the
-        // same cwd afterwards (e.g. the user invokes claude by hand) must not
-        // attach to the dead session.
+        store.registerPendingSpawn(projectID: projectID)
+        _ = store.bindOnSessionStart(sessionID: "sess-1", projectID: projectID)
+        // unbindAll fires on process termination — a stray claude run for the
+        // same project afterwards must not attach to the dead session.
         store.unbindAll(projectID: projectID)
-        let stray = store.bindOnSessionStart(sessionID: "sess-stray", cwd: cwd)
+        let stray = store.bindOnSessionStart(sessionID: "sess-stray", projectID: projectID)
         #expect(stray == nil)
-    }
-
-    @Test("cwd matching is path-normalized")
-    func cwdMatchingIsNormalized() {
-        let store = SessionBindingStore()
-        let projectID = UUID()
-        store.registerPendingSpawn(
-            projectID: projectID,
-            cwd: URL(fileURLWithPath: "/tmp/repo/")
-        )
-        let resolved = store.bindOnSessionStart(
-            sessionID: "sess-1",
-            cwd: URL(fileURLWithPath: "/tmp/repo")
-        )
-        #expect(resolved == .freshSpawn(projectID))
-    }
-
-    @Test("cwd matching resolves through symlinks")
-    func cwdMatchingResolvesThroughSymlinks() throws {
-        let fm = FileManager.default
-        let root = fm.temporaryDirectory
-            .appendingPathComponent("sandfest-symlink-\(UUID().uuidString)")
-        try fm.createDirectory(at: root, withIntermediateDirectories: true)
-        defer { try? fm.removeItem(at: root) }
-
-        let real = root.appendingPathComponent("real")
-        let link = root.appendingPathComponent("link")
-        try fm.createDirectory(at: real, withIntermediateDirectories: true)
-        try fm.createSymbolicLink(at: link, withDestinationURL: real)
-
-        let store = SessionBindingStore()
-        let projectID = UUID()
-        // Register under the symlink path (what the user typed in the editor)…
-        store.registerPendingSpawn(projectID: projectID, cwd: link)
-        // …and bind under the resolved path (what Claude's cwd hook reports).
-        let resolved = store.bindOnSessionStart(sessionID: "sess-1", cwd: real)
-        #expect(resolved == .freshSpawn(projectID))
     }
 }

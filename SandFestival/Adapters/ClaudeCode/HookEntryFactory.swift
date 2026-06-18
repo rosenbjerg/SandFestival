@@ -3,6 +3,12 @@ import Foundation
 enum HookEntryFactory {
     static let sourceSentinel = "?source=sand-festival"
 
+    /// Header the hook command forwards so the listener can route each event
+    /// to the project that spawned it. The value is the per-spawn
+    /// `SAND_FESTIVAL_PROJECT_ID` the shell expands at hook-fire time — the
+    /// same injection mechanism as the bearer token.
+    static let projectHeaderName = "X-Sand-Festival-Project"
+
     static func hookURL(port: UInt16) -> String {
         "http://127.0.0.1:\(port)/event\(sourceSentinel)"
     }
@@ -37,13 +43,16 @@ enum HookEntryFactory {
         // 1s timeout keeps Claude Code's tool loop from blocking when the
         // dashboard is briefly unreachable. `|| true` swallows ECONNREFUSED
         // and any other curl exit code so the hook always reports success.
-        // The Authorization header uses the env var SandFestival injects via
-        // prepareSpawn — the shell expands it at hook-fire time.
+        // The Authorization and project headers use env vars SandFestival
+        // injects via prepareSpawn — the shell expands them at hook-fire time.
+        // The project header pins the event to the spawning project even when
+        // two projects share a cwd, so routing never depends on the path.
         let url = hookURL(port: port)
         return """
         curl --silent --show-error --max-time 1 \
         -X POST \
         -H "Authorization: Bearer $SAND_FESTIVAL_TOKEN" \
+        -H "\(projectHeaderName): $SAND_FESTIVAL_PROJECT_ID" \
         -H "Content-Type: application/json" \
         --data-binary @- \
         "\(url)" \

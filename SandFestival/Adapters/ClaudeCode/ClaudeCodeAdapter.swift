@@ -49,10 +49,10 @@ final class ClaudeCodeAdapter: AgentAdapter {
             let token = try tokenStore.loadOrCreate()
             self.token = token
 
-            let listener = HookListener(port: port, token: token) { [weak self] body in
+            let listener = HookListener(port: port, token: token) { [weak self] body, projectIDHeader in
                 guard let self else { return }
                 Task { @MainActor in
-                    self.handleHookBody(body)
+                    self.handleHookBody(body, projectIDHeader: projectIDHeader)
                 }
             }
             try await listener.start()
@@ -71,9 +71,13 @@ final class ClaudeCodeAdapter: AgentAdapter {
     }
 
     func prepareSpawn(project: Project) -> SpawnEnvironment {
-        bindings.registerPendingSpawn(projectID: project.id, cwd: project.path)
-        guard let token else { return .empty }
-        return SpawnEnvironment(additions: ["SAND_FESTIVAL_TOKEN": token])
+        bindings.registerPendingSpawn(projectID: project.id)
+        // The project id is injected too so the hook command can name its
+        // owning project in every event — routing by id, not cwd, keeps two
+        // projects that share a working directory from colliding.
+        var additions = ["SAND_FESTIVAL_PROJECT_ID": project.id.uuidString]
+        if let token { additions["SAND_FESTIVAL_TOKEN"] = token }
+        return SpawnEnvironment(additions: additions)
     }
 
     func didSpawnSession(_ session: SessionHandle) {}
@@ -115,13 +119,18 @@ final class ClaudeCodeAdapter: AgentAdapter {
 
     // MARK: - Hook body handling
 
-    private func handleHookBody(_ body: Data) {
+    private func handleHookBody(_ body: Data, projectIDHeader: String?) {
         guard let payload = HookPayloadDecoder.decode(body) else { return }
 
         let projectID: UUID?
         var isRebind = false
-        if payload.hookEventName == HookEvent.sessionStart.rawValue {
-            switch bindings.bindOnSessionStart(sessionID: payload.sessionID, cwd: payload.cwd) {
+        // SessionStart names its owning project via the spawn-injected header;
+        // every later event for that conversation routes by session_id. `cd`
+        // mid-session therefore can't detach a session, and two projects that
+        // share a cwd never collide.
+        if payload.hookEventName == HookEvent.sessionStart.rawValue,
+           let headerID = projectIDHeader.flatMap(UUID.init(uuidString:)) {
+            switch bindings.bindOnSessionStart(sessionID: payload.sessionID, projectID: headerID) {
             case .freshSpawn(let id):
                 projectID = id
             case .rebound(let id):
