@@ -139,7 +139,9 @@ struct ProjectDuplicateView: View {
         Binding(
             get: { draft.branchName },
             set: { newValue in
-                draft.branchName = newValue
+                // Spaces aren't valid in branch names; fold them to dashes as
+                // the user types so the field never holds an invalid value.
+                draft.branchName = newValue.replacingOccurrences(of: " ", with: "-")
                 draft.refreshDerivedFields()
             }
         )
