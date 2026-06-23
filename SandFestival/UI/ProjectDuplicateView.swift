@@ -226,6 +226,14 @@ struct ProjectDuplicateView: View {
         }
     }
 
+    /// Whether `command` resolves to the nono sandbox wrapper, so the
+    /// `--allow <repo>` grant only gets injected into args nono understands.
+    /// Matches on the basename so a full path like `/usr/local/bin/nono`
+    /// still counts.
+    private func isNono(_ command: String) -> Bool {
+        (command as NSString).lastPathComponent == "nono"
+    }
+
     private func submit() {
         let snapshot = draft
         let trimmedName = snapshot.name.trimmingCharacters(in: .whitespaces)
@@ -296,12 +304,23 @@ struct ProjectDuplicateView: View {
                 isCreating = false
                 switch result {
                 case .success:
+                    // The worktree's `.git` is a gitlink into the source
+                    // repo's `.git/worktrees/…`, so the sandbox needs the
+                    // source repo root granted or every git command 401s with
+                    // "operation not permitted". Only meaningful for the nono
+                    // wrapper — leave a custom command's args untouched.
+                    let args = isNono(source.command)
+                        ? NonoWorktreeArgs.grantingRepoAccess(
+                            repoPath: sourceRepoPath.path,
+                            in: source.args
+                        )
+                        : source.args
                     let project = Project(
                         name: trimmedName,
                         path: newPath,
                         agentID: source.agentID,
                         command: source.command,
-                        args: source.args,
+                        args: args,
                         env: source.env,
                         autoStart: snapshot.autoStart,
                         worktreeInfo: WorktreeInfo(
