@@ -201,7 +201,13 @@ private struct IntegrationEnvironment {
     }
 
     func makeProject(cwdName: String) -> Project {
-        let cwd = FileManager.default.temporaryDirectory.appendingPathComponent(cwdName)
+        // Pass `isDirectory: true` so the URL is derived purely from the string,
+        // not the filesystem. The bare `appendingPathComponent(_:)` probes disk
+        // and appends a trailing slash once the directory exists — so calling
+        // this twice for the same cwd (the shared-cwd case) would yield URLs
+        // that differ only by that slash and compare unequal.
+        let cwd = FileManager.default.temporaryDirectory
+            .appendingPathComponent(cwdName, isDirectory: true)
         try? FileManager.default.createDirectory(at: cwd, withIntermediateDirectories: true)
         return Project(name: "Integration", path: cwd)
     }
