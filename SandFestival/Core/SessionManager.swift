@@ -245,6 +245,20 @@ final class SessionManager {
         session.restart()
     }
 
+    /// Restarts every running session so each resumes its conversation on the
+    /// freshly-updated agent binary. Invoked by "Update Claude Code" after a
+    /// successful `claude update` (which must finish first, or the relaunch
+    /// picks up the old binary). Iterates in sidebar order; stopped sessions
+    /// are left alone. Mirrors `restartSession`'s adapter notification so
+    /// per-process bindings are dropped before each relaunch re-registers.
+    func restartAllRunningContinuing() {
+        for project in projects {
+            guard let session = sessions[project.id], session.state.isRunning else { continue }
+            adapter?.willTerminateSession(handle(for: project))
+            session.restartContinuing()
+        }
+    }
+
     // MARK: - Internal
 
     private func autoStartIfNeeded() {

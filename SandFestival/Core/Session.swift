@@ -181,6 +181,29 @@ final class Session: Identifiable {
         }
     }
 
+    /// Restarts the session so the relaunch **resumes** the prior conversation
+    /// regardless of how it was originally launched. Used by "Update Claude
+    /// Code" to apply a freshly-installed binary to every live session without
+    /// dropping its conversation. Overwrites `extraAgentArgs` with the
+    /// continuation flag so `handleProcessTerminated`'s auto-relaunch continues
+    /// even for a session that started fresh; falls back to a plain
+    /// `startContinuing()` (a no-op continuation when the adapter has none)
+    /// while stopped.
+    func restartContinuing() {
+        let continuation = continuationArgsProvider?() ?? []
+        if state.isRunning {
+            let pid = terminalView.process.shellPid
+            guard pid != 0 else { return }
+            extraAgentArgs = continuation
+            wantsStop = true
+            wantsRestart = true
+            softStopRequested = true
+            kill(pid, SIGINT)
+        } else {
+            startContinuing()
+        }
+    }
+
     /// Hard stop: SIGKILL the wrapper PID. Unblocks the "nono is wedged on
     /// its prompt and won't quit" case after a soft stop. nono can't trap
     /// SIGKILL, so the OS-level process death is guaranteed and the
