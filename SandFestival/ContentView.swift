@@ -5,6 +5,7 @@ struct ContentView: View {
     @Bindable var manager: SessionManager
     @Bindable var claudeCodeAdapter: ClaudeCodeAdapter
     @Binding var manualHookSheet: Bool
+    @Binding var updateSheet: Bool
     @Binding var editorTarget: ProjectEditorTarget?
     @State private var duplicateTarget: Project?
     @State private var removalTarget: Project?
@@ -74,6 +75,12 @@ struct ContentView: View {
                     hookSheetSkipped = true
                     manualHookSheet = false
                 }
+            )
+        }
+        .sheet(isPresented: $updateSheet) {
+            UpdateClaudeCodeSheet(
+                manager: manager,
+                onClose: { updateSheet = false }
             )
         }
     }
@@ -146,6 +153,7 @@ struct ContentView: View {
         manager: SessionManager(),
         claudeCodeAdapter: ClaudeCodeAdapter(),
         manualHookSheet: .constant(false),
+        updateSheet: .constant(false),
         editorTarget: .constant(nil)
     )
 }

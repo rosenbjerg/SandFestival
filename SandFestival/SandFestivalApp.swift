@@ -8,6 +8,7 @@ struct SandFestivalApp: App {
     @State private var attentionPreferences = AttentionPreferences()
     @State private var attentionNotifier: AttentionNotifier?
     @State private var manualHookSheet = false
+    @State private var updateSheet = false
     @State private var editorTarget: ProjectEditorTarget?
 
     var body: some Scene {
@@ -16,6 +17,7 @@ struct SandFestivalApp: App {
                 manager: manager,
                 claudeCodeAdapter: claudeCodeAdapter,
                 manualHookSheet: $manualHookSheet,
+                updateSheet: $updateSheet,
                 editorTarget: $editorTarget
             )
                 .frame(minWidth: 900, minHeight: 600)
@@ -41,6 +43,10 @@ struct SandFestivalApp: App {
             }
 
             CommandGroup(after: .appSettings) {
+                Button(String(localized: "menu.update_claude_code")) {
+                    updateSheet = true
+                }
+
                 Button(String(localized: "menu.manage_hooks")) {
                     manualHookSheet = true
                 }

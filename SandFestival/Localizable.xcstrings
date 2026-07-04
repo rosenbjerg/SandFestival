@@ -867,12 +867,112 @@
         }
       }
     },
+    "menu.update_claude_code": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update Claude Code"
+          }
+        }
+      }
+    },
+    "update.done.close": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        }
+      }
+    },
+    "update.done.restart_note": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Active sessions are restarting to apply the update."
+          }
+        }
+      }
+    },
+    "update.done.title.failure": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update Failed"
+          }
+        }
+      }
+    },
+    "update.done.title.success": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update Complete"
+          }
+        }
+      }
+    },
     "update.error.claude_not_found": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "Couldn’t find the claude command. Make sure Claude Code is installed and on your PATH."
+          }
+        }
+      }
+    },
+    "update.prompt.body": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This runs claude update to install the latest version of Claude Code."
+          }
+        }
+      }
+    },
+    "update.prompt.cancel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        }
+      }
+    },
+    "update.prompt.confirm": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update"
+          }
+        }
+      }
+    },
+    "update.prompt.restart_toggle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restart active sessions afterward to apply the update now"
+          }
+        }
+      }
+    },
+    "update.running.status": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Running claude update…"
           }
         }
       }
