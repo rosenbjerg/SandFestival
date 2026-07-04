@@ -867,6 +867,16 @@
         }
       }
     },
+    "update.error.claude_not_found": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn’t find the claude command. Make sure Claude Code is installed and on your PATH."
+          }
+        }
+      }
+    },
     "notification.body.blocked_auto_mode": {
       "extractionState": "manual",
       "localizations": {
