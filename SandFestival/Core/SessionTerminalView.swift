@@ -46,10 +46,9 @@ final class SessionTerminalView: LocalProcessTerminalView {
     /// preference the moment it enters a window. A `Session` builds its view
     /// long before SwiftUI mounts it, so deferring to `viewDidMoveToWindow`
     /// is what makes the toggle's current value apply to sessions that were
-    /// never on screen. (SwiftTerm ≤1.17 also *required* the deferral —
-    /// `setUseMetal` on a windowless view bound the renderer to no window.
-    /// 1.18.0 rebinds on reparent in its own `viewDidMoveToWindow`, so the
-    /// deferral is now ours alone. Call `super` first so that rebind runs.)
+    /// never on screen. SwiftTerm rebinds the renderer on reparent from its
+    /// own `viewDidMoveToWindow` (since 1.14.0), so call `super` first and
+    /// let that run before `setUseMetal`.
     var useMetalProvider: (@MainActor () -> Bool)?
 
     override func send(source: TerminalView, data: ArraySlice<UInt8>) {
