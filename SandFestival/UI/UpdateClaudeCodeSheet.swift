@@ -41,7 +41,9 @@ struct UpdateClaudeCodeSheet: View {
         case .prompt, .running:
             return String(localized: "menu.update_claude_code")
         case .done:
-            return String(localized: succeeded ? "update.done.title.success" : "update.done.title.failure")
+            return succeeded
+                ? String(localized: "update.done.title.success")
+                : String(localized: "update.done.title.failure")
         }
     }
 

@@ -26,11 +26,15 @@ struct HookInstallSheet: View {
         let isReinstall = !adapter.needsInstallation
 
         return VStack(alignment: .leading, spacing: 16) {
-            Text(String(localized: isReinstall ? "hooks.install.title.reinstall" : "hooks.install.title"))
+            Text(isReinstall
+                ? String(localized: "hooks.install.title.reinstall")
+                : String(localized: "hooks.install.title"))
                 .font(.title2)
                 .bold()
 
-            Text(String(localized: isReinstall ? "hooks.install.body.reinstall" : "hooks.install.body"))
+            Text(isReinstall
+                ? String(localized: "hooks.install.body.reinstall")
+                : String(localized: "hooks.install.body"))
                 .fixedSize(horizontal: false, vertical: true)
 
             if let error = adapter.lastInstallError {
@@ -45,12 +49,16 @@ struct HookInstallSheet: View {
                 }
                 Spacer()
                 Button(
-                    String(localized: isReinstall ? "hooks.install.cancel" : "hooks.install.skip"),
+                    isReinstall
+                        ? String(localized: "hooks.install.cancel")
+                        : String(localized: "hooks.install.skip"),
                     role: .cancel
                 ) {
                     onSkip()
                 }
-                Button(String(localized: isReinstall ? "hooks.install.reinstall" : "hooks.install.install")) {
+                Button(isReinstall
+                    ? String(localized: "hooks.install.reinstall")
+                    : String(localized: "hooks.install.install")) {
                     adapter.installHooks()
                     if adapter.lastInstallError == nil {
                         onInstall()
