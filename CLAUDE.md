@@ -84,6 +84,8 @@ PATH precedence in `Session.composeEnvironment(inherited:projectEnv:extra:)`: pr
 
 ## Terminal lifetime
 
+SwiftTerm is pinned to an **exact version** (`kind = exactVersion` in pbxproj), so "Update to Latest Package Versions" can't move it. Terminal behavior here leans on version-specific upstream internals — see the viewport-pinning note below — so bumps are deliberate: raise the version, then re-test scrolling and selection by hand.
+
 Each `Session` owns its `LocalProcessTerminalView` for the whole app lifetime. `DetailPaneView` ZStacks every session's view and `TerminalPaneView` flips `NSView.isHidden` per selection (not `.opacity` — at alpha 0 the layer is still asked to paint dirty rects on every PTY update). **Never** swap views by selection, that destroys scrollback.
 
 `SessionTerminalView` sets `allowMouseReporting = false`. SwiftTerm clears the text selection on every feed (`feedPrepare`) and every linefeed, both gated only on that flag — so without it, streaming output wiped any drag-selection before the user could copy. `feedPrepare` is `internal` and not overridable, so the flag is the only lever; turning it off is SwiftTerm's documented way to preserve selection during output. The trade is that mouse events stop forwarding to mouse-aware apps, which is fine here (the session is the Claude Code TUI, primary-buffer + linefeeds, never mouse mode). Don't re-enable it to gain app-side mouse support without restoring selection some other way.
