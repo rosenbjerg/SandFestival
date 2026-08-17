@@ -163,11 +163,7 @@ final class SessionManager {
     }
 
     func removeProject(id: Project.ID) {
-        if let session = sessions[id], session.state.isRunning {
-            // Hard-kill: the project is going away, so nono's
-            // post-kill confirmation prompt has no one to answer it.
-            session.forceStop()
-        }
+        let removedSession = sessions[id]
         if let project = projects.first(where: { $0.id == id }) {
             adapter?.willTerminateSession(handle(for: project))
         }
@@ -184,9 +180,33 @@ final class SessionManager {
             selectedProjectID = projects.first?.id
         }
         persist()
+        // Hard-kill last, and hold the Session strongly for the duration: the
+        // project is going away, so nono's post-kill confirmation prompt has no
+        // one to answer it, and the terminal view has to outlive the kill for
+        // SwiftTerm's exit monitor to reap the child. Detached from the UI
+        // update because a plain removal has nothing to wait for — the worktree
+        // path in `ProjectRemovalView` awaits `terminateSessionAndWait` instead.
+        if let removedSession {
+            Task { await removedSession.forceStopAndWait() }
+        }
     }
 
     // MARK: - Session control
+
+    /// Kills a session's whole process group and waits for confirmation that
+    /// nothing in it is still running. Destructive flows that touch the
+    /// project's files — worktree removal above all — must await this before
+    /// they start, so `git` never races a live agent and a nono sitting on its
+    /// denied-paths prompt can't hold the directory open. Returns false when
+    /// something outlived the timeout, which callers should treat as "do not
+    /// proceed".
+    func terminateSessionAndWait(id: Project.ID, timeout: Duration = .seconds(5)) async -> Bool {
+        guard let session = sessions[id] else { return true }
+        if let project = projects.first(where: { $0.id == id }) {
+            adapter?.willTerminateSession(handle(for: project))
+        }
+        return await session.forceStopAndWait(timeout: timeout)
+    }
 
     func session(for id: Project.ID) -> Session? {
         sessions[id]

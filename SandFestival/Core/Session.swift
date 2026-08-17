@@ -204,20 +204,84 @@ final class Session: Identifiable {
         }
     }
 
-    /// Hard stop: SIGKILL the wrapper PID. Unblocks the "nono is wedged on
-    /// its prompt and won't quit" case after a soft stop. nono can't trap
-    /// SIGKILL, so the OS-level process death is guaranteed and the
-    /// existing `childMonitor` → `handleProcessTerminated` path runs
-    /// normally — we don't have to yank the PTY ourselves. Cancels any
-    /// queued restart so "Force Stop" really means stop, not restart.
+    /// Hard stop: SIGKILL the wrapper's whole process group. Unblocks the
+    /// "nono is wedged on its prompt and won't quit" case after a soft stop.
+    /// The *group* rather than the wrapper pid because nono outlives its child
+    /// on purpose — after the agent dies it can sit on the PTY asking whether
+    /// denied paths should be added to the profile — and because killing only
+    /// the wrapper orphans the agent instead of ending it. Neither can trap
+    /// SIGKILL, so the OS-level death is guaranteed and the existing
+    /// `childMonitor` → `handleProcessTerminated` path runs normally; we don't
+    /// have to yank the PTY ourselves. Cancels any queued restart so "Force
+    /// Stop" really means stop, not restart.
     func forceStop() {
         guard state.isRunning else { return }
         let pid = terminalView.process.shellPid
         guard pid != 0 else { return }
         wantsStop = true
         wantsRestart = false
-        kill(pid, SIGKILL)
+        ProcessGroupTerminator.signalGroup(leader: pid, signal: SIGKILL)
     }
+
+    /// Hard stop that **confirms** the kill: SIGKILLs the process group, then
+    /// polls until no group member can still run code. Returns true once the
+    /// group is clear, false if something outlived `timeout`.
+    ///
+    /// Destructive callers must use this rather than `forceStop()`. `kill`
+    /// returning 0 only means the signal was queued; `git worktree remove`
+    /// racing a still-live agent (or a nono that's mid-prompt about denied
+    /// paths) is exactly the case we have to rule out before touching the
+    /// filesystem. Awaiting the sweep also keeps the terminal view — and so
+    /// SwiftTerm's exit monitor, which is what calls `waitpid` — alive long
+    /// enough to reap the child instead of leaving a zombie behind.
+    ///
+    /// Guarded on `LocalProcess.running` rather than `state`: once the exit has
+    /// been observed the pid is stale, and signalling a recycled pid is worse
+    /// than doing nothing.
+    @discardableResult
+    func forceStopAndWait(timeout: Duration = .seconds(5)) async -> Bool {
+        let pid = terminalView.process.shellPid
+        guard terminalView.process.running, pid != 0 else { return true }
+        wantsStop = true
+        wantsRestart = false
+        softStopRequested = false
+        ProcessGroupTerminator.signalGroup(leader: pid, signal: SIGKILL)
+
+        let clear = await waitForGroupToClear(leader: pid, timeout: timeout)
+        // Give the exit monitor its turn on the main queue so `waitpid` runs
+        // and the session lands in `.stopped` before the caller drops us.
+        // Bounded separately and much tighter than the kill budget: the group
+        // is already gone by here, so this is pure bookkeeping.
+        if clear {
+            await drainTerminationCallback()
+        }
+        return clear
+    }
+
+    private func waitForGroupToClear(leader pid: pid_t, timeout: Duration) async -> Bool {
+        let deadline = ContinuousClock.now.advanced(by: timeout)
+        while true {
+            let survivors = ProcessGroupTerminator.liveGroupMembers(leader: pid)
+            if survivors.isEmpty { return true }
+            guard ContinuousClock.now < deadline else { return false }
+            // Re-signal every sweep. A member forked between our `killpg` and
+            // this poll never saw the first signal, and SIGKILL is idempotent
+            // for everyone who did.
+            for survivor in survivors {
+                kill(survivor, SIGKILL)
+            }
+            try? await Task.sleep(for: Session.terminationPollInterval)
+        }
+    }
+
+    private func drainTerminationCallback() async {
+        for _ in 0..<Session.terminationDrainPolls where state.isRunning {
+            try? await Task.sleep(for: Session.terminationPollInterval)
+        }
+    }
+
+    private static let terminationPollInterval: Duration = .milliseconds(25)
+    private static let terminationDrainPolls = 8
 
     @ObservationIgnored private var wantsRestart = false
     @ObservationIgnored private var wantsStop = false

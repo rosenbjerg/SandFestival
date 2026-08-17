@@ -64,6 +64,7 @@ struct ContentView: View {
         .sheet(item: $removalTarget) { project in
             ProjectRemovalView(
                 project: project,
+                onTerminate: { await manager.terminateSessionAndWait(id: project.id) },
                 onRemove: { manager.removeProject(id: project.id) },
                 onClose: { removalTarget = nil }
             )

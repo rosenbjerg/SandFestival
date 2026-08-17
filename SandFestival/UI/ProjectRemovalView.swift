@@ -7,6 +7,9 @@ import SwiftUI
 /// checks.
 struct ProjectRemovalView: View {
     let project: Project
+    /// Kills the project's session and reports whether the whole process group
+    /// is confirmed gone. Awaited before any `git` command runs.
+    let onTerminate: () async -> Bool
     let onRemove: () -> Void
     let onClose: () -> Void
 
@@ -114,6 +117,18 @@ struct ProjectRemovalView: View {
         isWorking = true
 
         Task {
+            // Kill first, and only proceed once the kill is *confirmed*. git
+            // must not delete the worktree out from under a live agent, and the
+            // wrapper has to be gone rather than merely asked to quit: nono
+            // deliberately outlives its child so it can ask about paths the
+            // agent was denied, and that prompt would sit on a PTY belonging to
+            // a project the user just deleted.
+            guard await onTerminate() else {
+                isWorking = false
+                errorMessage = String(localized: "removal.error.session_still_running")
+                return
+            }
+
             let outcome = await Task.detached { () -> RemovalOutcome in
                 let removal = GitWorktree.removeWorktree(
                     worktreePath: worktreePath,

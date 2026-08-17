@@ -1507,6 +1507,17 @@
         }
       }
     },
+    "removal.error.session_still_running" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The session could not be stopped, so the worktree was left alone. Try “Force Stop” in the toolbar, then remove the project again."
+          }
+        }
+      }
+    },
     "removal.option.delete_branch" : {
       "extractionState" : "manual",
       "localizations" : {
