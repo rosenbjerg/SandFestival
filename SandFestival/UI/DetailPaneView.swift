@@ -4,6 +4,7 @@ import SwiftUI
 struct DetailPaneView: View {
     @Bindable var manager: SessionManager
     @Binding var editorTarget: ProjectEditorTarget?
+    @Binding var duplicateTarget: Project?
 
     var body: some View {
         ZStack {
@@ -152,6 +153,22 @@ struct DetailPaneView: View {
                 Label(String(localized: "detail.toolbar.open_in_finder"), systemImage: "folder")
             }
             .help(String(localized: "detail.toolbar.open_in_finder"))
+
+            // Offered only for top-level projects. Every duplicate anchors to
+            // the top-level ancestor anyway (`resolvedParentProjectID`), so the
+            // toolbar affordance belongs on the row that owns the group —
+            // duplicating a worktree child stays available in its context menu.
+            if session.project.parentProjectID == nil {
+                Button {
+                    duplicateTarget = session.project
+                } label: {
+                    Label(
+                        String(localized: "detail.toolbar.duplicate"),
+                        systemImage: "plus.square.on.square"
+                    )
+                }
+                .help(String(localized: "detail.toolbar.duplicate"))
+            }
 
             Button {
                 editorTarget = .edit(session.project)

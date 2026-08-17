@@ -182,6 +182,17 @@
         }
       }
     },
+    "detail.toolbar.duplicate" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplicate project…"
+          }
+        }
+      }
+    },
     "detail.toolbar.edit" : {
       "extractionState" : "manual",
       "localizations" : {

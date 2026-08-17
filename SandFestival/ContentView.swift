@@ -23,7 +23,11 @@ struct ContentView: View {
                     removalTarget: $removalTarget
                 )
             } detail: {
-                DetailPaneView(manager: manager, editorTarget: $editorTarget)
+                DetailPaneView(
+                    manager: manager,
+                    editorTarget: $editorTarget,
+                    duplicateTarget: $duplicateTarget
+                )
             }
             .navigationTitle(windowTitle)
             .navigationSubtitle(windowSubtitle)
