@@ -15,11 +15,17 @@ struct ProjectDuplicateView: View {
     @State private var isCreating = false
     @State private var errorMessage: String?
 
+    /// Seeds the base-branch field on open and is written back on a successful
+    /// create, so the next duplicate in this lineage defaults to the same base.
+    private let baseBranchStore: WorktreeBaseBranchStore
+
     init(source: Project, onCreate: @escaping (Project) -> Void, onCancel: @escaping () -> Void) {
+        let store = WorktreeBaseBranchStore()
         self.source = source
         self.onCreate = onCreate
         self.onCancel = onCancel
-        _draft = State(initialValue: ProjectDuplicateDraft(source: source))
+        self.baseBranchStore = store
+        _draft = State(initialValue: ProjectDuplicateDraft(source: source, baseBranchStore: store))
     }
 
     var body: some View {
@@ -119,6 +125,7 @@ struct ProjectDuplicateView: View {
             let (resolvedBranches, resolvedInUse) = await (branches, inUse)
             draft.availableBranches = resolvedBranches
             draft.branchesInUse = resolvedInUse
+            draft.pruneUnknownBaseBranch()
         }
     }
 
@@ -199,7 +206,9 @@ struct ProjectDuplicateView: View {
     // vs. branch to check out), so clear it when the user flips modes —
     // otherwise typing "feat-x" then switching to "Existing branch" leaves a
     // value that doesn't match any local branch and disables the confirm
-    // button without explanation.
+    // button without explanation. The base branch resets to the remembered
+    // default rather than to nil, so a round trip through Existing branch
+    // doesn't quietly cost the user their usual base.
     private var modeBinding: Binding<WorktreeMode> {
         Binding(
             get: { draft.worktreeMode },
@@ -207,7 +216,8 @@ struct ProjectDuplicateView: View {
                 guard newValue != draft.worktreeMode else { return }
                 draft.worktreeMode = newValue
                 draft.branchName = ""
-                draft.baseBranch = nil
+                draft.baseBranch = draft.rememberedBaseBranch
+                draft.pruneUnknownBaseBranch()
                 draft.refreshDerivedFields()
             }
         )
@@ -304,6 +314,13 @@ struct ProjectDuplicateView: View {
                 isCreating = false
                 switch result {
                 case .success:
+                    // Remember the base for next time — only in new-branch
+                    // mode, where it was actually used. Checking out an
+                    // existing branch takes no base, so it mustn't clobber
+                    // the stored default.
+                    if mode == .newBranch {
+                        baseBranchStore.remember(base, for: snapshot.resolvedParentProjectID)
+                    }
                     // The worktree's `.git` is a gitlink into the source
                     // repo's `.git/worktrees/…`, so the sandbox needs the
                     // source repo root granted or every git command 401s with
@@ -398,10 +415,20 @@ struct ProjectDuplicateDraft {
     let sourceName: String
     let parentDir: String
     let sourcePath: URL
-    let sourceID: UUID
-    /// The source project's own parent, set when the source was itself
-    /// created via "Duplicate…". `nil` for top-level sources.
-    let sourceParentID: UUID?
+    /// The `parentProjectID` to stamp on the duplicate. The sidebar renders
+    /// only two levels (top-level rows, then one pass of their children), so
+    /// a duplicate whose parent is itself a child would render nowhere —
+    /// orphaned in `projects.json` with no row. Anchoring every duplicate of
+    /// a lineage to the top-level ancestor keeps them visible as siblings
+    /// under that ancestor.
+    ///
+    /// Doubles as the key `WorktreeBaseBranchStore` remembers the base branch
+    /// under, so a parent and all its worktree children share one memory.
+    let resolvedParentProjectID: UUID
+    /// The base branch remembered from the last worktree created in this
+    /// lineage, or `nil` when there's nothing remembered. Seeds `baseBranch`
+    /// and is restored when the user flips modes back to New branch.
+    let rememberedBaseBranch: String?
     /// Populated asynchronously by the view's `.task` so sheet construction
     /// doesn't block on a `git branch` subprocess on the main thread — same
     /// pattern as `ProjectEditorView`'s `discoveredProfiles`.
@@ -419,6 +446,7 @@ struct ProjectDuplicateDraft {
 
     init(
         source: Project,
+        baseBranchStore: WorktreeBaseBranchStore? = nil,
         availableBranches: [String]? = nil,
         branchesInUse: Set<String>? = nil,
         isGitRepo: Bool? = nil,
@@ -434,11 +462,13 @@ struct ProjectDuplicateDraft {
         // Tests inject overrides to avoid shelling out to git.
         let resolvedIsGitRepo = isGitRepo ?? GitWorktree.isGitRepo(at: source.path)
         let resolvedIsGitInstalled = isGitInstalled ?? GitWorktree.isGitInstalled()
+        let lineageID = source.parentProjectID ?? source.id
+        let remembered = (baseBranchStore ?? WorktreeBaseBranchStore()).base(for: lineageID)
         self.sourceName = source.name
         self.parentDir = parent
         self.sourcePath = source.path
-        self.sourceID = source.id
-        self.sourceParentID = source.parentProjectID
+        self.resolvedParentProjectID = lineageID
+        self.rememberedBaseBranch = remembered
         // Branches start empty; the view's `.task` swaps them in once the
         // off-main-thread subprocess returns.
         self.availableBranches = availableBranches ?? []
@@ -447,7 +477,11 @@ struct ProjectDuplicateDraft {
         self.isGitInstalled = resolvedIsGitInstalled
         self.name = source.name
         self.branchName = ""
-        self.baseBranch = nil
+        // Pre-selected before the branch list has loaded, so the field shows
+        // the remembered base immediately instead of flickering through
+        // "Current HEAD". `pruneUnknownBaseBranch()` drops it after the load
+        // if the branch is gone.
+        self.baseBranch = remembered
         self.pathString = parent
         self.autoStart = source.autoStart
         // Default to "make a worktree" when we can — that's the path users
@@ -506,14 +540,16 @@ struct ProjectDuplicateDraft {
         return !contents.isEmpty
     }
 
-    /// The `parentProjectID` to stamp on the duplicate. The sidebar renders
-    /// only two levels (top-level rows, then one pass of their children), so
-    /// a duplicate whose parent is itself a child would render nowhere —
-    /// orphaned in `projects.json` with no row. Anchoring every duplicate of
-    /// a lineage to the top-level ancestor keeps them visible as siblings
-    /// under that ancestor.
-    var resolvedParentProjectID: UUID {
-        sourceParentID ?? sourceID
+    /// Clears a pre-selected base branch that turned out not to exist — a
+    /// remembered branch that has since been deleted or renamed. Called once
+    /// the async branch list lands, so the field falls back to the visible
+    /// "Current HEAD" sentinel rather than letting `git worktree add` fail at
+    /// submit. A still-empty branch list means the listing failed (or hasn't
+    /// arrived), which is not evidence the branch is gone.
+    mutating func pruneUnknownBaseBranch() {
+        guard !availableBranches.isEmpty, let base = baseBranch else { return }
+        guard !availableBranches.contains(base) else { return }
+        baseBranch = nil
     }
 
     /// The path the user typed, trimmed and tilde-expanded. The text

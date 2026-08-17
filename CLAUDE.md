@@ -97,6 +97,7 @@ Viewport pinning (scrolled-up sessions not getting yanked to the bottom by strea
 - Projects: `~/Library/Application Support/SandFestival/projects.json` (Codable + atomic write)
 - Settings: `~/.claude/settings.json` (POSIX tempfile + fsync + rename)
 - Terminal font size: UserDefaults `terminal.fontSize`, registered via `UserDefaults.register(defaults:)` (don't use a 0-fallback)
+- Worktree base branch: UserDefaults `duplicate.baseBranch` via `WorktreeBaseBranchStore` — a `lineage-id → branch` map, written only on a successful new-branch duplicate. Keyed by `ProjectDuplicateDraft.resolvedParentProjectID` (the top-level ancestor), so a parent and all its worktree children share one memory; keying by path would fragment it because duplicating a child passes *that child's* worktree path as the source repo. An absent entry means "Current HEAD", so picking the sentinel forgets rather than stores
 
 ## Localization
 

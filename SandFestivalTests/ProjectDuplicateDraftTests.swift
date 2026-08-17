@@ -354,6 +354,117 @@ struct ProjectDuplicateDraftTests {
         #expect(draft.isValid)
     }
 
+    // MARK: - Remembered base branch
+
+    @Test("a remembered base branch pre-selects the base field")
+    func rememberedBaseSeedsDraft() {
+        let source = Project(name: "Demo", path: URL(fileURLWithPath: "/Users/me/repo"))
+        let store = makeStore()
+        store.remember("main", for: source.id)
+
+        let draft = ProjectDuplicateDraft(
+            source: source,
+            baseBranchStore: store,
+            isGitRepo: true,
+            isGitInstalled: true
+        )
+        #expect(draft.baseBranch == "main")
+        #expect(draft.rememberedBaseBranch == "main")
+    }
+
+    @Test("a worktree child reads the base remembered against its top-level ancestor")
+    func rememberedBaseSharedAcrossLineage() {
+        // Duplicating a worktree child passes that child's path as the source
+        // repo, so keying the memory by path would start it out empty. The
+        // lineage id keeps one memory per repo.
+        let topLevelID = UUID()
+        let store = makeStore()
+        store.remember("main", for: topLevelID)
+
+        let child = Project(
+            name: "Demo (feature-x)",
+            path: URL(fileURLWithPath: "/Users/me/repo/.worktrees/feature-x"),
+            parentProjectID: topLevelID
+        )
+        let draft = ProjectDuplicateDraft(
+            source: child,
+            baseBranchStore: store,
+            isGitRepo: true,
+            isGitInstalled: true
+        )
+        #expect(draft.baseBranch == "main")
+    }
+
+    @Test("nothing remembered leaves the base at the Current HEAD sentinel")
+    func noMemoryLeavesBaseNil() {
+        let source = Project(name: "Demo", path: URL(fileURLWithPath: "/Users/me/repo"))
+        let draft = ProjectDuplicateDraft(
+            source: source,
+            baseBranchStore: makeStore(),
+            isGitRepo: true,
+            isGitInstalled: true
+        )
+        #expect(draft.baseBranch == nil)
+        #expect(draft.rememberedBaseBranch == nil)
+    }
+
+    @Test("pruning drops a remembered base the repo no longer has")
+    func pruneDropsDeletedBase() {
+        let source = Project(name: "Demo", path: URL(fileURLWithPath: "/Users/me/repo"))
+        let store = makeStore()
+        store.remember("gone", for: source.id)
+
+        var draft = ProjectDuplicateDraft(
+            source: source,
+            baseBranchStore: store,
+            isGitRepo: true,
+            isGitInstalled: true
+        )
+        #expect(draft.baseBranch == "gone")
+        // The async branch list lands and the remembered branch isn't in it.
+        draft.availableBranches = ["main", "develop"]
+        draft.pruneUnknownBaseBranch()
+        #expect(draft.baseBranch == nil)
+        // The memory itself is untouched — only a successful create rewrites it.
+        #expect(draft.rememberedBaseBranch == "gone")
+    }
+
+    @Test("pruning keeps a remembered base that still exists")
+    func pruneKeepsLiveBase() {
+        let source = Project(name: "Demo", path: URL(fileURLWithPath: "/Users/me/repo"))
+        let store = makeStore()
+        store.remember("main", for: source.id)
+
+        var draft = ProjectDuplicateDraft(
+            source: source,
+            baseBranchStore: store,
+            isGitRepo: true,
+            isGitInstalled: true
+        )
+        draft.availableBranches = ["main", "develop"]
+        draft.pruneUnknownBaseBranch()
+        #expect(draft.baseBranch == "main")
+    }
+
+    @Test("pruning against an empty branch list is a no-op")
+    func pruneNoOpsWhileBranchesUnknown() {
+        // An empty list means the listing failed or hasn't arrived — not
+        // evidence the branch is gone. Clearing here would blank the field
+        // during the load on every open.
+        let source = Project(name: "Demo", path: URL(fileURLWithPath: "/Users/me/repo"))
+        let store = makeStore()
+        store.remember("main", for: source.id)
+
+        var draft = ProjectDuplicateDraft(
+            source: source,
+            baseBranchStore: store,
+            isGitRepo: true,
+            isGitInstalled: true
+        )
+        draft.pruneUnknownBaseBranch()
+        #expect(draft.baseBranch == "main")
+    }
+
     // MARK: - Branch picker filter
 
     @Test("the branch filter matches case-insensitive substrings")
@@ -382,10 +493,20 @@ struct ProjectDuplicateDraftTests {
         let source = Project(name: sourceName, path: URL(fileURLWithPath: sourcePath))
         return ProjectDuplicateDraft(
             source: source,
+            baseBranchStore: makeStore(),
             availableBranches: availableBranches,
             branchesInUse: branchesInUse,
             isGitRepo: isGitRepo,
             isGitInstalled: isGitInstalled
         )
+    }
+
+    /// A store on a throwaway suite, so a base branch remembered on this
+    /// machine can't leak into the drafts under test.
+    private func makeStore() -> WorktreeBaseBranchStore {
+        let name = "app.sandfestival.tests.duplicate-draft.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defaults.removePersistentDomain(forName: name)
+        return WorktreeBaseBranchStore(defaults: defaults)
     }
 }
