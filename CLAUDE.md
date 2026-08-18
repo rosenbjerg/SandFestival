@@ -82,6 +82,15 @@ PATH precedence in `Session.composeEnvironment(inherited:projectEnv:extra:)`: pr
 - Dock badge always mirrors `attentionSessions.count`. Dock bounce fires only on transitions *into* an attention state, only when SandFestival isn't frontmost, and only when system Focus is off (Focus is treated as off when `INFocusStatusCenter` authorization hasn't been granted — bouncing is the conservative default)
 - Notifications are opt-in (`AttentionPreferences`). One notification identifier **per project**, so a later transition updates the same banner instead of stacking; resolving the attention state withdraws it. Clicking a notification routes through `SessionManager.focus(projectID:)`
 
+## Worktree status
+
+- `WorktreeStatusStore` is the single cache of per-project git state. Only projects with `worktreeInfo != nil` are sampled — each sample is a subprocess, and nothing else renders one. It owns no timer, and coalesces: one sample per project in flight at a time
+- Sampling is driven by `SessionManager.sessionDidFinishWork`, which fires on every transition *out of* `.working` — that's when the tree just finished changing. It's a **separate slot** from `sessionStateObserver` (the attention pipeline's); don't merge them or make either one fan out
+- `ContentView` owns the only timer: a 30s backstop for the **selected** project, idle while the app is inactive, plus `refreshAll` on `didBecomeActive`. `refreshAll` is also what reaps entries for deleted projects — removals never reach the store directly
+- `GitWorktree.status` passes `--no-optional-locks`. Without it `git status` refreshes and rewrites `.git/index` on every poll, contending with the agent's own git commands inside that same worktree
+- `GitStatus.parse` is pure and takes porcelain **v2** — v1 has no `# branch.ab`, so ahead/behind wouldn't be available at all. Test the grammar without a repo, same split as `SessionStateMachine.next`
+- Sidebar worktree rows show the **live** branch from the sample, not `WorktreeInfo.branch` — that's a creation-time snapshot and goes stale the moment an agent switches branches. The git line replaces the path line, which for `.worktrees/<branch>` only restated the row's own name
+
 ## Terminal lifetime
 
 SwiftTerm is pinned to an **exact version** (`kind = exactVersion` in pbxproj), so "Update to Latest Package Versions" can't move it. Terminal behavior here leans on version-specific upstream internals — see the viewport-pinning note below — so bumps are deliberate: raise the version, then re-test scrolling and selection by hand.

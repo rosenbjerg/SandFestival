@@ -233,6 +233,21 @@ enum GitWorktree {
         return names
     }
 
+    /// Samples a working tree's git state.
+    ///
+    /// `--no-optional-locks` is load-bearing, not a nicety: a plain
+    /// `git status` refreshes and rewrites `.git/index`, and this runs on a
+    /// timer against directories a live agent is working in. The flag exists
+    /// for exactly this polling case.
+    nonisolated static func status(at path: URL) -> GitStatusResult {
+        guard let result = runGit(
+            ["--no-optional-locks", "status", "--porcelain=v2", "--branch"],
+            at: path
+        ), result.exitCode == 0
+        else { return .unavailable }
+        return .status(GitStatus.parse(porcelainV2: result.stdout))
+    }
+
     /// Idempotently ensures `.worktrees/` is listed in the source repo's
     /// `.gitignore`. Creates the file if missing, leaves it alone if a
     /// covering entry is already present, and is silent on I/O failure —

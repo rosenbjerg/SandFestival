@@ -4,6 +4,7 @@ import SwiftUI
 struct ContentView: View {
     @Bindable var manager: SessionManager
     @Bindable var claudeCodeAdapter: ClaudeCodeAdapter
+    let statusStore: WorktreeStatusStore
     @Binding var manualHookSheet: Bool
     @Binding var updateSheet: Bool
     @Binding var editorTarget: ProjectEditorTarget?
@@ -18,6 +19,7 @@ struct ContentView: View {
             NavigationSplitView {
                 SidebarView(
                     manager: manager,
+                    statusStore: statusStore,
                     editorTarget: $editorTarget,
                     duplicateTarget: $duplicateTarget,
                     removalTarget: $removalTarget
@@ -34,6 +36,23 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             manager.focusSelectedTerminal()
+            statusStore.refreshAll(projects: manager.projects)
+        }
+        // Backstop only. Sampling is normally driven by sessions finishing
+        // work; this covers a worktree changed from outside the app, and
+        // covers only what's on screen so the cost stays flat as projects
+        // accumulate. Idle in the background — an inactive app has no one
+        // reading the sidebar.
+        .task(id: manager.selectedProjectID) {
+            while !Task.isCancelled {
+                if let project = manager.projects.first(where: { $0.id == manager.selectedProjectID }) {
+                    statusStore.refresh(project: project)
+                }
+                try? await Task.sleep(for: .seconds(30))
+                while !Task.isCancelled, !NSApp.isActive {
+                    try? await Task.sleep(for: .seconds(30))
+                }
+            }
         }
         .onChange(of: manager.selectedProjectID) { _, _ in
             manager.focusSelectedTerminal()
@@ -157,6 +176,7 @@ struct ContentView: View {
     ContentView(
         manager: SessionManager(),
         claudeCodeAdapter: ClaudeCodeAdapter(),
+        statusStore: WorktreeStatusStore(),
         manualHookSheet: .constant(false),
         updateSheet: .constant(false),
         editorTarget: .constant(nil)

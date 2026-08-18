@@ -3,6 +3,7 @@ import SwiftUI
 
 struct SidebarView: View {
     @Bindable var manager: SessionManager
+    let statusStore: WorktreeStatusStore
     @Binding var editorTarget: ProjectEditorTarget?
     @Binding var duplicateTarget: Project?
     @Binding var removalTarget: Project?
@@ -176,11 +177,7 @@ struct SidebarView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(project.name)
                     .lineLimit(1)
-                Text(project.path.path)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.head)
+                secondaryLine(for: project)
                 if let title = session?.terminalTitle {
                     Text(title)
                         .font(.caption2)
@@ -198,6 +195,63 @@ struct SidebarView: View {
         }
         .padding(.leading, CGFloat(indent) * 14)
         .padding(.vertical, 2)
+    }
+
+    /// A worktree row spends its second line on git state instead of the
+    /// path: `<repo>/.worktrees/<branch>` is long, head-truncated, and mostly
+    /// restates the row's own name. Everything else — and a worktree whose
+    /// first sample hasn't landed — keeps the path.
+    @ViewBuilder
+    private func secondaryLine(for project: Project) -> some View {
+        if project.worktreeInfo != nil, let result = statusStore.result(for: project.id) {
+            gitLine(for: project, result: result)
+        } else {
+            Text(project.path.path)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.head)
+        }
+    }
+
+    @ViewBuilder
+    private func gitLine(for project: Project, result: GitStatusResult) -> some View {
+        switch result {
+        case .unavailable:
+            Text(String(localized: "sidebar.row.git.missing"))
+                .font(.caption)
+                .foregroundStyle(.orange)
+                .lineLimit(1)
+        case .status(let status):
+            HStack(spacing: 6) {
+                Text(branchLabel(for: status))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                if status.ahead > 0 {
+                    Text(String(format: String(localized: "sidebar.row.git.ahead"), status.ahead))
+                }
+                if status.behind > 0 {
+                    Text(String(format: String(localized: "sidebar.row.git.behind"), status.behind))
+                }
+                if status.changedFiles > 0 {
+                    Text(String(format: String(localized: "sidebar.row.git.changed"), status.changedFiles))
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .monospacedDigit()
+        }
+    }
+
+    /// The branch git reports right now, not the one `WorktreeInfo` recorded
+    /// at creation — a session that switched branches should show where it
+    /// actually is, and naming the recorded branch while detached would be a
+    /// lie rather than a fallback.
+    private func branchLabel(for status: GitStatus) -> String {
+        guard let branch = status.branch, !branch.isEmpty else {
+            return String(localized: "sidebar.row.git.detached")
+        }
+        return branch
     }
 
     /// Renders the chevron toggle for a parent row, or a same-width empty

@@ -7,6 +7,7 @@ struct SandFestivalApp: App {
     @State private var claudeCodeAdapter = ClaudeCodeAdapter()
     @State private var attentionPreferences = AttentionPreferences()
     @State private var attentionNotifier: AttentionNotifier?
+    @State private var statusStore = WorktreeStatusStore()
     @State private var manualHookSheet = false
     @State private var updateSheet = false
     @State private var editorTarget: ProjectEditorTarget?
@@ -16,6 +17,7 @@ struct SandFestivalApp: App {
             ContentView(
                 manager: manager,
                 claudeCodeAdapter: claudeCodeAdapter,
+                statusStore: statusStore,
                 manualHookSheet: $manualHookSheet,
                 updateSheet: $updateSheet,
                 editorTarget: $editorTarget
@@ -31,6 +33,10 @@ struct SandFestivalApp: App {
                     manager.shouldSurfaceOnActivity = { [attentionPreferences] in
                         attentionPreferences.autoSurfaceActiveProject
                     }
+                    manager.sessionDidFinishWork = { [statusStore] project in
+                        statusStore.refresh(project: project)
+                    }
+                    statusStore.refreshAll(projects: manager.projects)
                     await attachAdapterIfNeeded()
                 }
         }

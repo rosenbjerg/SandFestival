@@ -628,6 +628,40 @@ struct GitWorktreeTests {
         #expect(upstream == "origin/feature/theirs")
     }
 
+    // MARK: - Status
+
+    @Test("status reports the branch, its divergence and dirty files")
+    func statusReportsDivergence() throws {
+        guard hasGit() else { return }
+        let workspace = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workspace) }
+        let repo = try makeRepoWithRemote(in: workspace)
+        try runGit(["commit", "--allow-empty", "-m", "local work"], at: repo, withIdentity: true)
+        try "scratch\n".write(
+            to: repo.appendingPathComponent("notes.txt"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        guard case .status(let status) = GitWorktree.status(at: repo) else {
+            Issue.record("status came back unavailable")
+            return
+        }
+        #expect(status.branch == "main")
+        #expect(status.hasUpstream)
+        #expect(status.ahead == 1)
+        #expect(status.behind == 0)
+        #expect(status.changedFiles == 1)
+    }
+
+    @Test("status is unavailable for a directory that isn't a working tree")
+    func statusUnavailableOutsideRepo() throws {
+        guard hasGit() else { return }
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        #expect(GitWorktree.status(at: dir) == .unavailable)
+    }
+
     // MARK: - Helpers
 
     /// A repo with a bare `origin` it has already pushed `main` to — the

@@ -44,6 +44,13 @@ final class SessionManager {
     /// and a one-to-one closure beats a publisher for this scope.
     @ObservationIgnored var sessionStateObserver: ((Session, SessionState, SessionState) -> Void)?
 
+    /// Fires when a session stops working, which is when the project's files
+    /// have just finished changing — the moment a git sample is worth taking.
+    /// Deliberately its own slot rather than a second `sessionStateObserver`:
+    /// that one belongs to the attention pipeline, and the two have nothing
+    /// to say to each other.
+    @ObservationIgnored var sessionDidFinishWork: ((Project) -> Void)?
+
     /// Gates the "auto-surface to row 0 on Claude-driven activity" behavior.
     /// App layer wires this to AttentionPreferences so Core stays free of the
     /// preference type. Defaults to off — bare `SessionManager()` (and tests)
@@ -323,6 +330,7 @@ final class SessionManager {
             guard let self, let session else { return }
             self.surfaceIfActivityTrigger(projectID: session.id, to: new)
             self.sessionStateObserver?(session, old, new)
+            self.notifyIfWorkFinished(projectID: session.id, from: old, to: new)
             self.refocusIfStartTransition(projectID: session.id, from: old, to: new)
         }
         return session
@@ -340,6 +348,15 @@ final class SessionManager {
         guard projectID == selectedProjectID else { return }
         guard !old.isRunning, new.isRunning else { return }
         focusSelectedTerminal()
+    }
+
+    /// Every transition *out of* `.working` counts as work finishing —
+    /// pausing for a permission prompt leaves the tree just as changed as
+    /// going idle does, and both are worth resampling.
+    private func notifyIfWorkFinished(projectID: Project.ID, from old: SessionState, to new: SessionState) {
+        guard old == .working, new != .working else { return }
+        guard let project = projects.first(where: { $0.id == projectID }) else { return }
+        sessionDidFinishWork?(project)
     }
 
     /// Lifts `projectID` to row 0 when Claude reports activity worth surfacing,

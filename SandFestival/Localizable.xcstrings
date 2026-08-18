@@ -1716,6 +1716,61 @@
         }
       }
     },
+    "sidebar.row.git.ahead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "↑%d"
+          }
+        }
+      }
+    },
+    "sidebar.row.git.behind" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "↓%d"
+          }
+        }
+      }
+    },
+    "sidebar.row.git.changed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "●%d"
+          }
+        }
+      }
+    },
+    "sidebar.row.git.detached" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "detached"
+          }
+        }
+      }
+    },
+    "sidebar.row.git.missing" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "worktree missing"
+          }
+        }
+      }
+    },
     "sidebar.row.label.blocked" : {
       "extractionState" : "manual",
       "localizations" : {
