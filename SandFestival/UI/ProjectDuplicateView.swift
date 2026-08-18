@@ -582,12 +582,40 @@ struct ProjectDuplicateDraft {
         }
     }
 
+    /// Name to prefill the save panel's name field with. Derived from the
+    /// path the sheet currently targets, *not* from the branch: a branch
+    /// like `feat/foo` targets `.worktrees/feat/foo`, and a `/` handed to
+    /// the name field comes back as `feat:foo` — macOS forbids the
+    /// separator in a filename.
     var suggestedDirName: String {
-        let trimmed = branchName.trimmingCharacters(in: .whitespaces)
-        return trimmed.isEmpty ? sourceName : trimmed
+        let leaf = (resolvedPathString as NSString).lastPathComponent
+        return leaf.isEmpty ? sourceName : leaf
     }
 
+    /// Directory to open the save panel in: the deepest ancestor of the
+    /// targeted path that actually exists. `NSSavePanel` silently ignores a
+    /// `directoryURL` that isn't there — and the default target sits under
+    /// `.worktrees/`, which git only creates during `worktree add` — so
+    /// without the walk up the panel opens somewhere unrelated.
     var suggestedParentDir: String {
-        parentDir
+        let target = resolvedPathString
+        let start = target.isEmpty
+            ? parentDir
+            : (target as NSString).deletingLastPathComponent
+        return Self.deepestExistingDirectory(from: start)
+    }
+
+    private static func deepestExistingDirectory(from path: String) -> String {
+        let fileManager = FileManager.default
+        var candidate = (path as NSString).standardizingPath
+        while !candidate.isEmpty, candidate != "/" {
+            var isDirectory: ObjCBool = false
+            if fileManager.fileExists(atPath: candidate, isDirectory: &isDirectory),
+               isDirectory.boolValue {
+                return candidate
+            }
+            candidate = (candidate as NSString).deletingLastPathComponent
+        }
+        return "/"
     }
 }

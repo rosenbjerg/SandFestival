@@ -480,6 +480,50 @@ struct ProjectDuplicateDraftTests {
         #expect(BranchPickerField.matching(branches, filter: "ghost").isEmpty)
     }
 
+    // MARK: - Save panel suggestions
+
+    @Test("the save panel is named after the path leaf, not a slashed branch")
+    func suggestedDirNameUsesPathLeaf() {
+        var draft = makeDraft(sourcePath: "/Users/me/repo", sourceName: "Demo")
+        draft.branchName = "feat/foo"
+        draft.refreshDerivedFields()
+        #expect(draft.pathString == "/Users/me/repo/.worktrees/feat/foo")
+        #expect(draft.suggestedDirName == "foo")
+    }
+
+    @Test("the save panel follows a path the user typed rather than the branch")
+    func suggestedDirNameFollowsUserEditedPath() {
+        var draft = makeDraft(sourcePath: "/Users/me/repo", sourceName: "Demo")
+        draft.branchName = "feat-x"
+        draft.refreshDerivedFields()
+        draft.pathString = "/Users/me/elsewhere/custom-dir"
+        draft.pathUserEdited = true
+        #expect(draft.suggestedDirName == "custom-dir")
+    }
+
+    @Test("a blank path falls the save panel name back to the source name")
+    func suggestedDirNameFallsBackToSourceName() {
+        var draft = makeDraft(sourcePath: "/Users/me/repo", sourceName: "Demo")
+        draft.pathString = "   "
+        draft.pathUserEdited = true
+        #expect(draft.suggestedDirName == "Demo")
+    }
+
+    @Test("the save panel opens at the deepest ancestor that exists")
+    func suggestedParentDirWalksUpToExistingAncestor() throws {
+        let base = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("sandfestival-duplicate-draft-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: base) }
+
+        var draft = makeDraft(sourcePath: base.path, sourceName: "Demo")
+        draft.branchName = "feat/foo"
+        draft.refreshDerivedFields()
+        // Targets <base>/.worktrees/feat/foo, and git hasn't created either
+        // intermediate yet — so the panel has to fall back to <base>.
+        #expect(draft.suggestedParentDir == (base.path as NSString).standardizingPath)
+    }
+
     // MARK: - Helpers
 
     private func makeDraft(
