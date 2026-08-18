@@ -214,6 +214,10 @@ final class Session: Identifiable {
     /// `childMonitor` → `handleProcessTerminated` path runs normally; we don't
     /// have to yank the PTY ourselves. Cancels any queued restart so "Force
     /// Stop" really means stop, not restart.
+    ///
+    /// Deliberately does *not* snapshot descendants the way `forceStopAndWait`
+    /// does. Nothing here is gated on the kill having landed, so paying for a
+    /// process-table scan on a synchronous UI action would buy nothing.
     func forceStop() {
         guard state.isRunning else { return }
         let pid = terminalView.process.shellPid
@@ -223,9 +227,10 @@ final class Session: Identifiable {
         ProcessGroupTerminator.signalGroup(leader: pid, signal: SIGKILL)
     }
 
-    /// Hard stop that **confirms** the kill: SIGKILLs the process group, then
-    /// polls until no group member can still run code. Returns true once the
-    /// group is clear, false if something outlived `timeout`.
+    /// Hard stop that **confirms** the kill: SIGKILLs the process group and
+    /// every descendant captured beforehand, then polls until none of them can
+    /// still run code. Returns true once they're all gone, false if something
+    /// outlived `timeout`.
     ///
     /// Destructive callers must use this rather than `forceStop()`. `kill`
     /// returning 0 only means the signal was queued; `git worktree remove`
@@ -245,9 +250,14 @@ final class Session: Identifiable {
         wantsStop = true
         wantsRestart = false
         softStopRequested = false
-        ProcessGroupTerminator.signalGroup(leader: pid, signal: SIGKILL)
+        // Snapshot before signalling. A descendant that called `setsid` is
+        // invisible to the group query, so the parent chain is the only thing
+        // still tying it to us — and that chain breaks the moment the parent
+        // dies and the orphan reparents to launchd.
+        let tracked = ProcessGroupTerminator.descendants(of: pid)
+        ProcessGroupTerminator.signalAll(leader: pid, tracked: tracked, signal: SIGKILL)
 
-        let clear = await waitForGroupToClear(leader: pid, timeout: timeout)
+        let clear = await waitForGroupToClear(leader: pid, tracked: tracked, timeout: timeout)
         // Give the exit monitor its turn on the main queue so `waitpid` runs
         // and the session lands in `.stopped` before the caller drops us.
         // Bounded separately and much tighter than the kill budget: the group
@@ -258,18 +268,24 @@ final class Session: Identifiable {
         return clear
     }
 
-    private func waitForGroupToClear(leader pid: pid_t, timeout: Duration) async -> Bool {
+    private func waitForGroupToClear(
+        leader pid: pid_t,
+        tracked: Set<ProcessGroupTerminator.TrackedProcess>,
+        timeout: Duration
+    ) async -> Bool {
+        var tracked = tracked
         let deadline = ContinuousClock.now.advanced(by: timeout)
         while true {
-            let survivors = ProcessGroupTerminator.liveMembers(leader: pid)
+            let survivors = ProcessGroupTerminator.liveMembers(leader: pid, tracked: tracked)
             if survivors.isEmpty { return true }
             guard ContinuousClock.now < deadline else { return false }
-            // Re-signal every sweep. A member forked between our `killpg` and
-            // this poll never saw the first signal, and SIGKILL is idempotent
-            // for everyone who did.
-            for survivor in survivors {
-                kill(survivor, SIGKILL)
-            }
+            // Widen from the survivors while their parent links still resolve:
+            // anything forked after the last snapshot is only reachable until
+            // its parent dies. Re-signal every sweep too — a process that
+            // forked past the first delivery never saw it, and SIGKILL is
+            // idempotent for everyone who did.
+            tracked.formUnion(ProcessGroupTerminator.descendants(ofAnyOf: Set(survivors)))
+            ProcessGroupTerminator.signalAll(leader: pid, tracked: tracked, signal: SIGKILL)
             try? await Task.sleep(for: Session.terminationPollInterval)
         }
     }

@@ -106,7 +106,176 @@ struct ProcessGroupTerminatorTests {
         #expect(cleared)
     }
 
+    // MARK: - Descendant tracking
+
+    @Test("The snapshot covers the whole descendant tree, stamped")
+    func descendantsIncludeGrandchild() async throws {
+        let leader = try spawnDetachedLeaderWithChild()
+        var captured: Set<ProcessGroupTerminator.TrackedProcess> = []
+        defer { cleanUp(leader: leader, tracked: captured) }
+
+        let tracked = try await pollUntil(timeout: .seconds(3)) {
+            let found = ProcessGroupTerminator.descendants(of: leader)
+            return found.count >= 2 ? found : nil
+        }
+        captured = tracked
+
+        #expect(tracked.contains { $0.pid == leader })
+        // An unstamped entry would defeat the recycled-pid guard entirely.
+        #expect(tracked.allSatisfy { $0.startSeconds > 0 })
+    }
+
+    @Test("A setsid escapee is invisible to the group query but caught by tracking")
+    func escapeeIsInvisibleToGroupQueryButTracked() async throws {
+        try requirePython3()
+        let leader = try spawnLeaderWithEscapee()
+        var captured: Set<ProcessGroupTerminator.TrackedProcess> = []
+        defer { cleanUp(leader: leader, tracked: captured) }
+
+        let (tracked, escapee) = try await escapeeOf(leader: leader)
+        captured = tracked
+
+        #expect(!ProcessGroupTerminator.liveMembers(leader: leader).contains(escapee))
+        #expect(ProcessGroupTerminator.liveMembers(leader: leader, tracked: tracked).contains(escapee))
+    }
+
+    @Test("A tracked escapee is killed and the sweep clears")
+    func escapeeIsKilledAndSweepClears() async throws {
+        try requirePython3()
+        let leader = try spawnLeaderWithEscapee()
+        var captured: Set<ProcessGroupTerminator.TrackedProcess> = []
+        defer { cleanUp(leader: leader, tracked: captured) }
+
+        let (tracked, escapee) = try await escapeeOf(leader: leader)
+        captured = tracked
+
+        ProcessGroupTerminator.signalAll(leader: leader, tracked: tracked, signal: SIGKILL)
+        var status: Int32 = 0
+        waitpid(leader, &status, WNOHANG)
+
+        // Probe the escapee with `kill(_, 0)` rather than asking `liveMembers`.
+        // The sweep is the thing under test, so it cannot also be the evidence:
+        // a sweep that ignores `tracked` reports "clear" the moment the group
+        // dies, and this test would pass while the escapee ran on.
+        let gone = try await pollUntil(timeout: .seconds(5)) {
+            kill(escapee, 0) == -1 && errno == ESRCH ? true : nil
+        }
+        #expect(gone)
+    }
+
+    @Test("A single-target kill takes verified descendants with it")
+    func singleTargetKillsVerifiedDescendants() async throws {
+        let child = try spawnChildWithGrandchildInOurGroup()
+        var captured: Set<ProcessGroupTerminator.TrackedProcess> = []
+        defer { cleanUp(leader: child, tracked: captured) }
+
+        try #require(getpgid(child) != child, "child must not be its own group leader")
+
+        let tracked = try await pollUntil(timeout: .seconds(3)) {
+            let found = ProcessGroupTerminator.descendants(of: child)
+            return found.count >= 2 ? found : nil
+        }
+        captured = tracked
+        let grandchild = try #require(tracked.map(\.pid).first { $0 != child })
+
+        // The `.single` query sees only the leader — the grandchild sits in the
+        // runner's group, which we deliberately refuse to sweep.
+        #expect(!ProcessGroupTerminator.liveMembers(leader: child).contains(grandchild))
+        #expect(ProcessGroupTerminator.liveMembers(leader: child, tracked: tracked).contains(grandchild))
+
+        ProcessGroupTerminator.signalAll(leader: child, tracked: tracked, signal: SIGKILL)
+        var status: Int32 = 0
+        waitpid(child, &status, WNOHANG)
+
+        let cleared = try await pollUntil(timeout: .seconds(3)) {
+            ProcessGroupTerminator.liveMembers(leader: child, tracked: tracked).isEmpty ? true : nil
+        }
+        #expect(cleared)
+    }
+
+    @Test("A tracked entry whose start time no longer matches is ignored")
+    func staleIdentityIsNeverSignalled() async throws {
+        let child = try spawnChildInOurGroup()
+        defer { reap(child) }
+
+        let real = try await pollUntil(timeout: .seconds(3)) {
+            ProcessGroupTerminator.descendants(of: child).first { $0.pid == child }
+        }
+        let stale = ProcessGroupTerminator.TrackedProcess(
+            pid: real.pid,
+            startSeconds: real.startSeconds - 1,
+            startMicroseconds: real.startMicroseconds
+        )
+
+        // Same live pid, different stamp: this is the recycled-pid case, and
+        // treating it as a survivor would aim a SIGKILL at a stranger.
+        let absent = try unusedPid()
+        #expect(ProcessGroupTerminator.liveMembers(leader: absent, tracked: [stale]).isEmpty)
+        #expect(ProcessGroupTerminator.liveMembers(leader: absent, tracked: [real]) == [child])
+    }
+
     // MARK: - Helpers
+
+    /// Finds a descendant of `leader` that has left its process group — the
+    /// escapee — returning the snapshot alongside it.
+    private func escapeeOf(
+        leader: pid_t
+    ) async throws -> (Set<ProcessGroupTerminator.TrackedProcess>, pid_t) {
+        try await pollUntil(timeout: .seconds(10)) {
+            let tracked = ProcessGroupTerminator.descendants(of: leader)
+            let inGroup = Set(ProcessGroupTerminator.liveMembers(leader: leader))
+            guard let escapee = tracked.map(\.pid).first(where: { !inGroup.contains($0) }) else { return nil }
+            return (tracked, escapee)
+        }
+    }
+
+    /// `posix_spawn`s a `POSIX_SPAWN_SETSID` leader that forks a child which
+    /// calls `setsid` for itself, so it leaves the leader's group while staying
+    /// its descendant by parent link. macOS ships no `setsid(1)`, hence python.
+    private func spawnLeaderWithEscapee() throws -> pid_t {
+        var attr: posix_spawnattr_t?
+        posix_spawnattr_init(&attr)
+        defer { posix_spawnattr_destroy(&attr) }
+        posix_spawnattr_setflags(&attr, Int16(POSIX_SPAWN_SETSID))
+
+        let escapee = "/usr/bin/python3 -c 'import os, time; os.setsid(); time.sleep(30)'"
+        let args = ["/bin/sh", "-c", "\(escapee) & wait"]
+        var pid: pid_t = 0
+        let spawned = args.withCStringArray { argv in
+            posix_spawn(&pid, "/bin/sh", nil, &attr, argv, nil)
+        }
+        try #require(spawned == 0, "posix_spawn failed with \(spawned)")
+        try #require(pid > 0)
+        return pid
+    }
+
+    /// A child in the runner's group that forks a grandchild — the `.single`
+    /// shape where the descendant is invisible to the target query.
+    private func spawnChildWithGrandchildInOurGroup() throws -> pid_t {
+        let args = ["/bin/sh", "-c", "sleep 30 & wait"]
+        var pid: pid_t = 0
+        let spawned = args.withCStringArray { argv in
+            posix_spawn(&pid, "/bin/sh", nil, nil, argv, nil)
+        }
+        try #require(spawned == 0, "posix_spawn failed with \(spawned)")
+        try #require(pid > 0)
+        return pid
+    }
+
+    private func requirePython3() throws {
+        try #require(
+            FileManager.default.isExecutableFile(atPath: "/usr/bin/python3"),
+            "/usr/bin/python3 is required to produce a setsid escapee"
+        )
+    }
+
+    /// Kills the group *and* anything tracked, so an escapee can't outlive the
+    /// test as a 30-second stray.
+    private func cleanUp(leader: pid_t, tracked: Set<ProcessGroupTerminator.TrackedProcess>) {
+        ProcessGroupTerminator.signalAll(leader: leader, tracked: tracked, signal: SIGKILL)
+        var status: Int32 = 0
+        waitpid(leader, &status, WNOHANG)
+    }
 
     /// `posix_spawn`s `sh -c 'sleep 30 & wait'` with `POSIX_SPAWN_SETSID` so the
     /// child becomes its own session and group leader, exactly like a forkpty
