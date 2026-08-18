@@ -261,7 +261,7 @@ final class Session: Identifiable {
     private func waitForGroupToClear(leader pid: pid_t, timeout: Duration) async -> Bool {
         let deadline = ContinuousClock.now.advanced(by: timeout)
         while true {
-            let survivors = ProcessGroupTerminator.liveGroupMembers(leader: pid)
+            let survivors = ProcessGroupTerminator.liveMembers(leader: pid)
             if survivors.isEmpty { return true }
             guard ContinuousClock.now < deadline else { return false }
             // Re-signal every sweep. A member forked between our `killpg` and

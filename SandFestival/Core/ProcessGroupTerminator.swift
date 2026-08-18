@@ -49,8 +49,7 @@ enum ProcessGroupTerminator {
     /// `pid` alone. Returns false when there was nothing to signal.
     @discardableResult
     nonisolated static func signalGroup(leader pid: pid_t, signal: Int32) -> Bool {
-        let pgid = getpgid(pid)
-        switch target(leader: pid, processGroup: pgid == -1 ? nil : pgid) {
+        switch resolvedTarget(leader: pid) {
         case .group(let group):
             killpg(group, signal)
             return true
@@ -62,7 +61,20 @@ enum ProcessGroupTerminator {
         }
     }
 
-    /// Pids in `pid`'s process group that can still execute code.
+    nonisolated private static func resolvedTarget(leader pid: pid_t) -> SignalTarget? {
+        let pgid = getpgid(pid)
+        return target(leader: pid, processGroup: pgid == -1 ? nil : pgid)
+    }
+
+    /// Pids still able to execute code after `signalGroup` pointed a signal at
+    /// `pid` — the sweep that turns "the signal was queued" into "it landed".
+    ///
+    /// **This must resolve the same target `signalGroup` does.** Querying the
+    /// group unconditionally looks equivalent and isn't: `KERN_PROC_PGRP`
+    /// filters by pgid, so for a pid that *isn't* its own group leader — the
+    /// `.single` case — nothing matches and the sweep reports an empty group
+    /// while the process is alive and unkilled. Callers read empty as
+    /// "confirmed gone" and go on to delete the worktree underneath it.
     ///
     /// Zombies are excluded deliberately: an exited-but-unreaped process holds
     /// no file descriptors and no cwd, so it can't keep a worktree busy or
@@ -76,30 +88,50 @@ enum ProcessGroupTerminator {
     /// those would mean walking every process on the machine by parent pid, and
     /// that chain breaks the instant the parent dies (orphans reparent to
     /// launchd). Neither nono nor the agent does this today.
-    nonisolated static func liveGroupMembers(leader pid: pid_t) -> [pid_t] {
-        guard pid > 0 else { return [] }
-        return groupProcesses(pgid: pid)
+    nonisolated static func liveMembers(leader pid: pid_t) -> [pid_t] {
+        let processes: [kinfo_proc]?
+        switch resolvedTarget(leader: pid) {
+        case .group(let group): processes = fetchProcesses(selector: KERN_PROC_PGRP, value: group)
+        case .single(let single): processes = fetchProcesses(selector: KERN_PROC_PID, value: single)
+        case nil: return []
+        }
+        // A lookup we couldn't complete is reported as "still alive", not as an
+        // empty group: the caller's failure mode for a false empty is deleting
+        // a worktree out from under a live agent, and for a false survivor it's
+        // a refused removal the user can retry.
+        guard let processes else { return [pid] }
+        return processes
             .filter { $0.kp_proc.p_stat != SZOMB }
             .map(\.kp_proc.p_pid)
     }
 
-    /// `sysctl(KERN_PROC_PGRP)` — the whole group in one call, no `ps` fork
+    /// `sysctl(KERN_PROC_*)` — the matching processes in one call, no `ps` fork
     /// and no walking every process on the machine looking for parents.
-    nonisolated private static func groupProcesses(pgid: pid_t) -> [kinfo_proc] {
-        var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PGRP, pgid]
-        var size = 0
-        guard sysctl(&mib, u_int(mib.count), nil, &size, nil, 0) == 0, size > 0 else { return [] }
+    /// Returns nil when the lookup itself failed, which is distinct from a
+    /// successful lookup that found nothing.
+    nonisolated private static func fetchProcesses(selector: Int32, value: pid_t) -> [kinfo_proc]? {
+        var mib: [Int32] = [CTL_KERN, KERN_PROC, selector, value]
         let stride = MemoryLayout<kinfo_proc>.stride
-        // Size the buffer generously: the group can grow between the sizing
-        // call and the fetch, and a short buffer makes the second sysctl fail
-        // with ENOMEM (which we'd read as "group is empty" — the dangerous
-        // direction to be wrong in).
-        var buffer = [kinfo_proc](repeating: kinfo_proc(), count: size / stride + 8)
-        var actual = buffer.count * stride
-        let result = buffer.withUnsafeMutableBytes { raw in
-            sysctl(&mib, u_int(mib.count), raw.baseAddress, &actual, nil, 0)
+        for _ in 0..<sysctlAttempts {
+            var size = 0
+            guard sysctl(&mib, u_int(mib.count), nil, &size, nil, 0) == 0 else {
+                return errno == ESRCH ? [] : nil
+            }
+            guard size > 0 else { return [] }
+            // Size the buffer generously: the set can grow between the sizing
+            // call and the fetch, and a short buffer makes the second sysctl
+            // fail with ENOMEM. Retry rather than trust the slack.
+            var buffer = [kinfo_proc](repeating: kinfo_proc(), count: size / stride + sysctlSlack)
+            var actual = buffer.count * stride
+            let result = buffer.withUnsafeMutableBytes { raw in
+                sysctl(&mib, u_int(mib.count), raw.baseAddress, &actual, nil, 0)
+            }
+            if result == 0 { return Array(buffer.prefix(actual / stride)) }
+            guard errno == ENOMEM else { return errno == ESRCH ? [] : nil }
         }
-        guard result == 0 else { return [] }
-        return Array(buffer.prefix(actual / stride))
+        return nil
     }
+
+    nonisolated private static let sysctlAttempts = 3
+    nonisolated private static let sysctlSlack = 8
 }
