@@ -18,10 +18,15 @@ final class WorktreeStatusStore {
     private(set) var results: [Project.ID: GitStatusResult] = [:]
 
     /// Runs off the main actor, so it must not capture anything isolated.
-    @ObservationIgnored private let probe: @Sendable (URL) -> GitStatusResult
+    /// Takes the worktree's recorded base branch alongside its path.
+    @ObservationIgnored private let probe: @Sendable (URL, String?) -> GitStatusResult
     @ObservationIgnored private var inFlight: [Project.ID: Task<Void, Never>] = [:]
 
-    init(probe: @escaping @Sendable (URL) -> GitStatusResult = { GitWorktree.status(at: $0) }) {
+    init(
+        probe: @escaping @Sendable (URL, String?) -> GitStatusResult = {
+            GitWorktree.status(at: $0, base: $1)
+        }
+    ) {
         self.probe = probe
     }
 
@@ -44,9 +49,10 @@ final class WorktreeStatusStore {
         guard inFlight[project.id] == nil else { return nil }
         let id = project.id
         let path = project.path
+        let base = project.worktreeInfo?.baseBranch
         let probe = probe
         let task = Task { [weak self] in
-            let result = await Task.detached(priority: .utility) { probe(path) }.value
+            let result = await Task.detached(priority: .utility) { probe(path, base) }.value
             guard let self else { return }
             // `forget` drops the in-flight entry, so a project removed while
             // its sample was running doesn't get resurrected here.

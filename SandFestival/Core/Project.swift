@@ -57,6 +57,14 @@ struct WorktreeInfo: Codable, Hashable {
     /// so we can show it in the removal confirmation, not for any control
     /// flow — git itself tracks the actual branch state.
     var branch: String
+    /// The branch this worktree was forked from, when one was chosen. The
+    /// sidebar measures ahead/behind against it: a branch created with `-b`
+    /// has no upstream, so without a recorded base there'd be nothing to
+    /// compare it to and the numbers would always read zero — which is the
+    /// common case, not an edge one. `nil` for worktrees checked out from an
+    /// existing branch (their `--track` upstream serves instead) and for
+    /// worktrees recorded before this field existed.
+    var baseBranch: String? = nil
 }
 
 // MARK: - Defaults

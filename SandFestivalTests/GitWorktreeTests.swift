@@ -648,10 +648,72 @@ struct GitWorktreeTests {
             return
         }
         #expect(status.branch == "main")
-        #expect(status.hasUpstream)
+        #expect(status.comparisonRef == "origin/main")
         #expect(status.ahead == 1)
         #expect(status.behind == 0)
         #expect(status.changedFiles == 1)
+    }
+
+    @Test("a base branch gives divergence numbers where an upstream would give none")
+    func statusComparesAgainstRecordedBase() throws {
+        guard hasGit() else { return }
+        let workspace = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workspace) }
+        let sourceRepo = workspace.appendingPathComponent("source", isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceRepo, withIntermediateDirectories: true)
+        try runGit(["init", "-b", "main"], at: sourceRepo)
+        try runGit(["commit", "--allow-empty", "-m", "initial"], at: sourceRepo, withIdentity: true)
+
+        let worktreePath = workspace.appendingPathComponent("twin", isDirectory: true)
+        let added = GitWorktree.addWorktree(
+            newBranch: "feature/twin",
+            newPath: worktreePath,
+            base: "main",
+            sourceRepoPath: sourceRepo
+        )
+        guard case .success = added else {
+            Issue.record("addWorktree failed: \(added)")
+            return
+        }
+        try runGit(["commit", "--allow-empty", "-m", "work"], at: worktreePath, withIdentity: true)
+        try runGit(["commit", "--allow-empty", "-m", "more work"], at: worktreePath, withIdentity: true)
+        // Move the base on too, so behind is genuinely exercised.
+        try runGit(["commit", "--allow-empty", "-m", "meanwhile"], at: sourceRepo, withIdentity: true)
+
+        // A `-b` branch has no upstream, so without a base there's nothing
+        // to compare and both counts stay zero.
+        guard case .status(let bare) = GitWorktree.status(at: worktreePath) else {
+            Issue.record("status came back unavailable")
+            return
+        }
+        #expect(bare.comparisonRef == nil)
+        #expect(bare.ahead == 0)
+        #expect(bare.behind == 0)
+
+        guard case .status(let based) = GitWorktree.status(at: worktreePath, base: "main") else {
+            Issue.record("status came back unavailable")
+            return
+        }
+        #expect(based.comparisonRef == "main")
+        #expect(based.ahead == 2)
+        #expect(based.behind == 1)
+    }
+
+    @Test("a base branch that no longer exists falls back instead of erroring")
+    func statusFallsBackWhenBaseIsGone() throws {
+        guard hasGit() else { return }
+        let workspace = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workspace) }
+        let repo = try makeRepoWithRemote(in: workspace)
+        try runGit(["commit", "--allow-empty", "-m", "local work"], at: repo, withIdentity: true)
+
+        guard case .status(let status) = GitWorktree.status(at: repo, base: "deleted-base") else {
+            Issue.record("status came back unavailable")
+            return
+        }
+        // Falls back to what porcelain reported against the upstream.
+        #expect(status.comparisonRef == "origin/main")
+        #expect(status.ahead == 1)
     }
 
     @Test("status is unavailable for a directory that isn't a working tree")

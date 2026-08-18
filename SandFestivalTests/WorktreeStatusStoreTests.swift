@@ -77,6 +77,19 @@ struct WorktreeStatusStoreTests {
         #expect(store.result(for: removed.id) == nil)
     }
 
+    @Test("the worktree's recorded base branch reaches the probe")
+    func forwardsRecordedBaseBranch() async {
+        let probe = ProbeSpy(result: .status(GitStatus(branch: "feat")))
+        let store = WorktreeStatusStore(probe: probe.callable)
+        let based = makeWorktreeProject(name: "Based", baseBranch: "main")
+        let unbased = makeWorktreeProject(name: "Unbased")
+
+        await store.refresh(project: based)?.value
+        await store.refresh(project: unbased)?.value
+
+        #expect(probe.recordedBases == ["main", nil])
+    }
+
     @Test("forgetting a project discards a sample already in flight")
     func forgetDropsInFlightResult() async {
         let probe = ProbeSpy(result: .status(GitStatus(branch: "feat")))
@@ -92,13 +105,17 @@ struct WorktreeStatusStoreTests {
 
     // MARK: - Helpers
 
-    private func makeWorktreeProject(name: String = "Worktree") -> Project {
+    private func makeWorktreeProject(
+        name: String = "Worktree",
+        baseBranch: String? = nil
+    ) -> Project {
         Project(
             name: name,
             path: URL(fileURLWithPath: "/Users/me/repo/.worktrees/feat"),
             worktreeInfo: WorktreeInfo(
                 sourceRepoPath: URL(fileURLWithPath: "/Users/me/repo"),
-                branch: "feat"
+                branch: "feat",
+                baseBranch: baseBranch
             )
         )
     }
@@ -120,10 +137,21 @@ struct WorktreeStatusStoreTests {
             return calls
         }
 
-        var callable: @Sendable (URL) -> GitStatusResult {
-            { [self] _ in
+        var recordedBases: [String?] {
+            lock.lock()
+            defer { lock.unlock() }
+            return bases
+        }
+
+        /// Records the base each call was given, so the test can assert
+        /// the worktree's recorded fork point actually reaches git.
+        private(set) var bases: [String?] = []
+
+        var callable: @Sendable (URL, String?) -> GitStatusResult {
+            { [self] _, base in
                 lock.lock()
                 calls += 1
+                bases.append(base)
                 lock.unlock()
                 return result
             }

@@ -351,6 +351,10 @@ struct ProjectDuplicateView: View {
         let shouldUpdateGitignore = newPath.path.hasPrefix(worktreesDir)
 
         let mode = snapshot.worktreeMode
+        // Only new-branch mode actually uses a base. The field can still hold
+        // a remembered value in existing-branch mode, where recording it
+        // would claim a fork point the worktree was never created from.
+        let recordedBase = mode == .newBranch ? base.flatMap { $0.isEmpty ? nil : $0 } : nil
 
         Task {
             let result = await Task.detached {
@@ -415,7 +419,8 @@ struct ProjectDuplicateView: View {
                         autoStart: snapshot.autoStart,
                         worktreeInfo: WorktreeInfo(
                             sourceRepoPath: sourceRepoPath,
-                            branch: localBranch
+                            branch: localBranch,
+                            baseBranch: recordedBase
                         ),
                         parentProjectID: snapshot.resolvedParentProjectID
                     )

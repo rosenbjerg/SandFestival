@@ -20,7 +20,7 @@ struct GitStatusTests {
         """
         let status = GitStatus.parse(porcelainV2: output)
         #expect(status.branch == "feature/login")
-        #expect(status.hasUpstream)
+        #expect(status.comparisonRef == "origin/feature/login")
         #expect(status.ahead == 2)
         #expect(status.behind == 3)
         // Ordinary, renamed, unmerged and untracked all count as changed.
@@ -36,7 +36,7 @@ struct GitStatusTests {
         """
         let status = GitStatus.parse(porcelainV2: output)
         #expect(status.branch == "feature/fresh")
-        #expect(status.hasUpstream == false)
+        #expect(status.comparisonRef == nil)
         #expect(status.ahead == 0)
         #expect(status.behind == 0)
     }
@@ -61,7 +61,7 @@ struct GitStatusTests {
         let status = GitStatus.parse(porcelainV2: output)
         #expect(status.changedFiles == 0)
         #expect(status.isClean)
-        #expect(status.hasUpstream)
+        #expect(status.comparisonRef == "origin/main")
     }
 
     @Test("header lines are never mistaken for changed entries")

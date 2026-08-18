@@ -89,6 +89,8 @@ PATH precedence in `Session.composeEnvironment(inherited:projectEnv:extra:)`: pr
 - `ContentView` owns the only timer: a 30s backstop for the **selected** project, idle while the app is inactive, plus `refreshAll` on `didBecomeActive`. `refreshAll` is also what reaps entries for deleted projects — removals never reach the store directly
 - `GitWorktree.status` passes `--no-optional-locks`. Without it `git status` refreshes and rewrites `.git/index` on every poll, contending with the agent's own git commands inside that same worktree
 - `GitStatus.parse` is pure and takes porcelain **v2** — v1 has no `# branch.ab`, so ahead/behind wouldn't be available at all. Test the grammar without a repo, same split as `SessionStateMachine.next`
+- Ahead/behind is measured against `WorktreeInfo.baseBranch` when the worktree recorded one, else the upstream; `GitStatus.comparisonRef` says which. A branch created with `-b` has **no upstream**, so without the recorded base the numbers would read zero in the most common case. A base that has since been deleted falls back to the upstream rather than erroring
+- Two different "base branch" memories, don't conflate them: `WorktreeInfo.baseBranch` is the fork point of *this* worktree (persisted per project, drives divergence), while `WorktreeBaseBranchStore` is only the duplicate sheet's remembered *default* per lineage. Existing-branch duplicates record `nil` — they were never forked from anything
 - Sidebar worktree rows show the **live** branch from the sample, not `WorktreeInfo.branch` — that's a creation-time snapshot and goes stale the moment an agent switches branches. The git line replaces the path line, which for `.worktrees/<branch>` only restated the row's own name
 
 ## Terminal lifetime

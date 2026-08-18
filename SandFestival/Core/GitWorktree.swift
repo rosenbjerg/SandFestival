@@ -239,13 +239,46 @@ enum GitWorktree {
     /// `git status` refreshes and rewrites `.git/index`, and this runs on a
     /// timer against directories a live agent is working in. The flag exists
     /// for exactly this polling case.
-    nonisolated static func status(at path: URL) -> GitStatusResult {
+    /// When `base` is given it wins over the upstream: a worktree branched
+    /// with `-b` has no upstream at all, so porcelain reports no divergence
+    /// and "2 commits ahead of `main`" is the only reading that means
+    /// anything. A base that has since been deleted falls back to the
+    /// upstream rather than erroring.
+    nonisolated static func status(at path: URL, base: String? = nil) -> GitStatusResult {
         guard let result = runGit(
             ["--no-optional-locks", "status", "--porcelain=v2", "--branch"],
             at: path
         ), result.exitCode == 0
         else { return .unavailable }
-        return .status(GitStatus.parse(porcelainV2: result.stdout))
+        var status = GitStatus.parse(porcelainV2: result.stdout)
+        if let base, !base.isEmpty, let divergence = divergence(from: base, at: path) {
+            status.ahead = divergence.ahead
+            status.behind = divergence.behind
+            status.comparisonRef = base
+        }
+        return .status(status)
+    }
+
+    /// Commits separating `base` from HEAD.
+    ///
+    /// `git rev-list --left-right --count <base>...HEAD` prints
+    /// "<left>\t<right>": left counts commits reachable from `base` but not
+    /// HEAD — which is how far *behind* HEAD is — and right the reverse.
+    /// Getting the two round the wrong way inverts the sidebar.
+    nonisolated static func divergence(
+        from base: String,
+        at path: URL
+    ) -> (ahead: Int, behind: Int)? {
+        guard let result = runGit(
+            ["rev-list", "--left-right", "--count", "\(base)...HEAD"],
+            at: path
+        ), result.exitCode == 0
+        else { return nil }
+        let fields = result.stdout.split(whereSeparator: { $0 == "\t" || $0 == " " || $0.isNewline })
+        guard fields.count >= 2, let behind = Int(fields[0]), let ahead = Int(fields[1]) else {
+            return nil
+        }
+        return (ahead: ahead, behind: behind)
     }
 
     /// Idempotently ensures `.worktrees/` is listed in the source repo's

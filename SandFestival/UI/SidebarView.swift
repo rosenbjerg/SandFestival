@@ -240,7 +240,20 @@ struct SidebarView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             .monospacedDigit()
+            .help(comparisonHelp(for: status))
         }
+    }
+
+    /// Spells out what the arrows count. Two bare numbers are only
+    /// interpretable if you already know which branch this one forked from.
+    private func comparisonHelp(for status: GitStatus) -> String {
+        guard let ref = status.comparisonRef else { return "" }
+        return String(
+            format: String(localized: "sidebar.row.git.comparison"),
+            status.ahead,
+            status.behind,
+            ref
+        )
     }
 
     /// The branch git reports right now, not the one `WorktreeInfo` recorded

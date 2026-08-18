@@ -1749,6 +1749,17 @@
         }
       }
     },
+    "sidebar.row.git.comparison" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$d ahead, %2$d behind %3$@"
+          }
+        }
+      }
+    },
     "sidebar.row.git.detached" : {
       "extractionState" : "manual",
       "localizations" : {

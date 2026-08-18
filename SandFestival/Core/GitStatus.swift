@@ -7,14 +7,17 @@ struct GitStatus: Equatable {
     /// was when the worktree was created — an agent that switched branches
     /// mid-session would otherwise go unnoticed.
     var branch: String?
-    /// Commits on HEAD that the upstream doesn't have, and vice versa. Both
-    /// stay 0 when there's no upstream to compare against.
+    /// Commits HEAD has that `comparisonRef` doesn't, and vice versa. Both
+    /// stay 0 when there's nothing to compare against.
     var ahead: Int = 0
     var behind: Int = 0
     /// Staged, unstaged, unmerged and untracked paths together — "how much
     /// uncommitted work is sitting here", not a breakdown.
     var changedFiles: Int = 0
-    var hasUpstream: Bool = false
+    /// What `ahead`/`behind` are measured against: the worktree's recorded
+    /// base branch when it has one, otherwise its upstream. `nil` means
+    /// neither exists and both counts are meaningless rather than zero.
+    var comparisonRef: String?
 
     var isClean: Bool { changedFiles == 0 }
 }
@@ -41,8 +44,8 @@ extension GitStatus {
                 // git spells a detached working tree `(detached)`, which is
                 // not a branch name anyone should see.
                 status.branch = value == "(detached)" ? nil : String(value)
-            } else if line.hasPrefix("# branch.upstream ") {
-                status.hasUpstream = true
+            } else if let value = line.dropPrefix("# branch.upstream ") {
+                status.comparisonRef = String(value)
             } else if let value = line.dropPrefix("# branch.ab ") {
                 for field in value.split(separator: " ") {
                     if field.hasPrefix("+") {

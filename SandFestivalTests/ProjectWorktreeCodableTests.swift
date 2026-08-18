@@ -51,6 +51,53 @@ struct ProjectWorktreeCodableTests {
         #expect(decoded[0].worktreeInfo?.sourceRepoPath.path == "/tmp/source")
     }
 
+    @Test("worktreeInfo recorded before baseBranch existed still decodes")
+    func worktreeInfoWithoutBaseBranchDecodes() throws {
+        // A projects.json written before the sidebar started measuring
+        // divergence: worktreeInfo is there, but has no baseBranch key.
+        let legacyJSON = """
+        [
+          {
+            "id": "22222222-2222-2222-2222-222222222222",
+            "name": "Twin",
+            "path": "file:///tmp/twin",
+            "agentID": "claude-code",
+            "command": "nono",
+            "args": ["run"],
+            "env": {},
+            "autoStart": false,
+            "worktreeInfo": {
+              "sourceRepoPath": "file:///tmp/source",
+              "branch": "new-feature"
+            }
+          }
+        ]
+        """.data(using: .utf8)!
+
+        let decoded = try JSONDecoder().decode([Project].self, from: legacyJSON)
+        #expect(decoded[0].worktreeInfo?.branch == "new-feature")
+        #expect(decoded[0].worktreeInfo?.baseBranch == nil)
+    }
+
+    @Test("a recorded base branch round-trips through JSON")
+    func baseBranchRoundTrips() throws {
+        let original = Project(
+            name: "Twin",
+            path: URL(fileURLWithPath: "/tmp/twin"),
+            worktreeInfo: WorktreeInfo(
+                sourceRepoPath: URL(fileURLWithPath: "/tmp/source"),
+                branch: "new-feature",
+                baseBranch: "main"
+            )
+        )
+
+        let encoded = try JSONEncoder().encode([original])
+        let decoded = try JSONDecoder().decode([Project].self, from: encoded)
+
+        #expect(decoded == [original])
+        #expect(decoded[0].worktreeInfo?.baseBranch == "main")
+    }
+
     @Test("a Project with parentProjectID round-trips through JSON")
     func parentProjectIDRoundTrips() throws {
         let parentID = UUID()
