@@ -597,6 +597,37 @@ struct GitWorktreeTests {
         #expect(snapshot.lastFetch == nil)
     }
 
+    @Test("checkoutRemoteWorktree creates a tracking branch, not a detached HEAD")
+    func checkoutRemoteWorktreeTracks() throws {
+        guard hasGit() else { return }
+        let workspace = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workspace) }
+        let repo = try makeRepoWithRemote(in: workspace)
+        // A branch that exists only on the remote — the teammate's-branch case.
+        try runGit(["branch", "feature/theirs"], at: repo)
+        try runGit(["push", "origin", "feature/theirs"], at: repo)
+        try runGit(["branch", "-D", "feature/theirs"], at: repo)
+        #expect(!GitWorktree.listLocalBranches(at: repo).contains("feature/theirs"))
+
+        let worktreePath = workspace.appendingPathComponent("theirs", isDirectory: true)
+        let result = GitWorktree.checkoutRemoteWorktree(
+            remoteRef: "origin/feature/theirs",
+            localBranch: "feature/theirs",
+            newPath: worktreePath,
+            sourceRepoPath: repo
+        )
+        guard case .success = result else {
+            Issue.record("checkoutRemoteWorktree failed: \(result)")
+            return
+        }
+        // A plain `worktree add <path> origin/…` would leave HEAD detached
+        // and set no upstream; both assertions fail in that world.
+        let head = try runGitCapturing(["rev-parse", "--abbrev-ref", "HEAD"], at: worktreePath)
+        #expect(head == "feature/theirs")
+        let upstream = try runGitCapturing(["rev-parse", "--abbrev-ref", "@{u}"], at: worktreePath)
+        #expect(upstream == "origin/feature/theirs")
+    }
+
     // MARK: - Helpers
 
     /// A repo with a bare `origin` it has already pushed `main` to — the
@@ -655,6 +686,24 @@ struct GitWorktreeTests {
             let message = String(data: data, encoding: .utf8) ?? ""
             throw GitCommandFailed(args: args, stderr: message)
         }
+    }
+
+    /// Runs git and hands back trimmed stdout. Separate from `runGit`, which
+    /// most callers use only to assert the command succeeded.
+    private func runGitCapturing(_ args: [String], at cwd: URL) throws -> String {
+        guard let git = CommandResolver.resolve("git") else { throw GitNotInstalled() }
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: git)
+        task.arguments = args
+        task.currentDirectoryURL = cwd
+        let stdout = Pipe()
+        task.standardOutput = stdout
+        task.standardError = Pipe()
+        try task.run()
+        let data = stdout.fileHandleForReading.readDataToEndOfFile()
+        task.waitUntilExit()
+        return (String(data: data, encoding: .utf8) ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private struct GitCommandFailed: Error, CustomStringConvertible {

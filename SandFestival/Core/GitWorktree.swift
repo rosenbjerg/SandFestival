@@ -195,6 +195,21 @@ enum GitWorktree {
         return runChecked(args, at: sourceRepoPath)
     }
 
+    /// `git worktree add --track -b <localBranch> <newPath> <remoteRef>` from
+    /// `sourceRepoPath`. A bare `git worktree add <path> origin/feat` checks
+    /// out a *detached HEAD* rather than a branch tracking the remote, which
+    /// is never what "continue work on this branch" is asking for — so
+    /// picking a remote ref has to create the local branch explicitly.
+    nonisolated static func checkoutRemoteWorktree(
+        remoteRef: String,
+        localBranch: String,
+        newPath: URL,
+        sourceRepoPath: URL
+    ) -> Result<Void, GitWorktreeError> {
+        let args = ["worktree", "add", "--track", "-b", localBranch, newPath.path, remoteRef]
+        return runChecked(args, at: sourceRepoPath)
+    }
+
     /// Branch short-names currently checked out in any worktree of this repo
     /// (including the primary working tree). `git worktree add` refuses a
     /// branch that's in use elsewhere, so the duplicate picker uses this to

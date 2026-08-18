@@ -536,6 +536,88 @@ struct ProjectDuplicateDraftTests {
         #expect(draft.baseBranch == nil)
     }
 
+    @Test("checkout refs drop remotes whose short name is already local")
+    func checkoutRefsDedupeAgainstLocals() {
+        var draft = makeDraft(
+            sourcePath: "/Users/me/repo",
+            sourceName: "Demo",
+            availableBranches: ["main", "feature-x"]
+        )
+        draft.remoteBranches = ["origin/main", "origin/feature-x", "origin/theirs"]
+        #expect(draft.checkoutRefs == [
+            GitRef(name: "main", kind: .local),
+            GitRef(name: "feature-x", kind: .local),
+            GitRef(name: "origin/theirs", kind: .remote),
+        ])
+    }
+
+    @Test("a remote pick resolves to the tracking branch it will create")
+    func remotePickResolvesToLocalBranch() {
+        var draft = makeDraft(
+            sourcePath: "/Users/me/repo",
+            sourceName: "Demo",
+            availableBranches: ["main"]
+        )
+        draft.remoteBranches = ["origin/feat/foo"]
+        draft.worktreeMode = .existingBranch
+        draft.branchName = "origin/feat/foo"
+        #expect(draft.isRemoteSelection)
+        #expect(draft.resolvedLocalBranch == "feat/foo")
+        // Name and path follow the local branch, not the remote ref — a
+        // worktree at `.worktrees/origin/feat/foo` would be nonsense.
+        draft.refreshDerivedFields()
+        #expect(draft.name == "Demo (feat/foo)")
+        #expect(draft.pathString == "/Users/me/repo/.worktrees/feat/foo")
+    }
+
+    @Test("a local pick is not mistaken for a remote one")
+    func localPickIsNotTreatedAsRemote() {
+        var draft = makeDraft(
+            sourcePath: "/Users/me/repo",
+            sourceName: "Demo",
+            availableBranches: ["main"]
+        )
+        draft.remoteBranches = ["origin/main"]
+        draft.worktreeMode = .existingBranch
+        draft.branchName = "main"
+        #expect(draft.isRemoteSelection == false)
+        #expect(draft.resolvedLocalBranch == "main")
+    }
+
+    @Test("new-branch mode never reads its typed name as a remote ref")
+    func newBranchModeIgnoresRemoteMembership() {
+        var draft = makeDraft(
+            sourcePath: "/Users/me/repo",
+            sourceName: "Demo",
+            availableBranches: ["main"]
+        )
+        draft.remoteBranches = ["origin/feat"]
+        // Contrived, but typing the ref verbatim in new-branch mode still
+        // has to mean "create a branch called that".
+        draft.branchName = "origin/feat"
+        #expect(draft.isRemoteSelection == false)
+        #expect(draft.resolvedLocalBranch == "origin/feat")
+    }
+
+    @Test("a remote pick validates unless its local name is taken")
+    func remotePickValidation() {
+        var draft = makeDraft(
+            sourcePath: "/Users/me/repo",
+            sourceName: "Demo",
+            availableBranches: ["main"]
+        )
+        draft.remoteBranches = ["origin/theirs"]
+        draft.worktreeMode = .existingBranch
+        draft.branchName = "origin/theirs"
+        draft.refreshDerivedFields()
+        #expect(draft.blockingIssue == nil)
+
+        // A local branch appearing under it — a list that went stale while
+        // the sheet was open — blocks the create rather than letting git fail.
+        draft.availableBranches = ["main", "theirs"]
+        #expect(draft.blockingIssue == .branchAlreadyExists(branch: "theirs"))
+    }
+
     // MARK: - Save panel suggestions
 
     @Test("the save panel is named after the path leaf, not a slashed branch")

@@ -57,7 +57,7 @@ struct ProjectDuplicateView: View {
                             } else {
                                 BranchPickerField(
                                     label: String(localized: "duplicate.field.existing_branch"),
-                                    refs: draft.availableBranches.map { GitRef(name: $0, kind: .local) },
+                                    refs: draft.checkoutRefs,
                                     inUse: draft.branchesInUse,
                                     empty: .placeholder(
                                         text: String(localized: "duplicate.field.existing_branch.placeholder"),
@@ -329,6 +329,11 @@ struct ProjectDuplicateView: View {
         }
 
         let trimmedBranch = snapshot.branchName.trimmingCharacters(in: .whitespaces)
+        // The branch the project ends up on: identical to `trimmedBranch`
+        // everywhere except a remote pick, where `origin/feat` becomes the
+        // tracking branch `feat`.
+        let localBranch = snapshot.resolvedLocalBranch
+        let isRemote = snapshot.isRemoteSelection
         let resolvedPath = snapshot.resolvedPathString
         let base = snapshot.baseBranch?.trimmingCharacters(in: .whitespaces)
 
@@ -356,6 +361,13 @@ struct ProjectDuplicateView: View {
                         newBranch: trimmedBranch,
                         newPath: newPath,
                         base: base,
+                        sourceRepoPath: sourceRepoPath
+                    )
+                case .existingBranch where isRemote:
+                    outcome = GitWorktree.checkoutRemoteWorktree(
+                        remoteRef: trimmedBranch,
+                        localBranch: localBranch,
+                        newPath: newPath,
                         sourceRepoPath: sourceRepoPath
                     )
                 case .existingBranch:
@@ -403,7 +415,7 @@ struct ProjectDuplicateView: View {
                         autoStart: snapshot.autoStart,
                         worktreeInfo: WorktreeInfo(
                             sourceRepoPath: sourceRepoPath,
-                            branch: trimmedBranch
+                            branch: localBranch
                         ),
                         parentProjectID: snapshot.resolvedParentProjectID
                     )
@@ -577,6 +589,36 @@ struct ProjectDuplicateDraft {
             + remoteBranches.map { GitRef(name: $0, kind: .remote) }
     }
 
+    /// Refs offerable in existing-branch mode. Here remotes *are* deduped
+    /// against locals: picking one creates a local tracking branch by the
+    /// remote's short name, which git refuses when that name is taken — and
+    /// the existing local branch is what the user wanted anyway.
+    var checkoutRefs: [GitRef] {
+        let locals = Set(availableBranches)
+        return availableBranches.map { GitRef(name: $0, kind: .local) }
+            + remoteBranches
+                .filter { !locals.contains(GitWorktree.localName(forRemoteRef: $0)) }
+                .map { GitRef(name: $0, kind: .remote) }
+    }
+
+    /// True when the branch field holds a remote-tracking ref. Recovered by
+    /// membership rather than stored, exactly like `branchesInUse`, so there's
+    /// no second copy of the picker's state to drift.
+    var isRemoteSelection: Bool {
+        guard worktreeMode == .existingBranch else { return false }
+        return remoteBranches.contains(branchName.trimmingCharacters(in: .whitespaces))
+    }
+
+    /// The local branch this duplicate will end up on. A remote pick creates
+    /// a tracking branch named after the remote's short name, so `origin/feat`
+    /// resolves to `feat` — which is what the project name, the worktree path
+    /// and `WorktreeInfo` all need to use.
+    var resolvedLocalBranch: String {
+        let trimmed = branchName.trimmingCharacters(in: .whitespaces)
+        guard isRemoteSelection else { return trimmed }
+        return GitWorktree.localName(forRemoteRef: trimmed)
+    }
+
     /// The first problem that blocks submission, or `nil` when the form is
     /// ready. Catches the doomed cases — invalid branch name, a branch that
     /// already exists, an occupied target path — that would otherwise only
@@ -599,10 +641,20 @@ struct ProjectDuplicateDraft {
                 return .branchAlreadyExists(branch: trimmedBranch)
             }
         case .existingBranch:
-            // The branch must be a real local branch and not already checked
-            // out elsewhere — otherwise `git worktree add` would just fail.
-            guard availableBranches.contains(trimmedBranch) else { return .branchNotLocal }
-            guard !branchesInUse.contains(trimmedBranch) else { return .branchInUse }
+            if remoteBranches.contains(trimmedBranch) {
+                // The picker hides remote refs whose short name is taken, but
+                // a list that went stale while the sheet was open could still
+                // offer one — and the tracking branch couldn't be created.
+                let local = GitWorktree.localName(forRemoteRef: trimmedBranch)
+                if availableBranches.contains(local) {
+                    return .branchAlreadyExists(branch: local)
+                }
+            } else {
+                // The branch must be a real local branch and not already
+                // checked out elsewhere — otherwise `git worktree add` fails.
+                guard availableBranches.contains(trimmedBranch) else { return .branchNotLocal }
+                guard !branchesInUse.contains(trimmedBranch) else { return .branchInUse }
+            }
         }
         if pathIsOccupied { return .pathOccupied }
         return nil
@@ -653,8 +705,7 @@ struct ProjectDuplicateDraft {
     /// off the branch is irrelevant — fall back to the source name / parent
     /// dir for the auto-derived fields.
     mutating func refreshDerivedFields() {
-        let trimmed = branchName.trimmingCharacters(in: .whitespaces)
-        let effectiveBranch = createWorktree ? trimmed : ""
+        let effectiveBranch = createWorktree ? resolvedLocalBranch : ""
         if !nameUserEdited {
             name = effectiveBranch.isEmpty ? sourceName : "\(sourceName) (\(effectiveBranch))"
         }
