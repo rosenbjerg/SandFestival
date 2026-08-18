@@ -34,6 +34,25 @@ fi
 
 echo "==> Releasing ${PROJECT} ${VERSION}"
 
+# Nothing here bumps MARKETING_VERSION — that's a separate step — so it's easy
+# to re-run against a version that already shipped. An existing tag means the
+# DMG for it is already published, and rebuilding produces a *different* file
+# with a different checksum. The caller would then repoint the Homebrew cask at
+# that checksum while the published asset keeps the old one, breaking installs.
+# Checked before the archive so this costs a second, not a full notarize cycle.
+if git -C "${ROOT}" rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
+  echo "error: tag v${VERSION} already exists — bump MARKETING_VERSION before releasing" >&2
+  exit 1
+fi
+# The tag may only exist on the remote if a release went out from elsewhere.
+# Unreachable origin is not itself an error: the local check above still stands
+# and the script has to work offline.
+if REMOTE_TAG=$(git -C "${ROOT}" ls-remote --tags origin "refs/tags/v${VERSION}" 2>/dev/null) \
+  && [[ -n "${REMOTE_TAG}" ]]; then
+  echo "error: tag v${VERSION} already exists on origin — bump MARKETING_VERSION before releasing" >&2
+  exit 1
+fi
+
 if [[ "${SKIP_NOTARIZE:-0}" != "1" ]]; then
   : "${NOTARY_KEY_ID:?NOTARY_KEY_ID is required (or set SKIP_NOTARIZE=1)}"
   : "${NOTARY_ISSUER_ID:?NOTARY_ISSUER_ID is required (or set SKIP_NOTARIZE=1)}"
