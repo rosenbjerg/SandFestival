@@ -27,7 +27,10 @@ struct BranchPickerField: View {
 
     /// The `LabeledContent` label for the field.
     let label: String
-    let branches: [String]
+    /// Local branches first, then remote-tracking ones. The two are rendered
+    /// as separate sections, but only once a remote is actually present —
+    /// a repo without one shouldn't grow a lone "Local" caption.
+    let refs: [GitRef]
     /// Branches checked out in another worktree, shown disabled. Empty for
     /// pickers where an in-use branch is still a valid choice (a base branch).
     var inUse: Set<String> = []
@@ -59,7 +62,7 @@ struct BranchPickerField: View {
             .buttonStyle(.bordered)
             // Nothing to pick until the async branch list lands — unless a
             // sentinel is present, which is always a valid choice on its own.
-            .disabled(branches.isEmpty && sentinelLabel == nil)
+            .disabled(refs.isEmpty && sentinelLabel == nil)
             .popover(isPresented: $isExpanded, arrowEdge: .bottom) {
                 popover
             }
@@ -86,12 +89,16 @@ struct BranchPickerField: View {
         case .sentinel(let label):
             return label
         case .placeholder(let text, let loading):
-            return branches.isEmpty ? loading : text
+            return refs.isEmpty ? loading : text
         }
     }
 
-    private var filtered: [String] {
-        Self.matching(branches, filter: filter)
+    private var filtered: [GitRef] {
+        Self.matching(refs, filter: filter)
+    }
+
+    private var showsSectionHeaders: Bool {
+        refs.contains { $0.kind == .remote }
     }
 
     @ViewBuilder
@@ -122,9 +129,14 @@ struct BranchPickerField: View {
                         if let sentinelLabel {
                             sentinelRow(sentinelLabel)
                         }
-                        ForEach(filtered, id: \.self) { branch in
-                            branchRow(branch)
-                        }
+                        section(
+                            String(localized: "duplicate.field.branch.section.local"),
+                            refs: filtered.filter { $0.kind == .local }
+                        )
+                        section(
+                            String(localized: "duplicate.field.branch.section.remote"),
+                            refs: filtered.filter { $0.kind == .remote }
+                        )
                     }
                     .padding(.vertical, 4)
                 }
@@ -144,6 +156,24 @@ struct BranchPickerField: View {
             row(label, isChecked: selection == nil)
         }
         .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func section(_ title: String, refs: [GitRef]) -> some View {
+        if !refs.isEmpty {
+            if showsSectionHeaders {
+                Text(title)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.top, 6)
+                    .padding(.bottom, 2)
+            }
+            ForEach(refs, id: \.name) { ref in
+                branchRow(ref.name)
+            }
+        }
     }
 
     @ViewBuilder
@@ -189,16 +219,16 @@ struct BranchPickerField: View {
     /// Enter in the search field commits the first selectable match — the
     /// fast path for "I know the branch, just let me type it".
     private func pickFirstMatch() {
-        guard let match = filtered.first(where: { !inUse.contains($0) }) else { return }
-        pick(match)
+        guard let match = filtered.first(where: { !inUse.contains($0.name) }) else { return }
+        pick(match.name)
     }
 
     /// Case-insensitive substring filter. Pure, so the filtering behavior is
     /// unit-testable without instantiating the view.
-    static func matching(_ branches: [String], filter: String) -> [String] {
+    static func matching(_ refs: [GitRef], filter: String) -> [GitRef] {
         let query = filter.trimmingCharacters(in: .whitespaces)
-        guard !query.isEmpty else { return branches }
-        return branches.filter { $0.range(of: query, options: .caseInsensitive) != nil }
+        guard !query.isEmpty else { return refs }
+        return refs.filter { $0.name.range(of: query, options: .caseInsensitive) != nil }
     }
 }
 
@@ -206,14 +236,16 @@ struct BranchPickerField: View {
     Form {
         BranchPickerField(
             label: "Branch",
-            branches: ["main", "develop", "feature/login", "feature/signup", "hotfix/crash"],
+            refs: ["main", "develop", "feature/login", "feature/signup", "hotfix/crash"]
+                .map { GitRef(name: $0, kind: .local) },
             inUse: ["main"],
             empty: .placeholder(text: "Select branch…", loading: "Loading branches…"),
             selection: .constant("feature/login")
         )
         BranchPickerField(
             label: "Base branch",
-            branches: ["main", "develop", "feature/login"],
+            refs: ["main", "develop"].map { GitRef(name: $0, kind: .local) }
+                + ["origin/main", "origin/develop"].map { GitRef(name: $0, kind: .remote) },
             empty: .sentinel(label: "Current HEAD"),
             selection: .constant(String?.none)
         )

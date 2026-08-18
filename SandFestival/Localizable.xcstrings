@@ -346,6 +346,28 @@
         }
       }
     },
+    "duplicate.field.branch.section.local" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local"
+          }
+        }
+      }
+    },
+    "duplicate.field.branch.section.remote" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remote"
+          }
+        }
+      }
+    },
     "duplicate.field.create_worktree" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -417,6 +439,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Search branches"
+          }
+        }
+      }
+    },
+    "duplicate.field.fetch" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fetch"
+          }
+        }
+      }
+    },
+    "duplicate.field.fetch.last" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last fetched %@"
+          }
+        }
+      }
+    },
+    "duplicate.field.fetch.never" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Never fetched"
           }
         }
       }
@@ -851,6 +906,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "git could not be found on PATH."
+          }
+        }
+      }
+    },
+    "git.error.timed_out" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "git timed out."
           }
         }
       }

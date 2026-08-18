@@ -86,14 +86,84 @@ enum GitWorktree {
             .filter { !$0.isEmpty }
     }
 
-    /// Async wrapper that runs the (subprocess-spawning) branch listing
-    /// off the main actor. SwiftUI view construction blocks on
-    /// `waitUntilExit()` otherwise, jamming the runloop while the system
-    /// is trying to present the sheet — same shape as the
+    /// Remote-tracking branch names (`origin/main`) in `git branch -r` order.
+    /// `origin/HEAD` is dropped: it's a symref onto the remote's default
+    /// branch, not something a user would pick by name.
+    nonisolated static func listRemoteBranches(at path: URL) -> [String] {
+        guard let result = runGit(["branch", "--remotes", "--format=%(refname:short)"], at: path),
+              result.exitCode == 0
+        else { return [] }
+        return result.stdout
+            .split(whereSeparator: \.isNewline)
+            .map { String($0).trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && !$0.hasSuffix("/HEAD") }
+    }
+
+    /// True when the repo has at least one remote configured. Tells "no
+    /// remotes at all" apart from "remotes we've never fetched" — both show
+    /// an empty remote branch list, and only the second is worth offering a
+    /// Fetch button for.
+    nonisolated static func hasRemotes(at path: URL) -> Bool {
+        guard let result = runGit(["remote"], at: path), result.exitCode == 0 else { return false }
+        return result.stdout.contains { !$0.isWhitespace }
+    }
+
+    /// The local branch name a remote-tracking ref maps onto — everything
+    /// after the remote name. `origin/feat/foo` → `feat/foo`.
+    static func localName(forRemoteRef ref: String) -> String {
+        guard let slash = ref.firstIndex(of: "/") else { return ref }
+        return String(ref[ref.index(after: slash)...])
+    }
+
+    /// When the repo last fetched, from `FETCH_HEAD`'s mtime, or `nil` if it
+    /// never has. Lets the duplicate sheet say how stale its remote branch
+    /// list is without paying for a network round trip.
+    nonisolated static func lastFetchDate(at path: URL) -> Date? {
+        guard let result = runGit(["rev-parse", "--git-path", "FETCH_HEAD"], at: path),
+              result.exitCode == 0
+        else { return nil }
+        let raw = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raw.isEmpty else { return nil }
+        let url = raw.hasPrefix("/")
+            ? URL(fileURLWithPath: raw)
+            : URL(fileURLWithPath: raw, relativeTo: path)
+        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+        return attributes?[.modificationDate] as? Date
+    }
+
+    /// `git fetch --prune`. The only call in this file that touches the
+    /// network, so the only one carrying a deadline — an unreachable host
+    /// would otherwise wedge the sheet's refresh indefinitely.
+    nonisolated static func fetch(
+        at path: URL,
+        timeout: TimeInterval = 20
+    ) -> Result<Void, GitWorktreeError> {
+        runChecked(["fetch", "--prune"], at: path, timeout: timeout)
+    }
+
+    /// Everything the duplicate sheet needs to know about a repo's branches.
+    struct BranchSnapshot: Equatable {
+        var local: [String] = []
+        var remote: [String] = []
+        var inUse: Set<String> = []
+        var hasRemotes: Bool = false
+        var lastFetch: Date?
+    }
+
+    /// Gathers the whole snapshot in one hop off the main actor. SwiftUI view
+    /// construction blocks on `waitUntilExit()` otherwise, jamming the runloop
+    /// while the system is trying to present the sheet — same shape as the
     /// `NonoProfileDiscovery.availableProfilesAsync` fix.
-    static func listLocalBranchesAsync(at path: URL) async -> [String] {
+    static func loadBranchSnapshot(at path: URL) async -> BranchSnapshot {
         await Task.detached(priority: .userInitiated) {
-            listLocalBranches(at: path)
+            let remotesConfigured = hasRemotes(at: path)
+            return BranchSnapshot(
+                local: listLocalBranches(at: path),
+                remote: remotesConfigured ? listRemoteBranches(at: path) : [],
+                inUse: listInUseBranches(at: path),
+                hasRemotes: remotesConfigured,
+                lastFetch: remotesConfigured ? lastFetchDate(at: path) : nil
+            )
         }.value
     }
 
@@ -146,13 +216,6 @@ enum GitWorktree {
             if !name.isEmpty { names.insert(name) }
         }
         return names
-    }
-
-    /// Async wrapper for `listInUseBranches`, mirroring `listLocalBranchesAsync`.
-    static func listInUseBranchesAsync(at sourceRepoPath: URL) async -> Set<String> {
-        await Task.detached(priority: .userInitiated) {
-            listInUseBranches(at: sourceRepoPath)
-        }.value
     }
 
     /// Idempotently ensures `.worktrees/` is listed in the source repo's
@@ -219,21 +282,33 @@ enum GitWorktree {
 
     nonisolated private static func runChecked(
         _ args: [String],
-        at cwd: URL
+        at cwd: URL,
+        timeout: TimeInterval? = nil
     ) -> Result<Void, GitWorktreeError> {
-        guard let result = runGit(args, at: cwd) else {
+        guard let result = runGit(args, at: cwd, timeout: timeout) else {
             return .failure(.gitNotFound)
         }
+        if result.timedOut { return .failure(.timedOut) }
         if result.exitCode == 0 { return .success(()) }
         return .failure(.commandFailed(exitCode: result.exitCode, stderr: result.stderr))
     }
 
-    nonisolated private static func runGit(_ args: [String], at cwd: URL) -> CommandResult? {
+    nonisolated private static func runGit(
+        _ args: [String],
+        at cwd: URL,
+        timeout: TimeInterval? = nil
+    ) -> CommandResult? {
         guard let git = CommandResolver.resolve("git") else { return nil }
         let task = Process()
         task.executableURL = URL(fileURLWithPath: git)
         task.arguments = args
         task.currentDirectoryURL = cwd
+        // No terminal is attached, so a credential or passphrase prompt would
+        // block until the deadline instead of failing fast. Fetch is the call
+        // that can provoke one.
+        var environment = ProcessInfo.processInfo.environment
+        environment["GIT_TERMINAL_PROMPT"] = "0"
+        task.environment = environment
         let stdout = Pipe()
         let stderr = Pipe()
         task.standardOutput = stdout
@@ -243,6 +318,15 @@ enum GitWorktree {
         } catch {
             return nil
         }
+        // Terminating the child is what unblocks the reads below — there's no
+        // way to interrupt `readDataToEndOfFile` directly.
+        let watchdog = TimeoutWatchdog()
+        if let timeout {
+            DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
+                guard watchdog.expire() else { return }
+                task.terminate()
+            }
+        }
         // Drain both pipes concurrently before waiting. If the child outgrows
         // the ~64 KB pipe buffer on either stream it blocks on write — and a
         // `waitUntilExit()` before reading would then deadlock against it.
@@ -250,10 +334,12 @@ enum GitWorktree {
         let outData = stdout.fileHandleForReading.readDataToEndOfFile()
         let errData = errDrain.wait()
         task.waitUntilExit()
+        _ = watchdog.finish()
         return CommandResult(
             exitCode: task.terminationStatus,
             stdout: String(data: outData, encoding: .utf8) ?? "",
-            stderr: String(data: errData, encoding: .utf8) ?? ""
+            stderr: String(data: errData, encoding: .utf8) ?? "",
+            timedOut: watchdog.didExpire
         )
     }
 
@@ -261,13 +347,40 @@ enum GitWorktree {
         let exitCode: Int32
         let stdout: String
         let stderr: String
+        var timedOut: Bool = false
+    }
+
+    /// Decides the race between the timeout firing and the process exiting on
+    /// its own. `DispatchWorkItem.cancel()` can't stop an item already running,
+    /// so without a claim the watchdog could signal a pid Foundation has
+    /// already reaped — and pids get recycled. Whoever takes the lock first
+    /// wins; the loser does nothing.
+    private nonisolated final class TimeoutWatchdog: @unchecked Sendable {
+        private let lock = NSLock()
+        private var settled = false
+        /// Only written by the winning claim, and only read once `finish()`
+        /// has returned — by which point no further writes are possible.
+        private(set) var didExpire = false
+
+        func expire() -> Bool { claim(expired: true) }
+
+        func finish() -> Bool { claim(expired: false) }
+
+        private func claim(expired: Bool) -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            if settled { return false }
+            settled = true
+            didExpire = expired
+            return true
+        }
     }
 
     /// Reads a pipe to EOF on a background queue so a sibling pipe can be
     /// drained concurrently on the calling thread — neither child stream can
     /// fill its buffer and wedge the process while the other is read. All
     /// access to `data` is confined to `queue`, so the `@unchecked` is sound.
-    private final class PipeDrain: @unchecked Sendable {
+    private nonisolated final class PipeDrain: @unchecked Sendable {
         private let handle: FileHandle
         private var data = Data()
         private let queue = DispatchQueue(label: "app.sandfestival.gitworktree.pipe-drain")
@@ -284,14 +397,30 @@ enum GitWorktree {
     }
 }
 
+/// A branch the duplicate sheet can offer, tagged with where it came from.
+/// `name` is what git is given verbatim, so a remote ref carries its remote
+/// prefix (`origin/main`).
+struct GitRef: Hashable {
+    enum Kind: Hashable {
+        case local
+        case remote
+    }
+
+    let name: String
+    let kind: Kind
+}
+
 enum GitWorktreeError: Error, LocalizedError, Equatable {
     case gitNotFound
+    case timedOut
     case commandFailed(exitCode: Int32, stderr: String)
 
     var errorDescription: String? {
         switch self {
         case .gitNotFound:
             return String(localized: "git.error.not_found")
+        case .timedOut:
+            return String(localized: "git.error.timed_out")
         case .commandFailed(let code, let stderr):
             let trimmed = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty {

@@ -469,15 +469,71 @@ struct ProjectDuplicateDraftTests {
 
     @Test("the branch filter matches case-insensitive substrings")
     func branchFilterMatching() {
-        let branches = ["main", "develop", "feature/Login", "feature/signup", "hotfix/crash"]
+        let refs = ["main", "develop", "feature/Login", "feature/signup", "hotfix/crash"]
+            .map { GitRef(name: $0, kind: .local) }
+        func names(_ matched: [GitRef]) -> [String] { matched.map(\.name) }
         // An empty or whitespace filter returns everything, order preserved.
-        #expect(BranchPickerField.matching(branches, filter: "") == branches)
-        #expect(BranchPickerField.matching(branches, filter: "   ") == branches)
+        #expect(BranchPickerField.matching(refs, filter: "") == refs)
+        #expect(BranchPickerField.matching(refs, filter: "   ") == refs)
         // Substring match, case-insensitive.
-        #expect(BranchPickerField.matching(branches, filter: "feature") == ["feature/Login", "feature/signup"])
-        #expect(BranchPickerField.matching(branches, filter: "LOGIN") == ["feature/Login"])
+        #expect(names(BranchPickerField.matching(refs, filter: "feature")) == ["feature/Login", "feature/signup"])
+        #expect(names(BranchPickerField.matching(refs, filter: "LOGIN")) == ["feature/Login"])
         // No match yields an empty list.
-        #expect(BranchPickerField.matching(branches, filter: "ghost").isEmpty)
+        #expect(BranchPickerField.matching(refs, filter: "ghost").isEmpty)
+    }
+
+    @Test("the filter spans both sections and keeps each ref's kind")
+    func branchFilterSpansRemotes() {
+        let refs = [GitRef(name: "main", kind: .local), GitRef(name: "origin/main", kind: .remote)]
+        let matched = BranchPickerField.matching(refs, filter: "main")
+        #expect(matched == refs)
+        #expect(BranchPickerField.matching(refs, filter: "origin") == [refs[1]])
+    }
+
+    // MARK: - Remote refs
+
+    @Test("base refs offer local and remote branches without deduping them")
+    func baseRefsKeepBothSides() {
+        var draft = makeDraft(
+            sourcePath: "/Users/me/repo",
+            sourceName: "Demo",
+            availableBranches: ["main", "feature-x"]
+        )
+        draft.remoteBranches = ["origin/main", "origin/release"]
+        // `main` and `origin/main` are different commits — branching off the
+        // remote one is the whole point when the local branch has gone stale.
+        #expect(draft.baseRefs == [
+            GitRef(name: "main", kind: .local),
+            GitRef(name: "feature-x", kind: .local),
+            GitRef(name: "origin/main", kind: .remote),
+            GitRef(name: "origin/release", kind: .remote),
+        ])
+    }
+
+    @Test("a remembered remote base survives the prune")
+    func pruneKeepsRemoteBase() {
+        var draft = makeDraft(
+            sourcePath: "/Users/me/repo",
+            sourceName: "Demo",
+            availableBranches: ["main"]
+        )
+        draft.remoteBranches = ["origin/main"]
+        draft.baseBranch = "origin/main"
+        draft.pruneUnknownBaseBranch()
+        #expect(draft.baseBranch == "origin/main")
+    }
+
+    @Test("a base branch missing from both lists is pruned")
+    func pruneDropsBaseMissingFromBothLists() {
+        var draft = makeDraft(
+            sourcePath: "/Users/me/repo",
+            sourceName: "Demo",
+            availableBranches: ["main"]
+        )
+        draft.remoteBranches = ["origin/main"]
+        draft.baseBranch = "origin/deleted"
+        draft.pruneUnknownBaseBranch()
+        #expect(draft.baseBranch == nil)
     }
 
     // MARK: - Save panel suggestions

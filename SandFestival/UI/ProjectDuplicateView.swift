@@ -14,6 +14,8 @@ struct ProjectDuplicateView: View {
     @State private var draft: ProjectDuplicateDraft
     @State private var isCreating = false
     @State private var errorMessage: String?
+    @State private var isFetching = false
+    @State private var fetchError: String?
 
     /// Seeds the base-branch field on open and is written back on a successful
     /// create, so the next duplicate in this lineage defaults to the same base.
@@ -55,7 +57,7 @@ struct ProjectDuplicateView: View {
                             } else {
                                 BranchPickerField(
                                     label: String(localized: "duplicate.field.existing_branch"),
-                                    branches: draft.availableBranches,
+                                    refs: draft.availableBranches.map { GitRef(name: $0, kind: .local) },
                                     inUse: draft.branchesInUse,
                                     empty: .placeholder(
                                         text: String(localized: "duplicate.field.existing_branch.placeholder"),
@@ -63,6 +65,9 @@ struct ProjectDuplicateView: View {
                                     ),
                                     selection: existingBranchBinding
                                 )
+                            }
+                            if draft.hasRemotes {
+                                fetchRow
                             }
                             HStack {
                                 TextField(String(localized: "duplicate.field.worktree_path"), text: pathBinding)
@@ -120,12 +125,7 @@ struct ProjectDuplicateView: View {
         .navigationTitle(String(localized: "duplicate.title"))
         .task {
             guard draft.isGitRepo, draft.isGitInstalled, draft.availableBranches.isEmpty else { return }
-            async let branches = GitWorktree.listLocalBranchesAsync(at: source.path)
-            async let inUse = GitWorktree.listInUseBranchesAsync(at: source.path)
-            let (resolvedBranches, resolvedInUse) = await (branches, inUse)
-            draft.availableBranches = resolvedBranches
-            draft.branchesInUse = resolvedInUse
-            draft.pruneUnknownBaseBranch()
+            apply(await GitWorktree.loadBranchSnapshot(at: source.path))
         }
     }
 
@@ -133,10 +133,71 @@ struct ProjectDuplicateView: View {
     private var basePicker: some View {
         BranchPickerField(
             label: String(localized: "duplicate.field.base_branch"),
-            branches: draft.availableBranches,
+            refs: draft.baseRefs,
             empty: .sentinel(label: String(localized: "duplicate.field.base_branch.current")),
             selection: $draft.baseBranch
         )
+    }
+
+    @ViewBuilder
+    private var fetchRow: some View {
+        HStack(spacing: 8) {
+            Button(String(localized: "duplicate.field.fetch"), action: fetch)
+                .disabled(isFetching)
+            if isFetching {
+                ProgressView().controlSize(.small)
+            }
+            if let fetchError {
+                Text(fetchError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .lineLimit(2)
+                    .textSelection(.enabled)
+            } else {
+                Text(lastFetchCaption)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+    }
+
+    private var lastFetchCaption: String {
+        guard let date = draft.lastFetch else {
+            return String(localized: "duplicate.field.fetch.never")
+        }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return String(
+            format: String(localized: "duplicate.field.fetch.last"),
+            formatter.localizedString(for: date, relativeTo: Date())
+        )
+    }
+
+    /// Refreshes the branch lists even when the fetch itself failed: a
+    /// multi-remote fetch can update some refs and still exit non-zero, and
+    /// the failure is reported alongside rather than instead of the result.
+    private func fetch() {
+        isFetching = true
+        fetchError = nil
+        let repoPath = source.path
+        Task {
+            let result = await Task.detached { GitWorktree.fetch(at: repoPath) }.value
+            apply(await GitWorktree.loadBranchSnapshot(at: repoPath))
+            isFetching = false
+            if case .failure(let error) = result {
+                fetchError = error.errorDescription
+            }
+        }
+    }
+
+    private func apply(_ snapshot: GitWorktree.BranchSnapshot) {
+        draft.availableBranches = snapshot.local
+        draft.remoteBranches = snapshot.remote
+        draft.branchesInUse = snapshot.inUse
+        draft.hasRemotes = snapshot.hasRemotes
+        draft.lastFetch = snapshot.lastFetch
+        draft.pruneUnknownBaseBranch()
     }
 
     // The name and path fields keep tracking the branch name until the user
@@ -433,10 +494,18 @@ struct ProjectDuplicateDraft {
     /// doesn't block on a `git branch` subprocess on the main thread — same
     /// pattern as `ProjectEditorView`'s `discoveredProfiles`.
     var availableBranches: [String]
+    /// Remote-tracking branches (`origin/main`), carrying their remote prefix.
+    var remoteBranches: [String]
     /// Branches currently checked out in another worktree (incl. the source's
     /// own HEAD). Shown disabled in the existing-branch picker because
     /// `git worktree add <path> <branch>` refuses them.
     var branchesInUse: Set<String>
+    /// Whether the repo has any remote configured at all. Gates the fetch
+    /// row: an empty `remoteBranches` means either "no remotes" or "never
+    /// fetched", and only the second is worth offering a Fetch button for.
+    var hasRemotes: Bool
+    /// Mtime of `FETCH_HEAD`, for captioning how stale `remoteBranches` is.
+    var lastFetch: Date?
     let isGitRepo: Bool
     /// Whether a `git` binary is on PATH. The Worktree section hides itself
     /// when this is false even if `isGitRepo` is true — there'd be no way
@@ -448,7 +517,9 @@ struct ProjectDuplicateDraft {
         source: Project,
         baseBranchStore: WorktreeBaseBranchStore? = nil,
         availableBranches: [String]? = nil,
+        remoteBranches: [String]? = nil,
         branchesInUse: Set<String>? = nil,
+        hasRemotes: Bool? = nil,
         isGitRepo: Bool? = nil,
         isGitInstalled: Bool? = nil
     ) {
@@ -472,7 +543,9 @@ struct ProjectDuplicateDraft {
         // Branches start empty; the view's `.task` swaps them in once the
         // off-main-thread subprocess returns.
         self.availableBranches = availableBranches ?? []
+        self.remoteBranches = remoteBranches ?? []
         self.branchesInUse = branchesInUse ?? []
+        self.hasRemotes = hasRemotes ?? false
         self.isGitRepo = resolvedIsGitRepo
         self.isGitInstalled = resolvedIsGitInstalled
         self.name = source.name
@@ -494,6 +567,15 @@ struct ProjectDuplicateDraft {
     }
 
     var isValid: Bool { blockingIssue == nil }
+
+    /// Refs offerable as the base for a new branch. Remotes are deliberately
+    /// *not* deduped against locals here: `main` and `origin/main` are
+    /// different commits, and reaching for the remote one is the whole point
+    /// when the local branch has fallen behind.
+    var baseRefs: [GitRef] {
+        availableBranches.map { GitRef(name: $0, kind: .local) }
+            + remoteBranches.map { GitRef(name: $0, kind: .remote) }
+    }
 
     /// The first problem that blocks submission, or `nil` when the form is
     /// ready. Catches the doomed cases — invalid branch name, a branch that
@@ -548,7 +630,7 @@ struct ProjectDuplicateDraft {
     /// arrived), which is not evidence the branch is gone.
     mutating func pruneUnknownBaseBranch() {
         guard !availableBranches.isEmpty, let base = baseBranch else { return }
-        guard !availableBranches.contains(base) else { return }
+        guard !availableBranches.contains(base), !remoteBranches.contains(base) else { return }
         baseBranch = nil
     }
 

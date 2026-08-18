@@ -502,7 +502,118 @@ struct GitWorktreeTests {
         }
     }
 
+    // MARK: - Remotes
+
+    @Test("localName strips the remote prefix from a tracking ref")
+    func localNameStripsRemotePrefix() {
+        #expect(GitWorktree.localName(forRemoteRef: "origin/main") == "main")
+        #expect(GitWorktree.localName(forRemoteRef: "origin/feat/foo") == "feat/foo")
+        #expect(GitWorktree.localName(forRemoteRef: "upstream/main") == "main")
+        // Nothing to strip — returned unchanged rather than emptied.
+        #expect(GitWorktree.localName(forRemoteRef: "main") == "main")
+    }
+
+    @Test("hasRemotes tells a remote-less repo from one that just hasn't fetched")
+    func hasRemotesDistinguishesUnfetched() throws {
+        guard hasGit() else { return }
+        let workspace = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workspace) }
+
+        let plain = workspace.appendingPathComponent("plain", isDirectory: true)
+        try FileManager.default.createDirectory(at: plain, withIntermediateDirectories: true)
+        try runGit(["init", "-b", "main"], at: plain)
+        #expect(GitWorktree.hasRemotes(at: plain) == false)
+
+        let repo = try makeRepoWithRemote(in: workspace)
+        #expect(GitWorktree.hasRemotes(at: repo))
+    }
+
+    @Test("listRemoteBranches reports tracking refs and drops origin/HEAD")
+    func listRemoteBranchesDropsSymref() throws {
+        guard hasGit() else { return }
+        let workspace = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workspace) }
+        let repo = try makeRepoWithRemote(in: workspace)
+        try runGit(["branch", "feature/remote-only"], at: repo)
+        try runGit(["push", "origin", "feature/remote-only"], at: repo)
+        // `set-head` materializes the symref a clone would have created; it's
+        // not a branch anyone would pick by name.
+        try runGit(["remote", "set-head", "origin", "main"], at: repo)
+
+        let remotes = GitWorktree.listRemoteBranches(at: repo)
+        #expect(remotes.contains("origin/main"))
+        #expect(remotes.contains("origin/feature/remote-only"))
+        #expect(!remotes.contains { $0.hasSuffix("/HEAD") })
+    }
+
+    @Test("fetch succeeds and stamps FETCH_HEAD")
+    func fetchStampsLastFetchDate() throws {
+        guard hasGit() else { return }
+        let workspace = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workspace) }
+        let repo = try makeRepoWithRemote(in: workspace)
+        // Only a fetch writes FETCH_HEAD — `push -u` doesn't.
+        #expect(GitWorktree.lastFetchDate(at: repo) == nil)
+
+        let result = GitWorktree.fetch(at: repo)
+        guard case .success = result else {
+            Issue.record("fetch failed: \(result)")
+            return
+        }
+        #expect(GitWorktree.lastFetchDate(at: repo) != nil)
+    }
+
+    @Test("the branch snapshot gathers every list in one pass")
+    func branchSnapshotAggregates() async throws {
+        guard hasGit() else { return }
+        let workspace = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workspace) }
+        let repo = try makeRepoWithRemote(in: workspace)
+        try runGit(["fetch", "origin"], at: repo)
+
+        let snapshot = await GitWorktree.loadBranchSnapshot(at: repo)
+        #expect(snapshot.local.contains("main"))
+        #expect(snapshot.remote.contains("origin/main"))
+        // `main` is the primary working tree's HEAD, so it's in use.
+        #expect(snapshot.inUse.contains("main"))
+        #expect(snapshot.hasRemotes)
+        #expect(snapshot.lastFetch != nil)
+    }
+
+    @Test("the snapshot skips remote work entirely for a repo with no remote")
+    func branchSnapshotSkipsRemoteWorkWithoutRemotes() async throws {
+        guard hasGit() else { return }
+        let workspace = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workspace) }
+        let repo = workspace.appendingPathComponent("plain", isDirectory: true)
+        try FileManager.default.createDirectory(at: repo, withIntermediateDirectories: true)
+        try runGit(["init", "-b", "main"], at: repo)
+        try runGit(["commit", "--allow-empty", "-m", "initial"], at: repo, withIdentity: true)
+
+        let snapshot = await GitWorktree.loadBranchSnapshot(at: repo)
+        #expect(snapshot.local == ["main"])
+        #expect(snapshot.remote.isEmpty)
+        #expect(snapshot.hasRemotes == false)
+        #expect(snapshot.lastFetch == nil)
+    }
+
     // MARK: - Helpers
+
+    /// A repo with a bare `origin` it has already pushed `main` to — the
+    /// shape the remote-facing calls need.
+    private func makeRepoWithRemote(in workspace: URL) throws -> URL {
+        let remote = workspace.appendingPathComponent("origin.git", isDirectory: true)
+        try FileManager.default.createDirectory(at: remote, withIntermediateDirectories: true)
+        try runGit(["init", "--bare", "-b", "main"], at: remote)
+
+        let repo = workspace.appendingPathComponent("source", isDirectory: true)
+        try FileManager.default.createDirectory(at: repo, withIntermediateDirectories: true)
+        try runGit(["init", "-b", "main"], at: repo)
+        try runGit(["commit", "--allow-empty", "-m", "initial"], at: repo, withIdentity: true)
+        try runGit(["remote", "add", "origin", remote.path], at: repo)
+        try runGit(["push", "-u", "origin", "main"], at: repo)
+        return repo
+    }
 
     private func hasGit() -> Bool {
         // Soft-skip: tests bail out silently on CI/dev machines without git.
