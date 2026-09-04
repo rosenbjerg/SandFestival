@@ -169,7 +169,7 @@ struct SidebarView: View {
     @ViewBuilder
     private func sidebarRow(project: Project, indent: Int, hasChildren: Bool) -> some View {
         let session = manager.session(for: project.id)
-        HStack(spacing: 6) {
+        HStack(spacing: 5) {
             disclosureCell(for: project.id, hasChildren: hasChildren)
 
             StatusDot(state: session?.state ?? .stopped)
@@ -193,8 +193,14 @@ struct SidebarView: View {
                 rightSideStatus(for: session)
             }
         }
-        .padding(.leading, CGFloat(indent) * 14)
+        .padding(.leading, CGFloat(indent) * 12)
         .padding(.vertical, 2)
+        // `.listStyle(.sidebar)` overrides the horizontal half of
+        // `listRowInsets` with the source-list table's own row metrics, so
+        // negative padding is the only lever that widens the content. Drop it
+        // and the name and git line start truncating again at the minimum
+        // column width.
+        .padding(.horizontal, -6)
     }
 
     /// A worktree row spends its second line on git state instead of the
@@ -279,14 +285,14 @@ struct SidebarView: View {
                 Image(systemName: collapsedParents.contains(id) ? "chevron.right" : "chevron.down")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-                    .frame(width: 12, height: 12)
+                    .frame(width: 10, height: 12)
             }
             .buttonStyle(.plain)
             .help(collapsedParents.contains(id)
                   ? String(localized: "sidebar.disclosure.expand")
                   : String(localized: "sidebar.disclosure.collapse"))
         } else {
-            Color.clear.frame(width: 12, height: 12)
+            Color.clear.frame(width: 10, height: 12)
         }
     }
 
