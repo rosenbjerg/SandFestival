@@ -341,6 +341,25 @@ enum GitWorktree {
         return runChecked(["branch", flag, name], at: sourceRepoPath)
     }
 
+    /// Creates `path` (parents included) if it isn't there yet, then runs
+    /// `git init` in it. Lets the project editor point at a repository the
+    /// user hasn't made yet instead of sending them to a terminal first.
+    ///
+    /// An existing repo at `path` is reinitialized rather than refused —
+    /// `git init` leaves refs, config and the worktree untouched, so the
+    /// "create over a folder that already exists" case costs nothing.
+    nonisolated static func initRepository(at path: URL) -> Result<Void, GitWorktreeError> {
+        do {
+            try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true)
+        } catch {
+            return .failure(.cannotCreateDirectory(
+                path: path.path,
+                reason: error.localizedDescription
+            ))
+        }
+        return runChecked(["init"], at: path)
+    }
+
     // MARK: - Internals
 
     nonisolated private static func runChecked(
@@ -477,6 +496,7 @@ enum GitWorktreeError: Error, LocalizedError, Equatable {
     case gitNotFound
     case timedOut
     case commandFailed(exitCode: Int32, stderr: String)
+    case cannotCreateDirectory(path: String, reason: String)
 
     var errorDescription: String? {
         switch self {
@@ -490,6 +510,8 @@ enum GitWorktreeError: Error, LocalizedError, Equatable {
                 return String(format: String(localized: "git.error.exit_status"), code)
             }
             return trimmed
+        case .cannotCreateDirectory(let path, let reason):
+            return String(format: String(localized: "git.error.cannot_create_directory"), path, reason)
         }
     }
 }

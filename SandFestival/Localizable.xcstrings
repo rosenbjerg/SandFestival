@@ -856,6 +856,61 @@
         }
       }
     },
+    "editor.field.path.new_repository" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Repository…"
+          }
+        }
+      }
+    },
+    "editor.field.path.new_repository.message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose where to create the repository. The folder is created and initialized with git init."
+          }
+        }
+      }
+    },
+    "editor.field.path.new_repository.name_label" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Repository name:"
+          }
+        }
+      }
+    },
+    "editor.field.path.new_repository.prompt" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create"
+          }
+        }
+      }
+    },
+    "editor.field.path.new_repository.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Git Repository"
+          }
+        }
+      }
+    },
     "editor.field.path.not_found" : {
       "localizations" : {
         "en" : {
@@ -884,6 +939,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Environment"
+          }
+        }
+      }
+    },
+    "git.error.cannot_create_directory" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t create %@: %@"
           }
         }
       }

@@ -25,6 +25,8 @@ struct ProjectEditorView: View {
     let onCancel: () -> Void
 
     @State private var draft: ProjectDraft
+    @State private var isCreatingRepository = false
+    @State private var repositoryError: String?
 
     init(target: ProjectEditorTarget, onSave: @escaping (Project) -> Void, onCancel: @escaping () -> Void) {
         self.target = target
@@ -50,11 +52,23 @@ struct ProjectEditorView: View {
                         Button(String(localized: "editor.field.path.choose")) {
                             choosePath()
                         }
+                        if draft.isGitInstalled {
+                            Button(String(localized: "editor.field.path.new_repository")) {
+                                createRepository()
+                            }
+                            .disabled(isCreatingRepository)
+                        }
                     }
                     if draft.pathIsMissing {
                         Label(String(localized: "editor.field.path.not_found"), systemImage: "exclamationmark.triangle")
                             .font(.callout)
                             .foregroundStyle(.secondary)
+                    }
+                    if let repositoryError {
+                        Text(repositoryError)
+                            .font(.callout)
+                            .foregroundStyle(.red)
+                            .textSelection(.enabled)
                     }
                 }
 
@@ -175,6 +189,41 @@ struct ProjectEditorView: View {
             }
         }
     }
+
+    /// Names and creates a fresh `git init` repo, so adding a project that
+    /// doesn't exist yet doesn't mean a detour to a terminal. A save panel
+    /// rather than an open panel: the point is naming a folder that isn't
+    /// there, which an open panel can only do through its New Folder button.
+    private func createRepository() {
+        let panel = NSSavePanel()
+        panel.canCreateDirectories = true
+        panel.showsTagField = false
+        panel.title = String(localized: "editor.field.path.new_repository.title")
+        panel.message = String(localized: "editor.field.path.new_repository.message")
+        panel.nameFieldLabel = String(localized: "editor.field.path.new_repository.name_label")
+        panel.prompt = String(localized: "editor.field.path.new_repository.prompt")
+        let suggestedName = draft.name.trimmingCharacters(in: .whitespaces)
+        if !suggestedName.isEmpty {
+            panel.nameFieldStringValue = suggestedName
+        }
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        repositoryError = nil
+        isCreatingRepository = true
+        Task {
+            let result = await Task.detached { GitWorktree.initRepository(at: url) }.value
+            isCreatingRepository = false
+            switch result {
+            case .success:
+                draft.pathString = url.path
+                if draft.name.trimmingCharacters(in: .whitespaces).isEmpty {
+                    draft.name = url.lastPathComponent
+                }
+            case .failure(let error):
+                repositoryError = error.errorDescription
+            }
+        }
+    }
 }
 
 // MARK: - Draft model
@@ -198,7 +247,14 @@ struct ProjectDraft {
     /// without waiting on a `nono profile list` subprocess.
     var discoveredProfiles: [String] = []
 
-    init(seedFolder: URL? = nil) {
+    /// Whether a `git` binary is on PATH. The editor hides "New Repository…"
+    /// when it isn't — `git init` is the whole of what the button does, so
+    /// it could only ever fail. Resolved once at init rather than in `body`,
+    /// which would stat PATH on every keystroke.
+    let isGitInstalled: Bool
+
+    init(seedFolder: URL? = nil, isGitInstalled: Bool? = nil) {
+        self.isGitInstalled = isGitInstalled ?? GitWorktree.isGitInstalled()
         self.name = seedFolder?.lastPathComponent ?? ""
         self.pathString = seedFolder?.path ?? ""
         self.command = Project.defaultCommand
@@ -211,7 +267,8 @@ struct ProjectDraft {
         self.nonoProfile = extracted.profile
     }
 
-    init(project: Project) {
+    init(project: Project, isGitInstalled: Bool? = nil) {
+        self.isGitInstalled = isGitInstalled ?? GitWorktree.isGitInstalled()
         self.name = project.name
         self.pathString = project.path.path
         self.command = project.command

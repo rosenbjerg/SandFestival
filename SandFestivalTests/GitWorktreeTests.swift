@@ -24,6 +24,55 @@ struct GitWorktreeTests {
         }
     }
 
+    @Test("initRepository creates a missing directory and makes it a repo")
+    func initRepositoryCreatesDirectory() throws {
+        guard hasGit() else { return }
+        let parent = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let repo = parent.appendingPathComponent("nested/new-repo", isDirectory: true)
+
+        let result = GitWorktree.initRepository(at: repo)
+
+        if case .failure(let error) = result {
+            Issue.record("initRepository failed: \(error)")
+        }
+        #expect(GitWorktree.isGitRepo(at: repo))
+    }
+
+    @Test("initRepository over an existing repo leaves its branches intact")
+    func initRepositoryIsIdempotent() throws {
+        guard hasGit() else { return }
+        let repo = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: repo) }
+        try runGit(["init"], at: repo)
+        try runGit(["commit", "--allow-empty", "-m", "initial"], at: repo, withIdentity: true)
+        try runGit(["branch", "keepme"], at: repo)
+
+        let result = GitWorktree.initRepository(at: repo)
+
+        if case .failure(let error) = result {
+            Issue.record("initRepository failed: \(error)")
+        }
+        #expect(GitWorktree.listLocalBranches(at: repo).contains("keepme"))
+    }
+
+    @Test("initRepository reports a path it can't create")
+    func initRepositoryReportsCreationFailure() throws {
+        let parent = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: parent) }
+        // A regular file can't be a parent directory, so createDirectory fails
+        // before git is ever invoked.
+        let blocker = parent.appendingPathComponent("blocker")
+        try "".write(to: blocker, atomically: true, encoding: .utf8)
+
+        let result = GitWorktree.initRepository(at: blocker.appendingPathComponent("repo"))
+
+        guard case .failure(.cannotCreateDirectory) = result else {
+            Issue.record("expected .cannotCreateDirectory, got \(result)")
+            return
+        }
+    }
+
     @Test("isGitRepo is false for an unrelated directory")
     func isGitRepoFalseForPlainDir() throws {
         let dir = try makeTempDir()
