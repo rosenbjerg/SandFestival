@@ -424,7 +424,7 @@ final class SessionManager {
         }
     }
 
-    private func currentTerminalFont() -> NSFont {
+    func currentTerminalFont() -> NSFont {
         // .medium reads noticeably crisper than .regular on dark backgrounds
         // — the slightly thicker stroke survives anti-aliasing better.
         NSFont.monospacedSystemFont(ofSize: terminalFontSize, weight: .medium)

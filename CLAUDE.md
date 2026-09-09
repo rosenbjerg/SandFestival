@@ -93,11 +93,21 @@ PATH precedence in `Session.composeEnvironment(inherited:projectEnv:extra:)`: pr
 - Two different "base branch" memories, don't conflate them: `WorktreeInfo.baseBranch` is the fork point of *this* worktree (persisted per project, drives divergence), while `WorktreeBaseBranchStore` is only the duplicate sheet's remembered *default* per lineage. Existing-branch duplicates record `nil` — they were never forked from anything
 - Sidebar worktree rows show the **live** branch from the sample, not `WorktreeInfo.branch` — that's a creation-time snapshot and goes stale the moment an agent switches branches. The git line replaces the path line, which for `.worktrees/<branch>` only restated the row's own name
 
+## Claude Code login
+
+"Log In to Claude Code…" opens a `Window` — not a sheet, because the flow leaves for the browser and comes back, so the main window has to stay usable — running `claude auth login` in its own terminal.
+
+- `ClaudeCodeLogin.args` is `Project.defaultArgs`' wrapper **plus** `--allow-launch-services`. That flag is deliberately absent from the session default: nono's browser broker does not shim `open(1)` for a plain `nono run`, so without it the OAuth hop dies with `_LSOpenURLsWithCompletionHandler` error -54. It belongs to one short user-initiated process, not to every unattended agent. Don't move it back into `Project.defaultArgs`, and don't drop it here
+- `--profile claude-code` is load-bearing on both counts: it carries the paired `allow_launch_services: true` profile gate (the CLI flag alone hits a closed gate on `default`) *and* the `$HOME/Library/Keychains` bypass plus `~/.claude.json` write the credential needs. On `default` the browser opens, the user signs in, and the credential then silently fails to persist — the worst failure shape, because it looks like it worked
+- Launched from a fresh empty scratch directory under `NSTemporaryDirectory()`, removed on close. `--allow-cwd` grants read+write to the working directory, so an empty throwaway makes that grant worth nothing. Don't point it at the project path or `$HOME`
+- `ClaudeCodeLoginController` is **not** a `Session`: no project, no hooks, and no `SAND_FESTIVAL_TOKEN` / `SAND_FESTIVAL_PROJECT_ID` in its environment, so nothing it spawns can bind to a project or reach the sidebar. It shares `Session.inheritedEnvironment()` only so both spawn paths resolve `nono` and `claude` off the same PATH
+- Restarting sessions afterward is an offered button, not a default — the opposite of "Update Claude Code", where a new binary genuinely cannot reach a live process. Whether a running session picks up refreshed credentials on its own is unverified
+
 ## Terminal lifetime
 
 SwiftTerm is pinned to an **exact version** (`kind = exactVersion` in pbxproj), so "Update to Latest Package Versions" can't move it. Terminal behavior here leans on version-specific upstream internals — see the viewport-pinning note below — so bumps are deliberate: raise the version, then re-test scrolling and selection by hand.
 
-Each `Session` owns its `LocalProcessTerminalView` for the whole app lifetime. `DetailPaneView` ZStacks every session's view and `TerminalPaneView` flips `NSView.isHidden` per selection (not `.opacity` — at alpha 0 the layer is still asked to paint dirty rects on every PTY update). **Never** swap views by selection, that destroys scrollback.
+Each `Session` owns its `LocalProcessTerminalView` for the whole app lifetime. The login window's terminal is the one exception — it belongs to the window and dies with it. `DetailPaneView` ZStacks every session's view and `TerminalPaneView` flips `NSView.isHidden` per selection (not `.opacity` — at alpha 0 the layer is still asked to paint dirty rects on every PTY update). **Never** swap views by selection, that destroys scrollback.
 
 `SessionTerminalView` sets `allowMouseReporting = false`. SwiftTerm clears the text selection on every feed (`feedPrepare`) and every linefeed, both gated only on that flag — so without it, streaming output wiped any drag-selection before the user could copy. `feedPrepare` is `internal` and not overridable, so the flag is the only lever; turning it off is SwiftTerm's documented way to preserve selection during output. The trade is that mouse events stop forwarding to mouse-aware apps, which is fine here (the session is the Claude Code TUI, primary-buffer + linefeeds, never mouse mode). Don't re-enable it to gain app-side mouse support without restoring selection some other way.
 

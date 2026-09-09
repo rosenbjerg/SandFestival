@@ -3,6 +3,7 @@ import SwiftUI
 @main
 struct SandFestivalApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @Environment(\.openWindow) private var openWindow
     @State private var manager = SessionManager()
     @State private var claudeCodeAdapter = ClaudeCodeAdapter()
     @State private var attentionPreferences = AttentionPreferences()
@@ -53,6 +54,10 @@ struct SandFestivalApp: App {
                     updateSheet = true
                 }
 
+                Button(String(localized: "menu.login_claude_code")) {
+                    openWindow(id: ClaudeCodeLoginWindow.windowID)
+                }
+
                 Button(String(localized: "menu.manage_hooks")) {
                     manualHookSheet = true
                 }
@@ -75,6 +80,11 @@ struct SandFestivalApp: App {
                 .keyboardShortcut("0", modifiers: [.command])
             }
         }
+
+        Window(String(localized: "window.claude_login.title"), id: ClaudeCodeLoginWindow.windowID) {
+            ClaudeCodeLoginWindow(manager: manager)
+        }
+        .defaultSize(width: 760, height: 520)
 
         Settings {
             TabView {

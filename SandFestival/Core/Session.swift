@@ -411,6 +411,17 @@ final class Session: Identifiable {
     }
 
     private func composedEnvironment(extra: [String: String]) -> [String] {
+        Session.composeEnvironment(
+            inherited: Session.inheritedEnvironment(),
+            projectEnv: project.env,
+            extra: extra
+        )
+    }
+
+    /// The parent environment with the user's interactive-shell PATH overlaid.
+    /// Shared with the `claude auth login` window so both spawn paths resolve
+    /// `nono` and `claude` the same way.
+    static func inheritedEnvironment() -> [String] {
         var inherited = Terminal.getEnvironmentVariables()
         // Block briefly on first call after launch so the very first
         // session start picks up the real shell PATH instead of racing
@@ -424,11 +435,7 @@ final class Session: Identifiable {
             inherited.removeAll { $0.hasPrefix("PATH=") }
             inherited.append("PATH=\(shellPath)")
         }
-        return Session.composeEnvironment(
-            inherited: inherited,
-            projectEnv: project.env,
-            extra: extra
-        )
+        return inherited
     }
 
     /// PATH precedence is: explicit project/adapter override → inherited
