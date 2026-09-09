@@ -36,11 +36,11 @@ struct ProjectRemovalView: View {
                 .font(.headline)
 
             if let info = project.worktreeInfo {
-                Text(String(format: String(localized: "removal.body"), info.branch, project.path.path))
+                Text(String(format: String(localized: "removal.body"), info.branch, project.displayPath))
                     .fixedSize(horizontal: false, vertical: true)
 
                 Toggle(isOn: $removeWorktree) {
-                    Text(String(format: String(localized: "removal.option.remove_worktree"), project.path.path))
+                    Text(String(format: String(localized: "removal.option.remove_worktree"), project.displayPath))
                         .lineLimit(2)
                         .truncationMode(.middle)
                 }

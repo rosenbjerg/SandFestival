@@ -212,7 +212,7 @@ struct SidebarView: View {
         if project.worktreeInfo != nil, let result = statusStore.result(for: project.id) {
             gitLine(for: project, result: result)
         } else {
-            Text(project.path.path)
+            Text(project.displayPath)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)

@@ -81,3 +81,17 @@ extension Project {
         "--enable-auto-mode",
     ]
 }
+
+// MARK: - Display
+
+extension Project {
+    var displayPath: String { Project.abbreviatingHome(path.path) }
+
+    static func abbreviatingHome(_ path: String, home: String = NSHomeDirectory()) -> String {
+        let home = home.hasSuffix("/") ? String(home.dropLast()) : home
+        guard !home.isEmpty, home != "/" else { return path }
+        if path == home { return "~" }
+        guard path.hasPrefix(home + "/") else { return path }
+        return "~" + path.dropFirst(home.count)
+    }
+}
