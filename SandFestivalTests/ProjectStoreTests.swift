@@ -71,7 +71,6 @@ struct ProjectStoreTests {
             "run",
             "--profile", "claude-code",
             "--allow-cwd",
-            "--allow-launch-services",
             "--",
             "claude",
             "--enable-auto-mode",

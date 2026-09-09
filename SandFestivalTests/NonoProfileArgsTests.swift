@@ -6,15 +6,15 @@ struct NonoProfileArgsTests {
 
     @Test("extract pulls the profile name and removes both tokens")
     func extractsPair() {
-        let wrapper = ["run", "--allow-cwd", "--profile", "claude-code", "--allow-launch-services"]
+        let wrapper = ["run", "--allow-cwd", "--profile", "claude-code", "--allow-gpu"]
         let (profile, rest) = NonoProfileArgs.extract(from: wrapper)
         #expect(profile == "claude-code")
-        #expect(rest == ["run", "--allow-cwd", "--allow-launch-services"])
+        #expect(rest == ["run", "--allow-cwd", "--allow-gpu"])
     }
 
     @Test("extract returns nil profile when no --profile flag is present")
     func extractWithoutFlag() {
-        let wrapper = ["run", "--allow-cwd", "--allow-launch-services"]
+        let wrapper = ["run", "--allow-cwd", "--allow-gpu"]
         let (profile, rest) = NonoProfileArgs.extract(from: wrapper)
         #expect(profile == nil)
         #expect(rest == wrapper)
@@ -30,9 +30,9 @@ struct NonoProfileArgsTests {
 
     @Test("inject places --profile <name> immediately after `run`")
     func injectsAfterRun() {
-        let wrapper = ["run", "--allow-cwd", "--allow-launch-services"]
+        let wrapper = ["run", "--allow-cwd", "--allow-gpu"]
         let result = NonoProfileArgs.inject(profile: "xcode", into: wrapper)
-        #expect(result == ["run", "--profile", "xcode", "--allow-cwd", "--allow-launch-services"])
+        #expect(result == ["run", "--profile", "xcode", "--allow-cwd", "--allow-gpu"])
     }
 
     @Test("inject prepends when there is no `run` token")
