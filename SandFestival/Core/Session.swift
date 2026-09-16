@@ -23,6 +23,11 @@ final class Session: Identifiable {
     /// via the OSC 0/2 escape sequence to summarise the current task). Cleared
     /// on start/stop so a stale title never outlives the process.
     private(set) var terminalTitle: String?
+    /// Claude finished a turn while nobody was looking at this session. The
+    /// sidebar shows it as an unread dot until the user views the session or
+    /// the state moves on from `.idle`. Set and cleared by `SessionManager`,
+    /// which is what knows about selection and app activity.
+    private(set) var hasUnseenOutput = false
 
     @ObservationIgnored let terminalView: SessionTerminalView
     @ObservationIgnored private let processBridge: ProcessBridge
@@ -305,6 +310,16 @@ final class Session: Identifiable {
 
     func update(project: Project) {
         self.project = project
+    }
+
+    func markOutputUnseen() {
+        guard !hasUnseenOutput else { return }
+        hasUnseenOutput = true
+    }
+
+    func markOutputSeen() {
+        guard hasUnseenOutput else { return }
+        hasUnseenOutput = false
     }
 
     // MARK: - Agent event ingestion

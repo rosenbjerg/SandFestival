@@ -57,6 +57,11 @@ final class SessionManager {
     /// see the previous behavior unless they opt in.
     @ObservationIgnored var shouldSurfaceOnActivity: () -> Bool = { false }
 
+    /// Whether the user can currently see the selected session. Injected so
+    /// tests can stage "finished while the app was in the background"
+    /// without touching AppKit.
+    @ObservationIgnored var isAppActive: () -> Bool = { NSApp.isActive }
+
     @ObservationIgnored private var persistDebounceTask: Task<Void, Never>?
     @ObservationIgnored var persistDebounceDelay: Duration = .seconds(1)
 
@@ -254,6 +259,13 @@ final class SessionManager {
         }
     }
 
+    /// The user is now looking at the selected session — selection changed
+    /// or the app came to the front — so whatever it finished while they
+    /// weren't is no longer unseen.
+    func markSelectedSessionSeen() {
+        selectedSession()?.markOutputSeen()
+    }
+
     func startSession(id: Project.ID) {
         sessions[id]?.start()
     }
@@ -332,8 +344,25 @@ final class SessionManager {
             self.sessionStateObserver?(session, old, new)
             self.notifyIfWorkFinished(projectID: session.id, from: old, to: new)
             self.refocusIfStartTransition(projectID: session.id, from: old, to: new)
+            self.trackUnseenOutput(session: session, from: old, to: new)
         }
         return session
+    }
+
+    /// A turn that ends while the session isn't on screen is worth an unread
+    /// mark; anything that moves the session on from `.idle` — a new turn, an
+    /// attention state with its own badge, a stop — supersedes it. "Finished"
+    /// reuses `AttentionEvent.finishedOutputting` so the sidebar dot and the
+    /// notification agree on what counts.
+    private func trackUnseenOutput(session: Session, from old: SessionState, to new: SessionState) {
+        if old == .idle {
+            session.markOutputSeen()
+        }
+        guard AttentionEvent.from(transition: old, to: new) == .finishedOutputting else { return }
+        let isViewed = session.id == selectedProjectID && isAppActive()
+        if !isViewed {
+            session.markOutputUnseen()
+        }
     }
 
     /// The notRunningOverlay's Start button (and the toolbar Start when

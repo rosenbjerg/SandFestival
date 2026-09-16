@@ -366,9 +366,21 @@ struct SidebarView: View {
             attentionLabel(String(localized: "sidebar.row.label.blocked"), color: .red)
         case .errored:
             attentionLabel(String(localized: "sidebar.row.label.errored"), color: .red)
-        case .starting, .idle, .stopped:
+        case .idle:
+            if session.hasUnseenOutput {
+                unseenOutputDot
+            }
+        case .starting, .stopped:
             EmptyView()
         }
+    }
+
+    private var unseenOutputDot: some View {
+        Circle()
+            .fill(Color.accentColor)
+            .frame(width: 7, height: 7)
+            .accessibilityLabel(String(localized: "sidebar.row.label.unseen_output"))
+            .help(String(localized: "sidebar.row.unseen_output.help"))
     }
 
     private func attentionLabel(_ text: String, color: Color) -> some View {

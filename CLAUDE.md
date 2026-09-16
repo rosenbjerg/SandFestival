@@ -81,6 +81,7 @@ PATH precedence in `Session.composeEnvironment(inherited:projectEnv:extra:)`: pr
 - `AttentionDecision.decide` is pure — no AppKit, no Focus center. Same split as `SessionStateMachine.next`: `decide` answers "what should fire?", the notifier owns the side effects. Test the policy without spinning up AppKit
 - Dock badge always mirrors `attentionSessions.count`. Dock bounce fires only on transitions *into* an attention state, only when SandFestival isn't frontmost, and only when system Focus is off (Focus is treated as off when `INFocusStatusCenter` authorization hasn't been granted — bouncing is the conservative default)
 - Notifications are opt-in (`AttentionPreferences`). One notification identifier **per project**, so a later transition updates the same banner instead of stacking; resolving the attention state withdraws it. Clicking a notification routes through `SessionManager.focus(projectID:)`
+- `Session.hasUnseenOutput` is the sidebar's unread dot: set when a turn finishes (`AttentionEvent.finishedOutputting` — the one definition of "finished", shared with notifications) while the session isn't viewed (selected **and** app active, `SessionManager.isAppActive` injectable for tests); cleared by `markSelectedSessionSeen()` from ContentView's selection-change and `didBecomeActive` sites, and by any transition out of `.idle`. Lives in `SessionManager.trackUnseenOutput`, part of the `onStateChanged` fan-out — not a new observer slot
 
 ## Worktree status
 

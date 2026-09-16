@@ -35,6 +35,7 @@ struct ContentView: View {
             .navigationSubtitle(windowSubtitle)
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            manager.markSelectedSessionSeen()
             manager.focusSelectedTerminal()
             statusStore.refreshAll(projects: manager.projects)
         }
@@ -55,6 +56,7 @@ struct ContentView: View {
             }
         }
         .onChange(of: manager.selectedProjectID) { _, _ in
+            manager.markSelectedSessionSeen()
             manager.focusSelectedTerminal()
         }
         .sheet(item: $editorTarget) { target in

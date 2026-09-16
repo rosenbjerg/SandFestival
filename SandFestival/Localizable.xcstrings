@@ -2014,6 +2014,17 @@
         }
       }
     },
+    "sidebar.row.label.unseen_output" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New output"
+          }
+        }
+      }
+    },
     "sidebar.row.open_in_finder" : {
       "localizations" : {
         "en" : {
@@ -2041,6 +2052,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Remove"
+          }
+        }
+      }
+    },
+    "sidebar.row.unseen_output.help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finished while you were away"
           }
         }
       }
