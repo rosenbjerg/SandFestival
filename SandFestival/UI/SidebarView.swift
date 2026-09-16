@@ -11,6 +11,7 @@ struct SidebarView: View {
     /// Persisted across launches as a comma-joined list of UUID strings.
     /// Parents default to expanded; this holds the ids the user folded up.
     @AppStorage("sidebar.collapsedParents") private var collapsedParentsStorage: String = ""
+    @State private var query = ""
 
     private var collapsedParents: Set<Project.ID> {
         Set(collapsedParentsStorage
@@ -20,13 +21,14 @@ struct SidebarView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            filterField
+
             List(selection: $manager.selectedProjectID) {
-                ForEach(topLevelProjects) { parent in
-                    let kids = children(of: parent.id)
+                ForEach(visibleBlocks, id: \.parent.id) { parent, kids in
                     sidebarRow(project: parent, indent: 0, hasChildren: !kids.isEmpty)
                         .tag(parent.id)
                         .contextMenu { contextMenu(for: parent) }
-                    if !kids.isEmpty && !collapsedParents.contains(parent.id) {
+                    if !kids.isEmpty && (isFiltering || !collapsedParents.contains(parent.id)) {
                         ForEach(kids) { child in
                             sidebarRow(project: child, indent: 1, hasChildren: false)
                                 .tag(child.id)
@@ -34,9 +36,11 @@ struct SidebarView: View {
                         }
                     }
                 }
-                .onMove { source, destination in
-                    moveTopLevelBlocks(fromOffsets: source, toOffset: destination)
-                }
+                // `moveTopLevelBlocks` maps the List's offsets onto the
+                // unfiltered top-level order, so a drag on a filtered list
+                // would reorder the wrong rows. Reordering waits for the
+                // filter to clear.
+                .onMove(perform: moveHandler)
             }
             .listStyle(.sidebar)
             .dropDestination(for: URL.self) { urls, _ in
@@ -61,6 +65,35 @@ struct SidebarView: View {
         .navigationSplitViewColumnWidth(min: 220, ideal: 260)
     }
 
+    /// Laid out as an ordinary row above the list rather than via
+    /// `.searchable(placement: .sidebar)`, which hoists the field into the
+    /// column chrome without insetting a sidebar whose root is a `VStack` —
+    /// the first project row ended up underneath it.
+    private var filterField: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField(String(localized: "sidebar.filter.prompt"), text: $query)
+                .textFieldStyle(.plain)
+                .onExitCommand { query = "" }
+            if !query.isEmpty {
+                Button {
+                    query = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help(String(localized: "sidebar.filter.clear"))
+            }
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+    }
+
     // MARK: - Hierarchy helpers
 
     private var topLevelProjects: [Project] {
@@ -69,6 +102,27 @@ struct SidebarView: View {
 
     private func children(of id: Project.ID) -> [Project] {
         manager.projects.filter { $0.parentProjectID == id }
+    }
+
+    private var isFiltering: Bool {
+        !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var visibleBlocks: [(parent: Project, children: [Project])] {
+        let visible = SidebarFilter.visibleIDs(projects: manager.projects, query: query) { id in
+            guard case .status(let status)? = statusStore.result(for: id) else { return nil }
+            return status.branch
+        }
+        return topLevelProjects
+            .filter { visible.contains($0.id) }
+            .map { parent in
+                (parent: parent, children: children(of: parent.id).filter { visible.contains($0.id) })
+            }
+    }
+
+    private var moveHandler: ((IndexSet, Int) -> Void)? {
+        guard !isFiltering else { return nil }
+        return { moveTopLevelBlocks(fromOffsets: $0, toOffset: $1) }
     }
 
     /// Translates a top-level `.onMove` (which only knows about block
@@ -278,7 +332,7 @@ struct SidebarView: View {
     /// aligned across the whole sidebar.
     @ViewBuilder
     private func disclosureCell(for id: Project.ID, hasChildren: Bool) -> some View {
-        if hasChildren {
+        if hasChildren, !isFiltering {
             Button {
                 toggleCollapse(id)
             } label: {

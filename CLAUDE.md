@@ -93,6 +93,11 @@ PATH precedence in `Session.composeEnvironment(inherited:projectEnv:extra:)`: pr
 - Two different "base branch" memories, don't conflate them: `WorktreeInfo.baseBranch` is the fork point of *this* worktree (persisted per project, drives divergence), while `WorktreeBaseBranchStore` is only the duplicate sheet's remembered *default* per lineage. Existing-branch duplicates record `nil` — they were never forked from anything
 - Sidebar worktree rows show the **live** branch from the sample, not `WorktreeInfo.branch` — that's a creation-time snapshot and goes stale the moment an agent switches branches. The git line replaces the path line, which for `.worktrees/<branch>` only restated the row's own name
 
+## Sidebar filter
+
+- `SidebarFilter.visibleIDs` is pure and decides which rows a query keeps (name, `displayPath`, live worktree branch; a hit never orphans its parent or children). Test it without a view, same split as `SessionStateMachine.next`
+- While a query is active the List's `.onMove` is `nil` and collapse state is ignored. `moveTopLevelBlocks` maps List offsets onto the *unfiltered* top-level order, so a drag on a filtered list would reorder the wrong rows — don't re-enable it under a filter without rewriting that mapping
+
 ## Claude Code login
 
 "Log In to Claude Code…" opens a `Window` — not a sheet, because the flow leaves for the browser and comes back, so the main window has to stay usable — running `claude auth login` in its own terminal.
