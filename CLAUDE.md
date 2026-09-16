@@ -13,7 +13,7 @@ conventions that have emerged in code.
 ## Release
 
 - Distribution is **Developer ID + notarization, direct download via Homebrew cask** — not the Mac App Store. The sandbox-off architecture rules out MAS.
-- `scripts/release.sh` runs the full pipeline: archive → exportArchive (Developer ID) → codesign verify → `notarytool submit --wait` → staple → DMG → sha256. See `scripts/README.md` for env-var setup (`NOTARY_KEY_ID`, `NOTARY_ISSUER_ID`, `NOTARY_KEY_PATH`).
+- `scripts/release.sh` runs the full pipeline: archive → exportArchive (Developer ID) → codesign verify → notarize + staple the app → DMG → notarize + staple the DMG → sha256. The DMG is a **second** `notarytool submit`: stapler looks the ticket up by the hash of the file it's stapling, so a DMG built around an already-notarized app still has no ticket of its own. Don't drop either submission. See `scripts/README.md` for env-var setup (`NOTARY_KEY_ID`, `NOTARY_ISSUER_ID`, `NOTARY_KEY_PATH`).
 - Version source of truth is `MARKETING_VERSION` in pbxproj — the **two app-target occurrences** (Debug + Release). The other four occurrences belong to a separate target pinned at `0.1.0` and are not bumped. The release script reads the first match directly. When bumping, change only the occurrences whose value matches that first match (same rule for the `CURRENT_PROJECT_VERSION` build number).
 - `build/` is the artifact directory and is gitignored.
 

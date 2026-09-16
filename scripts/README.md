@@ -34,8 +34,10 @@ is what you paste into the Homebrew cask formula.
 
 ### Iterating without notarization
 
-Notarization round-trips to Apple and takes a few minutes. For quick local
-verification of the archive + sign + DMG steps, set `SKIP_NOTARIZE=1`:
+Notarization round-trips to Apple twice — once for the app, once for the
+DMG built around it, since each needs its own ticket to be stapled — and
+takes a few minutes. For quick local verification of the archive + sign + DMG
+steps, set `SKIP_NOTARIZE=1`:
 
 ```bash
 SKIP_NOTARIZE=1 ./scripts/release.sh

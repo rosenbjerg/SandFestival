@@ -88,38 +88,46 @@ echo "==> Verifying code signature"
 codesign --verify --deep --strict --verbose=2 "${APP_PATH}"
 codesign --display --verbose=2 "${APP_PATH}" 2>&1 | grep -E "Authority|TeamIdentifier|Hardened"
 
+notarize() {
+  local artifact="$1" label="$2"
+  local result="${BUILD_DIR}/notary-${label}.plist"
+
+  echo "==> Submitting ${label} to notary service (this may take several minutes)"
+  set +e
+  xcrun notarytool submit "${artifact}" \
+    --key "${NOTARY_KEY_PATH}" \
+    --key-id "${NOTARY_KEY_ID}" \
+    --issuer "${NOTARY_ISSUER_ID}" \
+    --wait \
+    --output-format plist > "${result}"
+  local notary_exit=$?
+  set -e
+
+  if [[ -s "${result}" ]]; then
+    cat "${result}"
+  fi
+  if [[ ${notary_exit} -ne 0 ]]; then
+    local submission_id
+    submission_id=$(/usr/libexec/PlistBuddy -c "Print :id" "${result}" 2>/dev/null || true)
+    if [[ "${submission_id}" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+      echo "==> Notarization of ${label} failed; fetching log for ${submission_id}"
+      xcrun notarytool log "${submission_id}" \
+        --key "${NOTARY_KEY_PATH}" \
+        --key-id "${NOTARY_KEY_ID}" \
+        --issuer "${NOTARY_ISSUER_ID}" || true
+    else
+      echo "==> Notarization of ${label} failed before a submission ID was issued (likely an auth problem — check NOTARY_KEY_PATH / NOTARY_KEY_ID / NOTARY_ISSUER_ID)" >&2
+    fi
+    exit ${notary_exit}
+  fi
+}
+
 if [[ "${SKIP_NOTARIZE:-0}" != "1" ]]; then
   ZIP_PATH="${BUILD_DIR}/${PROJECT}-${VERSION}.zip"
   echo "==> Zipping for notarization"
   ditto -c -k --keepParent "${APP_PATH}" "${ZIP_PATH}"
 
-  echo "==> Submitting to notary service (this may take several minutes)"
-  set +e
-  xcrun notarytool submit "${ZIP_PATH}" \
-    --key "${NOTARY_KEY_PATH}" \
-    --key-id "${NOTARY_KEY_ID}" \
-    --issuer "${NOTARY_ISSUER_ID}" \
-    --wait \
-    --output-format plist > "${BUILD_DIR}/notary.plist"
-  NOTARY_EXIT=$?
-  set -e
-
-  if [[ -s "${BUILD_DIR}/notary.plist" ]]; then
-    cat "${BUILD_DIR}/notary.plist"
-  fi
-  if [[ ${NOTARY_EXIT} -ne 0 ]]; then
-    SUBMISSION_ID=$(/usr/libexec/PlistBuddy -c "Print :id" "${BUILD_DIR}/notary.plist" 2>/dev/null || true)
-    if [[ "${SUBMISSION_ID}" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
-      echo "==> Notarization failed; fetching log for ${SUBMISSION_ID}"
-      xcrun notarytool log "${SUBMISSION_ID}" \
-        --key "${NOTARY_KEY_PATH}" \
-        --key-id "${NOTARY_KEY_ID}" \
-        --issuer "${NOTARY_ISSUER_ID}" || true
-    else
-      echo "==> Notarization failed before a submission ID was issued (likely an auth problem — check NOTARY_KEY_PATH / NOTARY_KEY_ID / NOTARY_ISSUER_ID)" >&2
-    fi
-    exit ${NOTARY_EXIT}
-  fi
+  notarize "${ZIP_PATH}" app
 
   echo "==> Stapling notarization ticket"
   xcrun stapler staple "${APP_PATH}"
@@ -149,9 +157,17 @@ else
     "${DMG_PATH}"
 fi
 
+# Stapler finds the ticket by the hash of the file it is stapling, and the DMG
+# has a different hash from the zip notarized above — so without its own
+# submission the DMG staple fails with "Record not found". Submitting only the
+# DMG would be one round-trip instead of two, but then the app inside carries
+# no ticket of its own and Gatekeeper has to reach Apple on first launch.
 if [[ "${SKIP_NOTARIZE:-0}" != "1" ]]; then
+  notarize "${DMG_PATH}" dmg
+
   echo "==> Stapling DMG"
   xcrun stapler staple "${DMG_PATH}"
+  xcrun stapler validate "${DMG_PATH}"
 fi
 
 echo
