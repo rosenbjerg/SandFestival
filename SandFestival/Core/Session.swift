@@ -28,6 +28,9 @@ final class Session: Identifiable {
     /// the state moves on from `.idle`. Set and cleared by `SessionManager`,
     /// which is what knows about selection and app activity.
     private(set) var hasUnseenOutput = false
+    /// Output has landed below a scrolled-up viewport. The detail pane offers
+    /// a jump to the bottom while this is set.
+    private(set) var hasOutputBelowViewport = false
 
     @ObservationIgnored let terminalView: SessionTerminalView
     @ObservationIgnored private let processBridge: ProcessBridge
@@ -94,6 +97,13 @@ final class Session: Identifiable {
         view.onUserSent = { [weak self] in
             self?.handleUserKeystroke()
         }
+        view.onOutputBelowViewportChanged = { [weak self] value in
+            self?.hasOutputBelowViewport = value
+        }
+    }
+
+    func scrollToBottom() {
+        terminalView.scroll(toPosition: 1)
     }
 
     // MARK: - Lifecycle

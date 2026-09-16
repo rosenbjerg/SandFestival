@@ -38,6 +38,12 @@ struct DetailPaneView: View {
         TerminalPaneView(terminalView: session.terminalView, isVisible: isVisible)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.leading, 4)
+            .overlay(alignment: .bottom) {
+                if isVisible, session.state.isRunning, session.hasOutputBelowViewport {
+                    newOutputPill(session: session)
+                }
+            }
+            .animation(.easeOut(duration: 0.15), value: session.hasOutputBelowViewport)
             .overlay {
                 if isVisible, !session.state.isRunning {
                     notRunningOverlay(session: session)
@@ -82,6 +88,27 @@ struct DetailPaneView: View {
         // underlying NSView wins and the mouse stays an I-beam over the
         // overlay. .default forces an arrow on this layer's content rect.
         .pointerStyle(.default)
+    }
+
+    private func newOutputPill(session: Session) -> some View {
+        Button {
+            session.scrollToBottom()
+            // Same first-responder footgun as the overlay's Start button:
+            // the click leaves focus on the pill, so hand it back.
+            manager.focusSelectedTerminal()
+        } label: {
+            Label(String(localized: "detail.new_output"), systemImage: "arrow.down")
+                .font(.callout)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+        }
+        .buttonStyle(.plain)
+        .background(.regularMaterial, in: Capsule())
+        .overlay(Capsule().strokeBorder(.separator))
+        .help(String(localized: "detail.new_output.help"))
+        .padding(.bottom, 16)
+        .pointerStyle(.default)
+        .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 
     private var emptyState: some View {

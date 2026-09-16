@@ -10,6 +10,8 @@ import SwiftTerm
 /// the most reliable "user is engaging again" signal we have.
 final class SessionTerminalView: LocalProcessTerminalView {
     var onUserSent: (@MainActor () -> Void)?
+    var onOutputBelowViewportChanged: (@MainActor (Bool) -> Void)?
+    private var outputBelowViewport = false
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -58,6 +60,41 @@ final class SessionTerminalView: LocalProcessTerminalView {
         // explicitly so the captured closure is callable from a Sendable
         // override without isolation gymnastics.
         Task { @MainActor in onUserSent() }
+    }
+
+    /// Compares `scrollPosition` across the feed rather than treating any
+    /// bytes as new output: Claude Code's spinner and input box redraw in
+    /// place constantly, and only real new lines move the position. Observes
+    /// only — viewport pinning is SwiftTerm's, see CLAUDE.md.
+    override func dataReceived(slice: ArraySlice<UInt8>) {
+        let before = scrollPosition
+        super.dataReceived(slice: slice)
+        if isScrolledUp, scrollPosition < before {
+            setOutputBelowViewport(true)
+        }
+    }
+
+    override func scrolled(source: TerminalView, position: Double) {
+        super.scrolled(source: source, position: position)
+        if !isScrolledUp {
+            setOutputBelowViewport(false)
+        }
+    }
+
+    /// `scrollPosition` reads 0 both at the top of the scrollback and when
+    /// there is none yet; `canScroll` tells them apart.
+    private var isScrolledUp: Bool {
+        canScroll && scrollPosition < 1
+    }
+
+    /// Edge-triggered on purpose: `scrolled` fires for every line the
+    /// terminal scrolls while pinned at the bottom, and the SwiftUI listener
+    /// re-renders on every call it receives.
+    private func setOutputBelowViewport(_ value: Bool) {
+        guard value != outputBelowViewport else { return }
+        outputBelowViewport = value
+        guard let onOutputBelowViewportChanged else { return }
+        Task { @MainActor in onOutputBelowViewportChanged(value) }
     }
 
     override func viewDidMoveToWindow() {

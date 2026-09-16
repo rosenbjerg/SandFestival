@@ -119,6 +119,28 @@
         }
       }
     },
+    "detail.new_output" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New output"
+          }
+        }
+      }
+    },
+    "detail.new_output.help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scroll to the latest output"
+          }
+        }
+      }
+    },
     "detail.not_running.continue" : {
       "localizations" : {
         "en" : {
