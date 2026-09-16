@@ -1487,6 +1487,46 @@
         }
       }
     },
+    "preferences.keep_awake.description" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prevents idle sleep only while a session is working. The display can still dim and lock, and closing the lid is unaffected."
+          }
+        }
+      }
+    },
+    "preferences.keep_awake.enabled" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep Mac awake while an agent is working"
+          }
+        }
+      }
+    },
+    "preferences.keep_awake.only_plugged_in" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only when connected to power"
+          }
+        }
+      }
+    },
+    "preferences.keep_awake.section" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sleep"
+          }
+        }
+      }
+    },
     "preferences.notifications.enabled" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1622,6 +1662,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Attention"
+          }
+        }
+      }
+    },
+    "preferences.tab.power" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Power"
           }
         }
       }

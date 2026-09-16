@@ -83,6 +83,15 @@ PATH precedence in `Session.composeEnvironment(inherited:projectEnv:extra:)`: pr
 - Notifications are opt-in (`AttentionPreferences`). One notification identifier **per project**, so a later transition updates the same banner instead of stacking; resolving the attention state withdraws it. Clicking a notification routes through `SessionManager.focus(projectID:)`
 - `Session.hasUnseenOutput` is the sidebar's unread dot: set when a turn finishes (`AttentionEvent.finishedOutputting` — the one definition of "finished", shared with notifications) while the session isn't viewed (selected **and** app active, `SessionManager.isAppActive` injectable for tests); cleared by `markSelectedSessionSeen()` from ContentView's selection-change and `didBecomeActive` sites, and by any transition out of `.idle`. Lives in `SessionManager.trackUnseenOutput`, part of the `onStateChanged` fan-out — not a new observer slot
 
+## Keep awake
+
+- `KeepAwake` holds an idle-sleep assertion while **any** session is `.working`, gated on `KeepAwakePreferences` (on by default, plugged-in-only by default) and the live power source. Attention states don't hold it — nothing is progressing and the user isn't there
+- The assertion is `ProcessInfo.beginActivity(.idleSystemSleepDisabled)` — verified to be `PreventUserIdleSystemSleep`, i.e. `caffeinate -i`. Display sleep and lid-close sleep are untouched. It's in-process on purpose: powerd drops it when we die, and `pmset -g assertions` attributes it to SandFestival. Don't replace it with a spawned `caffeinate` — an orphan keeps the Mac awake forever
+- `KeepAwake.shouldHold` is pure; the instance owns the side effect and reconciles on any input change. Same split as `AttentionDecision.decide`. `SleepAssertion` and `PowerSourceMonitor` are protocols so tests count holds/releases and flip the charger without IOKit
+- Power source: `IOPSCreateLimitedPowerNotification`, which posts only on AC↔battery transitions — not `IOPSNotificationCreateRunLoopSource`, which fires on every percent tick. The callback carries no payload, so `isPluggedIn` re-reads `IOPSGetProvidingPowerSourceType` each time. The source is scheduled on the main run loop and the callback uses `MainActor.assumeIsolated`; don't move it to another loop
+- Driven by `SessionManager.anyWorkingDidChange`, which fires only when "is any session working?" flips — a **third** slot next to `sessionStateObserver` and `sessionDidFinishWork`, same rule: don't merge. It's recomputed from the transition fan-out and from `removeProject`, so removing a working project releases without waiting for its `.stopped`
+- The hold is only as correct as the state: a live claude whose hooks stopped reaching us stays `.working` and keeps the Mac awake. That's a visible sidebar bug to fix at the source, not something to paper over with an assertion timeout — multi-hour runs are legitimate
+
 ## Worktree status
 
 - `WorktreeStatusStore` is the single cache of per-project git state. Only projects with `worktreeInfo != nil` are sampled — each sample is a subprocess, and nothing else renders one. It owns no timer, and coalesces: one sample per project in flight at a time

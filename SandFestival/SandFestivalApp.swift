@@ -9,6 +9,8 @@ struct SandFestivalApp: App {
     @State private var attentionPreferences = AttentionPreferences()
     @State private var attentionNotifier: AttentionNotifier?
     @State private var statusStore = WorktreeStatusStore()
+    @State private var keepAwakePreferences = KeepAwakePreferences()
+    @State private var keepAwake: KeepAwake?
     @State private var manualHookSheet = false
     @State private var updateSheet = false
     @State private var editorTarget: ProjectEditorTarget?
@@ -36,6 +38,12 @@ struct SandFestivalApp: App {
                     }
                     manager.sessionDidFinishWork = { [statusStore] project in
                         statusStore.refresh(project: project)
+                    }
+                    if keepAwake == nil {
+                        keepAwake = KeepAwake(preferences: keepAwakePreferences)
+                    }
+                    manager.anyWorkingDidChange = { [keepAwake] anyWorking in
+                        keepAwake?.anyWorking = anyWorking
                     }
                     statusStore.refreshAll(projects: manager.projects)
                     await attachAdapterIfNeeded()
@@ -104,6 +112,14 @@ struct SandFestivalApp: App {
                         Label(
                             String(localized: "preferences.tab.terminal"),
                             systemImage: "terminal"
+                        )
+                    }
+
+                KeepAwakePreferencesView(preferences: keepAwakePreferences)
+                    .tabItem {
+                        Label(
+                            String(localized: "preferences.tab.power"),
+                            systemImage: "powerplug"
                         )
                     }
             }

@@ -51,6 +51,13 @@ final class SessionManager {
     /// to say to each other.
     @ObservationIgnored var sessionDidFinishWork: ((Project) -> Void)?
 
+    /// Fires when the answer to "is any session working?" flips, and only
+    /// then — `KeepAwake` holds the idle-sleep assertion on `true` and drops
+    /// it on `false`. Its own slot for the same reason `sessionDidFinishWork`
+    /// is: it has nothing to say to the attention pipeline.
+    @ObservationIgnored var anyWorkingDidChange: ((Bool) -> Void)?
+    @ObservationIgnored private var anyWorking = false
+
     /// Gates the "auto-surface to row 0 on Claude-driven activity" behavior.
     /// App layer wires this to AttentionPreferences so Core stays free of the
     /// preference type. Defaults to off — bare `SessionManager()` (and tests)
@@ -180,6 +187,7 @@ final class SessionManager {
             adapter?.willTerminateSession(handle(for: project))
         }
         sessions.removeValue(forKey: id)
+        refreshAnyWorking()
         projects.removeAll { $0.id == id }
         // Any duplicates of the removed project become top-level on their
         // own — preserve them rather than cascade-removing. The user can
@@ -345,8 +353,16 @@ final class SessionManager {
             self.notifyIfWorkFinished(projectID: session.id, from: old, to: new)
             self.refocusIfStartTransition(projectID: session.id, from: old, to: new)
             self.trackUnseenOutput(session: session, from: old, to: new)
+            self.refreshAnyWorking()
         }
         return session
+    }
+
+    private func refreshAnyWorking() {
+        let now = sessions.values.contains { $0.state == .working }
+        guard now != anyWorking else { return }
+        anyWorking = now
+        anyWorkingDidChange?(now)
     }
 
     /// A turn that ends while the session isn't on screen is worth an unread
