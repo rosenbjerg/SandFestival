@@ -24,8 +24,6 @@ struct WorktreeStatusStoreTests {
         let store = WorktreeStatusStore(probe: probe.callable)
         let project = makeWorktreeProject()
 
-        // The in-flight marker is set synchronously, so the second call can
-        // see it without any waiting for the first to finish.
         let first = store.refresh(project: project)
         let second = store.refresh(project: project)
         #expect(first != nil)
@@ -33,7 +31,6 @@ struct WorktreeStatusStoreTests {
 
         await first?.value
         #expect(probe.count == 1)
-        // Once it has landed, the next refresh goes through again.
         await store.refresh(project: project)?.value
         #expect(probe.count == 2)
     }
@@ -57,8 +54,6 @@ struct WorktreeStatusStoreTests {
 
         await store.refresh(project: project)?.value
 
-        // The sidebar renders this as "worktree missing" — dropping it would
-        // leave the row showing a stale branch forever.
         #expect(store.result(for: project.id) == .unavailable)
     }
 
@@ -120,8 +115,6 @@ struct WorktreeStatusStoreTests {
         )
     }
 
-    /// Counts calls across the actor hop the store makes to run the probe off
-    /// the main thread, so the count needs its own synchronization.
     private final class ProbeSpy: @unchecked Sendable {
         private let lock = NSLock()
         private let result: GitStatusResult
@@ -143,8 +136,6 @@ struct WorktreeStatusStoreTests {
             return bases
         }
 
-        /// Records the base each call was given, so the test can assert
-        /// the worktree's recorded fork point actually reaches git.
         private(set) var bases: [String?] = []
 
         var callable: @Sendable (URL, String?) -> GitStatusResult {

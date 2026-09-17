@@ -46,7 +46,6 @@ struct ProjectEditorDraftTests {
     func isValidUsesExpandedPath() throws {
         let dir = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: dir) }
-        // Seeding from a real folder fills name + command + an existing path.
         var draft = ProjectDraft(seedFolder: dir)
         #expect(draft.isValid)
         draft.pathString = "/no/such/dir/\(UUID().uuidString)"

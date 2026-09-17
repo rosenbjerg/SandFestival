@@ -81,9 +81,6 @@ struct HookPayloadTranslatorTests {
 
     @Test("PostToolUse for non-AskUserQuestion tools yields no event")
     func postToolUseYieldsNil() {
-        // The state machine already short-circuits same-state events, so
-        // there's nothing for a generic PostToolUse to do — emit nothing
-        // rather than carry a placeholder event through the sink.
         #expect(HookPayloadTranslator.translate(makePayload(event: "PostToolUse")) == nil)
         #expect(HookPayloadTranslator.translate(makePayload(event: "PostToolUse", toolName: "Bash")) == nil)
     }
@@ -113,8 +110,6 @@ struct HookPayloadTranslatorTests {
 
     @Test("SessionEnd yields no event — OS process termination is the authoritative .stopped signal")
     func sessionEndYieldsNil() {
-        // SessionEnd also fires for /clear and /resume while the process keeps
-        // running, so it must not push the state machine into .stopped.
         #expect(HookPayloadTranslator.translate(makePayload(event: "SessionEnd")) == nil)
     }
 
@@ -193,9 +188,6 @@ struct SessionBindingStoreTests {
 
     @Test("two projects sharing a cwd bind to their own ids, not each other's")
     func sharedCwdProjectsDoNotCollide() {
-        // The bug this fix targets: a "Duplicate…" without a worktree points
-        // the child project at the parent's path. Routing by the injected id
-        // keeps the two sessions distinct even though the cwd is identical.
         let store = SessionBindingStore()
         let parent = UUID()
         let child = UUID()
@@ -244,11 +236,6 @@ struct SessionBindingStoreTests {
         store.registerPendingSpawn(projectID: projectID)
         let first = store.bindOnSessionStart(sessionID: "sess-1", projectID: projectID)
         #expect(first == .freshSpawn(projectID))
-        // /resume mints a new session_id without restarting the process. As
-        // long as we haven't been told the project is gone, the new session_id
-        // must bind to the same project so subsequent events route correctly.
-        // The outcome distinguishes this from the first SessionStart so the
-        // adapter can react (clearing the previous conversation's title).
         let second = store.bindOnSessionStart(sessionID: "sess-2", projectID: projectID)
         #expect(second == .rebound(projectID))
         #expect(store.projectID(forSession: "sess-2") == projectID)
@@ -261,8 +248,6 @@ struct SessionBindingStoreTests {
 
         store.registerPendingSpawn(projectID: projectID)
         _ = store.bindOnSessionStart(sessionID: "sess-1", projectID: projectID)
-        // unbindAll fires on process termination — a stray claude run for the
-        // same project afterwards must not attach to the dead session.
         store.unbindAll(projectID: projectID)
         let stray = store.bindOnSessionStart(sessionID: "sess-stray", projectID: projectID)
         #expect(stray == nil)

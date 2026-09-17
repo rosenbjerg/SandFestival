@@ -103,7 +103,6 @@ struct SessionTerminalViewOutputTests {
         String(repeating: "line\n", count: count)
     }
 
-    /// The change callback hops through a `Task` onto the main actor.
     private func settle() async {
         try? await Task.sleep(for: .milliseconds(30))
     }

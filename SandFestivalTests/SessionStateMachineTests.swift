@@ -81,13 +81,9 @@ struct SessionStateMachineTests {
 
     @Test(".sessionRestarted drives the same transitions as .started")
     func sessionRestartedMirrorsStarted() {
-        // `.sessionRestarted` is `/resume` / `/clear` — the side effect lives
-        // in Session.apply (drop the stale terminal title); state-machine
-        // transitions are identical to `.started`.
         #expect(SessionStateMachine.next(from: .starting, event: .sessionRestarted) == .idle)
         #expect(SessionStateMachine.next(from: .errored(reason: "x"), event: .sessionRestarted) == .idle)
         #expect(SessionStateMachine.next(from: .stopped, event: .sessionRestarted) == .idle)
-        // On a live session it's a no-op, same as `.started`.
         for state in [SessionState.idle, .working, .waitingForPermission, .waitingForIdle, .blockedByAutoMode] {
             #expect(SessionStateMachine.next(from: state, event: .sessionRestarted) == state)
         }
@@ -107,15 +103,11 @@ struct SessionStateMachineTests {
 
     @Test("waitingForIdle + .userInteracted → idle")
     func waitingForIdleResolvesOnUserInteraction() {
-        // Claude Code emits no hook when the user dismisses AskUserQuestion
-        // with Ctrl+C, so terminal input is the fallback resolution signal.
         #expect(SessionStateMachine.next(from: .waitingForIdle, event: .userInteracted) == .idle)
     }
 
     @Test(".userInteracted is ignored in every other state")
     func userInteractedIgnoredOutsideWaitingForIdle() {
-        // Typing during e.g. waitingForPermission must not fake a grant —
-        // those states have their own resolution paths.
         let ignoringStates: [SessionState] = [
             .starting, .idle, .working,
             .waitingForPermission, .blockedByAutoMode,

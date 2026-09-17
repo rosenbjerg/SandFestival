@@ -47,7 +47,6 @@ struct UserShellPathShellPickerTests {
 
     @Test("returns the SHELL value when it is an executable file")
     func returnsExecutableShell() {
-        // /bin/sh is guaranteed to be an executable on every macOS host.
         let picked = UserShellPath.resolveShellExecutable(env: ["SHELL": "/bin/sh"])
         #expect(picked == "/bin/sh")
     }
@@ -126,8 +125,7 @@ struct UserShellPathSubprocessTests {
         )
         let elapsed = Date().timeIntervalSince(start)
         #expect(path == nil)
-        // Should return shortly after the deadline, not after the full 5s
-        // sleep. The polling tick is 20 ms, so allow generous headroom.
+        // Generous headroom over the deadline; tightening this makes it flaky.
         #expect(elapsed < 1.5)
     }
 

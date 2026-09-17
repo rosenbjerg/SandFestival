@@ -20,7 +20,6 @@ struct ClaudeCodeUpdaterTests {
     func shellDirsTakePrecedence() {
         let result = ClaudeCodeUpdater.searchPath(shellPath: "/custom/bin:/opt/tools")
         #expect(result.starts(with: ["/custom/bin", "/opt/tools"]))
-        // Fallback dirs are appended so a native ~/.local/bin install still resolves.
         for dir in CommandResolver.defaultSearchPath {
             #expect(result.contains(dir))
         }

@@ -10,8 +10,6 @@ struct ProjectEditorTargetTests {
         let plain = ProjectEditorTarget.add(seedFolder: nil)
         let seededA = ProjectEditorTarget.add(seedFolder: URL(fileURLWithPath: "/tmp/a"))
         let seededB = ProjectEditorTarget.add(seedFolder: URL(fileURLWithPath: "/tmp/b"))
-        // sheet(item:) keys on Identifiable.id — a shared "add" id would make
-        // it treat a re-seeded Add target as the same item and drop it.
         #expect(plain.id != seededA.id)
         #expect(seededA.id != seededB.id)
     }

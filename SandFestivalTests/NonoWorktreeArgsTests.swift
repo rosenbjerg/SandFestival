@@ -12,7 +12,6 @@ struct NonoWorktreeArgsTests {
         )
         let split = ArgsSplitter.split(result)
         #expect(split.wrapper.suffix(2) == ["--allow", "/Users/me/repo"])
-        // The agent segment is untouched.
         #expect(split.agent == ["claude", "--enable-auto-mode"])
     }
 

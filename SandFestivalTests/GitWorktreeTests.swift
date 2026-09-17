@@ -2,19 +2,14 @@ import Foundation
 import Testing
 @testable import SandFestival
 
-/// Integration test: spins up a real git repo in a temp directory and
-/// exercises add/remove/listLocalBranches. Skipped automatically if
-/// `git` isn't on PATH so CI environments without git don't fail.
 @Suite("GitWorktree integration")
 struct GitWorktreeTests {
 
     @Test("isValidBranchName accepts ordinary names and rejects malformed ones")
     func branchNameValidation() {
-        // Names a user would plausibly type — all fine.
         for name in ["main", "feature-x", "fix/bug-123", "release_2.0", "wip"] {
             #expect(GitWorktree.isValidBranchName(name), "\(name) should be valid")
         }
-        // Each of these trips a distinct `git check-ref-format` rule.
         for name in [
             "", "@", "has space", "-leading-dash", "trailing.lock",
             "double..dot", "ends-with-dot.", "/leading-slash", "trailing-slash/",
@@ -60,8 +55,6 @@ struct GitWorktreeTests {
     func initRepositoryReportsCreationFailure() throws {
         let parent = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: parent) }
-        // A regular file can't be a parent directory, so createDirectory fails
-        // before git is ever invoked.
         let blocker = parent.appendingPathComponent("blocker")
         try "".write(to: blocker, atomically: true, encoding: .utf8)
 
@@ -106,9 +99,6 @@ struct GitWorktreeTests {
     func isGitRepoAcceptsRelativeGitlink() throws {
         let dir = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: dir) }
-        // Synthesize the shape `git worktree add` produces: a sibling
-        // gitdir containing a HEAD file, and a relative gitlink pointing
-        // at it from the worktree dir.
         let gitdir = dir.appendingPathComponent("siblingdir", isDirectory: true)
         try FileManager.default.createDirectory(at: gitdir, withIntermediateDirectories: true)
         try "ref: refs/heads/main\n".write(
@@ -177,7 +167,6 @@ struct GitWorktreeTests {
             return
         }
         #expect(FileManager.default.fileExists(atPath: worktreePath.path))
-        // The new branch should now appear in the list.
         let branchesAfterAdd = GitWorktree.listLocalBranches(at: sourceRepo)
         #expect(branchesAfterAdd.contains("feature/twin"))
 
@@ -215,8 +204,6 @@ struct GitWorktreeTests {
             Issue.record("addWorktree failed: \(addResult)")
             return
         }
-        // Worktree must go away first — git refuses `branch -d` for a
-        // branch that's checked out somewhere.
         let removeResult = GitWorktree.removeWorktree(
             worktreePath: worktreePath,
             sourceRepoPath: sourceRepo,
@@ -226,8 +213,6 @@ struct GitWorktreeTests {
             Issue.record("removeWorktree failed: \(removeResult)")
             return
         }
-        // A freshly-created branch with no commits beyond the base is
-        // considered merged, so the non-force `-d` should accept it.
         let deleteResult = GitWorktree.deleteBranch(
             name: "feature/twin",
             sourceRepoPath: sourceRepo,
@@ -258,12 +243,10 @@ struct GitWorktreeTests {
             base: "main",
             sourceRepoPath: sourceRepo
         )
-        // Add an unmerged commit to the worktree so non-force delete refuses.
         try Data("hello".utf8).write(to: worktreePath.appendingPathComponent("note.txt"))
         try runGit(["add", "note.txt"], at: worktreePath)
         try runGit(["commit", "-m", "diverge"], at: worktreePath, withIdentity: true)
 
-        // Removing the worktree needs --force because of the new commit.
         let removed = GitWorktree.removeWorktree(
             worktreePath: worktreePath,
             sourceRepoPath: sourceRepo,
@@ -273,7 +256,6 @@ struct GitWorktreeTests {
             Issue.record("removeWorktree --force failed: \(removed)")
             return
         }
-        // Non-force branch delete must refuse the unmerged branch.
         let softDelete = GitWorktree.deleteBranch(
             name: "feature/twin",
             sourceRepoPath: sourceRepo,
@@ -282,7 +264,6 @@ struct GitWorktreeTests {
         if case .success = softDelete {
             Issue.record("expected non-force deleteBranch to refuse unmerged branch")
         }
-        // Force should succeed.
         let forced = GitWorktree.deleteBranch(
             name: "feature/twin",
             sourceRepoPath: sourceRepo,
@@ -306,9 +287,6 @@ struct GitWorktreeTests {
         try runGit(["init", "-b", "main"], at: sourceRepo)
         try runGit(["commit", "--allow-empty", "-m", "initial"], at: sourceRepo, withIdentity: true)
 
-        // Pre-create the worktree path with a file inside so `git worktree add`
-        // refuses — git happily accepts *empty* directories, the conflict only
-        // triggers when there's existing content.
         let worktreePath = workspace.appendingPathComponent("twin", isDirectory: true)
         try FileManager.default.createDirectory(at: worktreePath, withIntermediateDirectories: true)
         try Data("blocker".utf8).write(to: worktreePath.appendingPathComponent("file.txt"))
@@ -323,8 +301,7 @@ struct GitWorktreeTests {
         case .success:
             Issue.record("expected addWorktree to fail for existing path")
         case .failure(let err):
-            // Pass when we got *any* git error description — the exact
-            // wording is git-version-dependent.
+            // Any description: the exact wording is git-version-dependent.
             #expect(err.errorDescription?.isEmpty == false)
         }
     }
@@ -360,7 +337,6 @@ struct GitWorktreeTests {
         let dir = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: dir) }
         let gitignore = dir.appendingPathComponent(".gitignore")
-        // No trailing newline — common when the file was hand-edited.
         try "build/".write(to: gitignore, atomically: true, encoding: .utf8)
 
         GitWorktree.ensureWorktreesIgnored(at: dir)
@@ -378,7 +354,6 @@ struct GitWorktreeTests {
         try original.write(to: gitignore, atomically: true, encoding: .utf8)
 
         GitWorktree.ensureWorktreesIgnored(at: dir)
-        // Run a second time to confirm idempotency under back-to-back calls.
         GitWorktree.ensureWorktreesIgnored(at: dir)
 
         let contents = try String(contentsOf: gitignore, encoding: .utf8)
@@ -416,8 +391,6 @@ struct GitWorktreeTests {
         let dir = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: dir) }
         let gitignore = dir.appendingPathComponent(".gitignore")
-        // The comment looks like a covering pattern but git ignores it,
-        // so we should still append a real entry.
         try "# .worktrees/\nbuild/\n".write(to: gitignore, atomically: true, encoding: .utf8)
 
         GitWorktree.ensureWorktreesIgnored(at: dir)
@@ -431,8 +404,6 @@ struct GitWorktreeTests {
         let dir = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: dir) }
         let gitignore = dir.appendingPathComponent(".gitignore")
-        // Suffix is part of the path segment, so this only ignores a
-        // specifically-named file — not the directory we want to cover.
         try ".worktrees-backup/\n".write(to: gitignore, atomically: true, encoding: .utf8)
 
         GitWorktree.ensureWorktreesIgnored(at: dir)
@@ -483,8 +454,6 @@ struct GitWorktreeTests {
         #expect(inUse.contains("main"))
         #expect(inUse.contains("feature/twin"))
 
-        // A branch that exists locally but isn't checked out anywhere
-        // shouldn't appear.
         try runGit(["branch", "parked"], at: sourceRepo)
         let inUseAfter = GitWorktree.listInUseBranches(at: sourceRepo)
         #expect(!inUseAfter.contains("parked"))
@@ -500,8 +469,6 @@ struct GitWorktreeTests {
         try FileManager.default.createDirectory(at: sourceRepo, withIntermediateDirectories: true)
         try runGit(["init", "-b", "main"], at: sourceRepo)
         try runGit(["commit", "--allow-empty", "-m", "initial"], at: sourceRepo, withIdentity: true)
-        // A branch that's NOT currently checked out anywhere — the duplicate
-        // flow's "continue work on an existing branch" path is exactly this.
         try runGit(["branch", "feature/parked"], at: sourceRepo)
 
         let worktreePath = workspace.appendingPathComponent("twin", isDirectory: true)
@@ -515,12 +482,9 @@ struct GitWorktreeTests {
             return
         }
         #expect(FileManager.default.fileExists(atPath: worktreePath.path))
-        // listLocalBranches shouldn't gain a new branch — we checked out an
-        // existing one, not created a new one.
         let branches = GitWorktree.listLocalBranches(at: sourceRepo)
         #expect(branches.contains("feature/parked"))
-        #expect(branches.count == 2) // main + feature/parked
-        // And feature/parked is now in use.
+        #expect(branches.count == 2)
         let inUse = GitWorktree.listInUseBranches(at: sourceRepo)
         #expect(inUse.contains("feature/parked"))
     }
@@ -536,7 +500,6 @@ struct GitWorktreeTests {
         try runGit(["init", "-b", "main"], at: sourceRepo)
         try runGit(["commit", "--allow-empty", "-m", "initial"], at: sourceRepo, withIdentity: true)
 
-        // `main` is the primary worktree's HEAD — git should refuse.
         let worktreePath = workspace.appendingPathComponent("twin", isDirectory: true)
         let result = GitWorktree.checkoutWorktree(
             existingBranch: "main",
@@ -558,7 +521,6 @@ struct GitWorktreeTests {
         #expect(GitWorktree.localName(forRemoteRef: "origin/main") == "main")
         #expect(GitWorktree.localName(forRemoteRef: "origin/feat/foo") == "feat/foo")
         #expect(GitWorktree.localName(forRemoteRef: "upstream/main") == "main")
-        // Nothing to strip — returned unchanged rather than emptied.
         #expect(GitWorktree.localName(forRemoteRef: "main") == "main")
     }
 
@@ -585,8 +547,6 @@ struct GitWorktreeTests {
         let repo = try makeRepoWithRemote(in: workspace)
         try runGit(["branch", "feature/remote-only"], at: repo)
         try runGit(["push", "origin", "feature/remote-only"], at: repo)
-        // `set-head` materializes the symref a clone would have created; it's
-        // not a branch anyone would pick by name.
         try runGit(["remote", "set-head", "origin", "main"], at: repo)
 
         let remotes = GitWorktree.listRemoteBranches(at: repo)
@@ -601,7 +561,6 @@ struct GitWorktreeTests {
         let workspace = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: workspace) }
         let repo = try makeRepoWithRemote(in: workspace)
-        // Only a fetch writes FETCH_HEAD — `push -u` doesn't.
         #expect(GitWorktree.lastFetchDate(at: repo) == nil)
 
         let result = GitWorktree.fetch(at: repo)
@@ -623,7 +582,6 @@ struct GitWorktreeTests {
         let snapshot = await GitWorktree.loadBranchSnapshot(at: repo)
         #expect(snapshot.local.contains("main"))
         #expect(snapshot.remote.contains("origin/main"))
-        // `main` is the primary working tree's HEAD, so it's in use.
         #expect(snapshot.inUse.contains("main"))
         #expect(snapshot.hasRemotes)
         #expect(snapshot.lastFetch != nil)
@@ -652,7 +610,6 @@ struct GitWorktreeTests {
         let workspace = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: workspace) }
         let repo = try makeRepoWithRemote(in: workspace)
-        // A branch that exists only on the remote — the teammate's-branch case.
         try runGit(["branch", "feature/theirs"], at: repo)
         try runGit(["push", "origin", "feature/theirs"], at: repo)
         try runGit(["branch", "-D", "feature/theirs"], at: repo)
@@ -669,8 +626,6 @@ struct GitWorktreeTests {
             Issue.record("checkoutRemoteWorktree failed: \(result)")
             return
         }
-        // A plain `worktree add <path> origin/…` would leave HEAD detached
-        // and set no upstream; both assertions fail in that world.
         let head = try runGitCapturing(["rev-parse", "--abbrev-ref", "HEAD"], at: worktreePath)
         #expect(head == "feature/theirs")
         let upstream = try runGitCapturing(["rev-parse", "--abbrev-ref", "@{u}"], at: worktreePath)
@@ -726,11 +681,8 @@ struct GitWorktreeTests {
         }
         try runGit(["commit", "--allow-empty", "-m", "work"], at: worktreePath, withIdentity: true)
         try runGit(["commit", "--allow-empty", "-m", "more work"], at: worktreePath, withIdentity: true)
-        // Move the base on too, so behind is genuinely exercised.
         try runGit(["commit", "--allow-empty", "-m", "meanwhile"], at: sourceRepo, withIdentity: true)
 
-        // A `-b` branch has no upstream, so without a base there's nothing
-        // to compare and both counts stay zero.
         guard case .status(let bare) = GitWorktree.status(at: worktreePath) else {
             Issue.record("status came back unavailable")
             return
@@ -760,7 +712,6 @@ struct GitWorktreeTests {
             Issue.record("status came back unavailable")
             return
         }
-        // Falls back to what porcelain reported against the upstream.
         #expect(status.comparisonRef == "origin/main")
         #expect(status.ahead == 1)
     }
@@ -775,8 +726,6 @@ struct GitWorktreeTests {
 
     // MARK: - Helpers
 
-    /// A repo with a bare `origin` it has already pushed `main` to — the
-    /// shape the remote-facing calls need.
     private func makeRepoWithRemote(in workspace: URL) throws -> URL {
         let remote = workspace.appendingPathComponent("origin.git", isDirectory: true)
         try FileManager.default.createDirectory(at: remote, withIntermediateDirectories: true)
@@ -792,7 +741,6 @@ struct GitWorktreeTests {
     }
 
     private func hasGit() -> Bool {
-        // Soft-skip: tests bail out silently on CI/dev machines without git.
         CommandResolver.resolve("git") != nil
     }
 
@@ -805,8 +753,6 @@ struct GitWorktreeTests {
         return url
     }
 
-    /// Runs git in `cwd`. When `withIdentity` is true, injects author/committer
-    /// env so `git commit` works without a system-level git config.
     private func runGit(_ args: [String], at cwd: URL, withIdentity: Bool = false) throws {
         guard let git = CommandResolver.resolve("git") else { throw GitNotInstalled() }
         let task = Process()
@@ -833,8 +779,6 @@ struct GitWorktreeTests {
         }
     }
 
-    /// Runs git and hands back trimmed stdout. Separate from `runGit`, which
-    /// most callers use only to assert the command succeeded.
     private func runGitCapturing(_ args: [String], at cwd: URL) throws -> String {
         guard let git = CommandResolver.resolve("git") else { throw GitNotInstalled() }
         let task = Process()

@@ -91,7 +91,6 @@ struct WorktreeBaseBranchStoreTests {
         #expect(store.base(for: good) == "main")
         #expect(store.base(for: bad) == nil)
 
-        // And a subsequent write keeps the surviving entry.
         store.remember("develop", for: bad)
         #expect(store.base(for: good) == "main")
         #expect(store.base(for: bad) == "develop")

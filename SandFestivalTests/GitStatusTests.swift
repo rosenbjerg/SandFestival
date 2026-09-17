@@ -23,7 +23,6 @@ struct GitStatusTests {
         #expect(status.comparisonRef == "origin/feature/login")
         #expect(status.ahead == 2)
         #expect(status.behind == 3)
-        // Ordinary, renamed, unmerged and untracked all count as changed.
         #expect(status.changedFiles == 5)
         #expect(status.isClean == false)
     }

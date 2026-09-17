@@ -15,9 +15,6 @@ struct ProcessGroupTerminatorTests {
 
     @Test("A pid that isn't its own group leader is signalled alone")
     func singleTargetWhenGroupBelongsToSomeoneElse() {
-        // This is the recycled-pid / unexpected-spawn-shape case: the group
-        // now belongs to processes we never spawned, so killpg would be a
-        // stranger's problem.
         #expect(ProcessGroupTerminator.target(leader: 4242, processGroup: 17) == .single(4242))
     }
 
@@ -28,8 +25,6 @@ struct ProcessGroupTerminatorTests {
 
     @Test("Non-positive pids resolve to no target at all")
     func noTargetForInvalidPid() {
-        // kill(0, …) signals our own process group and kill(-1, …) signals
-        // everything we own — both catastrophic, so they must never resolve.
         #expect(ProcessGroupTerminator.target(leader: 0, processGroup: 0) == nil)
         #expect(ProcessGroupTerminator.target(leader: -1, processGroup: -1) == nil)
         #expect(ProcessGroupTerminator.signalGroup(leader: 0, signal: SIGKILL) == false)
@@ -39,10 +34,6 @@ struct ProcessGroupTerminatorTests {
 
     @Test("liveMembers sees a leader and its child; the group kill takes both")
     func killsWholeGroupIncludingGrandchild() async throws {
-        // Mirrors the session's shape: a setsid leader (stand-in for nono)
-        // that forks a long-lived child (stand-in for claude) and then waits,
-        // which is precisely the arrangement where signalling the leader alone
-        // leaves the child running.
         let leader = try spawnDetachedLeaderWithChild()
 
         let members = try await pollUntil(timeout: .seconds(3)) {
@@ -57,27 +48,18 @@ struct ProcessGroupTerminatorTests {
             ProcessGroupTerminator.liveMembers(leader: leader).isEmpty ? true : nil
         }
         #expect(cleared)
-        // Reap the leader so the test doesn't leave a zombie for the runner.
         var status: Int32 = 0
         waitpid(leader, &status, WNOHANG)
     }
 
     @Test("liveMembers is empty for a pid that isn't running")
     func noMembersForUnknownGroup() throws {
-        // `0` stops at the `pid > 0` guard; the high pid is the one that
-        // actually reaches sysctl. Nothing to kill, and — more importantly —
-        // no false "still running" that would block a removal.
         #expect(ProcessGroupTerminator.liveMembers(leader: 0).isEmpty)
         #expect(ProcessGroupTerminator.liveMembers(leader: try unusedPid()).isEmpty)
     }
 
     @Test("A live pid that isn't its own group leader still reports as running")
     func nonLeaderIsReportedLive() async throws {
-        // Regression: the sweep used to query KERN_PROC_PGRP unconditionally.
-        // A non-leader owns no group, so that query came back empty and
-        // `forceStopAndWait` reported a confirmed kill for a process that was
-        // still very much alive — clearing the way for `git worktree remove` to
-        // run underneath it.
         let child = try spawnChildInOurGroup()
         defer { reap(child) }
 
@@ -121,7 +103,6 @@ struct ProcessGroupTerminatorTests {
         captured = tracked
 
         #expect(tracked.contains { $0.pid == leader })
-        // An unstamped entry would defeat the recycled-pid guard entirely.
         #expect(tracked.allSatisfy { $0.startSeconds > 0 })
     }
 
@@ -153,10 +134,8 @@ struct ProcessGroupTerminatorTests {
         var status: Int32 = 0
         waitpid(leader, &status, WNOHANG)
 
-        // Probe the escapee with `kill(_, 0)` rather than asking `liveMembers`.
-        // The sweep is the thing under test, so it cannot also be the evidence:
-        // a sweep that ignores `tracked` reports "clear" the moment the group
-        // dies, and this test would pass while the escapee ran on.
+        // kill(_, 0), not liveMembers: the sweep is the thing under test, so
+        // it cannot also be the evidence.
         let gone = try await pollUntil(timeout: .seconds(5)) {
             kill(escapee, 0) == -1 && errno == ESRCH ? true : nil
         }
@@ -178,8 +157,6 @@ struct ProcessGroupTerminatorTests {
         captured = tracked
         let grandchild = try #require(tracked.map(\.pid).first { $0 != child })
 
-        // The `.single` query sees only the leader — the grandchild sits in the
-        // runner's group, which we deliberately refuse to sweep.
         #expect(!ProcessGroupTerminator.liveMembers(leader: child).contains(grandchild))
         #expect(ProcessGroupTerminator.liveMembers(leader: child, tracked: tracked).contains(grandchild))
 
@@ -207,8 +184,6 @@ struct ProcessGroupTerminatorTests {
             startMicroseconds: real.startMicroseconds
         )
 
-        // Same live pid, different stamp: this is the recycled-pid case, and
-        // treating it as a survivor would aim a SIGKILL at a stranger.
         let absent = try unusedPid()
         #expect(ProcessGroupTerminator.liveMembers(leader: absent, tracked: [stale]).isEmpty)
         #expect(ProcessGroupTerminator.liveMembers(leader: absent, tracked: [real]) == [child])
@@ -216,8 +191,6 @@ struct ProcessGroupTerminatorTests {
 
     // MARK: - Helpers
 
-    /// Finds a descendant of `leader` that has left its process group — the
-    /// escapee — returning the snapshot alongside it.
     private func escapeeOf(
         leader: pid_t
     ) async throws -> (Set<ProcessGroupTerminator.TrackedProcess>, pid_t) {
@@ -229,9 +202,7 @@ struct ProcessGroupTerminatorTests {
         }
     }
 
-    /// `posix_spawn`s a `POSIX_SPAWN_SETSID` leader that forks a child which
-    /// calls `setsid` for itself, so it leaves the leader's group while staying
-    /// its descendant by parent link. macOS ships no `setsid(1)`, hence python.
+    // python because macOS ships no setsid(1).
     private func spawnLeaderWithEscapee() throws -> pid_t {
         var attr: posix_spawnattr_t?
         posix_spawnattr_init(&attr)
@@ -249,8 +220,6 @@ struct ProcessGroupTerminatorTests {
         return pid
     }
 
-    /// A child in the runner's group that forks a grandchild — the `.single`
-    /// shape where the descendant is invisible to the target query.
     private func spawnChildWithGrandchildInOurGroup() throws -> pid_t {
         let args = ["/bin/sh", "-c", "sleep 30 & wait"]
         var pid: pid_t = 0
@@ -269,17 +238,12 @@ struct ProcessGroupTerminatorTests {
         )
     }
 
-    /// Kills the group *and* anything tracked, so an escapee can't outlive the
-    /// test as a 30-second stray.
     private func cleanUp(leader: pid_t, tracked: Set<ProcessGroupTerminator.TrackedProcess>) {
         ProcessGroupTerminator.signalAll(leader: leader, tracked: tracked, signal: SIGKILL)
         var status: Int32 = 0
         waitpid(leader, &status, WNOHANG)
     }
 
-    /// `posix_spawn`s `sh -c 'sleep 30 & wait'` with `POSIX_SPAWN_SETSID` so the
-    /// child becomes its own session and group leader, exactly like a forkpty
-    /// child. The `sleep` it backgrounds inherits that group.
     private func spawnDetachedLeaderWithChild() throws -> pid_t {
         var attr: posix_spawnattr_t?
         posix_spawnattr_init(&attr)
@@ -296,9 +260,6 @@ struct ProcessGroupTerminatorTests {
         return pid
     }
 
-    /// `posix_spawn`s `sleep 30` *without* `POSIX_SPAWN_SETSID`, so the child
-    /// stays in the test runner's process group and is therefore not its own
-    /// group leader — the shape that resolves to `.single`.
     private func spawnChildInOurGroup() throws -> pid_t {
         let args = ["/bin/sh", "-c", "sleep 30"]
         var pid: pid_t = 0
@@ -310,10 +271,7 @@ struct ProcessGroupTerminatorTests {
         return pid
     }
 
-    /// A pid that is valid but genuinely not in use. Probed rather than
-    /// guessed: `ESRCH` from `kill(pid, 0)` is the only thing that actually
-    /// says "no such process" (`EPERM` means it exists and we may not signal
-    /// it), and pids are handed out well below the 99999 ceiling.
+    // ESRCH only: EPERM from kill(pid, 0) means the process exists.
     private func unusedPid() throws -> pid_t {
         for candidate in stride(from: pid_t(99_998), through: pid_t(50_000), by: -1)
         where kill(candidate, 0) == -1 && errno == ESRCH {
@@ -333,10 +291,7 @@ struct ProcessGroupTerminatorTests {
         waitpid(pid, &status, 0)
     }
 
-    /// Polls `body` until it returns a value or the timeout expires. Process
-    /// teardown is asynchronous — SIGKILL is delivered immediately but the
-    /// process table entry disappears a moment later — so every assertion about
-    /// liveness has to be a poll rather than a single sample.
+    // Every liveness assertion must poll: the process table lags the SIGKILL.
     private func pollUntil<T>(
         timeout: Duration,
         _ body: () -> T?
@@ -351,8 +306,6 @@ struct ProcessGroupTerminatorTests {
 }
 
 private extension [String] {
-    /// Builds a NULL-terminated argv for `posix_spawn`, valid for the duration
-    /// of `body`.
     func withCStringArray<R>(_ body: (UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>) -> R) -> R {
         var pointers: [UnsafeMutablePointer<CChar>?] = map { strdup($0) }
         pointers.append(nil)

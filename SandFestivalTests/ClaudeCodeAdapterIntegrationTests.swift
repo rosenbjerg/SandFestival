@@ -2,11 +2,6 @@ import Foundation
 import Testing
 @testable import SandFestival
 
-/// End-to-end coverage for the Claude Code adapter's hook ingestion path:
-/// HookListener → HookRequestParser → HookPayloadDecoder →
-/// HookPayloadTranslator → SessionBindingStore → AgentEventSink. The pieces
-/// each have unit tests; this suite makes sure they still fit together
-/// after refactors.
 @MainActor
 @Suite("ClaudeCodeAdapter integration", .serialized)
 struct ClaudeCodeAdapterIntegrationTests {
@@ -39,8 +34,6 @@ struct ClaudeCodeAdapterIntegrationTests {
         let project = env.makeProject(cwdName: "sf-int-\(UUID().uuidString)")
         _ = env.adapter.prepareSpawn(project: project)
 
-        // Bind the session via SessionStart, then drain the resulting event so
-        // we can assert on the follow-up cleanly.
         try await env.postHook([
             "session_id": "sess-perm",
             "hook_event_name": "SessionStart",
@@ -68,7 +61,6 @@ struct ClaudeCodeAdapterIntegrationTests {
         let project = env.makeProject(cwdName: "sf-int-\(UUID().uuidString)")
         _ = env.adapter.prepareSpawn(project: project)
 
-        // 1. Original session starts.
         try await env.postHook([
             "session_id": "sess-original",
             "hook_event_name": "SessionStart",
@@ -77,8 +69,6 @@ struct ClaudeCodeAdapterIntegrationTests {
         try await env.sink.waitForEvents(1)
         env.sink.drainEvents()
 
-        // 2. User runs /resume — claude emits SessionEnd for the old id and
-        //    SessionStart for a new id, but the OS process keeps running.
         try await env.postHook([
             "session_id": "sess-original",
             "hook_event_name": "SessionEnd",
@@ -90,8 +80,6 @@ struct ClaudeCodeAdapterIntegrationTests {
             "cwd": project.path.path,
         ], projectID: project.id)
 
-        // 3. A follow-up event under the new session_id must route to the same
-        //    project — this is what proves the rebind worked end-to-end.
         try await env.postHook([
             "session_id": "sess-resumed",
             "hook_event_name": "UserPromptSubmit",
@@ -100,11 +88,6 @@ struct ClaudeCodeAdapterIntegrationTests {
 
         try await env.sink.waitForEvents(2)
 
-        // SessionEnd no longer emits anything, so the only events we expect are
-        // .sessionRestarted (the resumed SessionStart, distinguished from a
-        // fresh-spawn .started so Session drops the stale conversation title)
-        // and .working (from the follow-up UserPromptSubmit). Crucially: no
-        // .stopped, and no fresh-spawn .started either.
         let events = env.sink.events
         #expect(events.allSatisfy { $0.projectID == project.id })
         #expect(events.contains { $0.event == .sessionRestarted })
@@ -118,7 +101,6 @@ struct ClaudeCodeAdapterIntegrationTests {
         let env = try await IntegrationEnvironment.start(port: 51795)
         defer { env.teardown() }
 
-        // A "Duplicate…" without a worktree gives the child the parent's path.
         let cwdName = "sf-int-\(UUID().uuidString)"
         let parent = env.makeProject(cwdName: cwdName)
         let child = env.makeProject(cwdName: cwdName)
@@ -139,8 +121,6 @@ struct ClaudeCodeAdapterIntegrationTests {
 
         try await env.sink.waitForEvents(2)
         let events = env.sink.events
-        // Each session's .started must land on its own project — before the
-        // fix the shared cwd routed both to whichever spawned last.
         #expect(events.contains { $0.projectID == parent.id && $0.event == .started })
         #expect(events.contains { $0.projectID == child.id && $0.event == .started })
     }
@@ -164,7 +144,7 @@ struct ClaudeCodeAdapterIntegrationTests {
         )
         #expect(status == 401)
 
-        // Give the listener a beat in case it would (incorrectly) dispatch.
+        // Without the beat a wrongly dispatched event wouldn't have landed yet.
         try await Task.sleep(for: .milliseconds(100))
         #expect(env.sink.events.isEmpty)
     }
@@ -201,11 +181,8 @@ private struct IntegrationEnvironment {
     }
 
     func makeProject(cwdName: String) -> Project {
-        // Pass `isDirectory: true` so the URL is derived purely from the string,
-        // not the filesystem. The bare `appendingPathComponent(_:)` probes disk
-        // and appends a trailing slash once the directory exists — so calling
-        // this twice for the same cwd (the shared-cwd case) would yield URLs
-        // that differ only by that slash and compare unequal.
+        // isDirectory: true — the bare overload probes disk and adds a trailing
+        // slash once the directory exists, so two calls would compare unequal.
         let cwd = FileManager.default.temporaryDirectory
             .appendingPathComponent(cwdName, isDirectory: true)
         try? FileManager.default.createDirectory(at: cwd, withIntermediateDirectories: true)
@@ -228,8 +205,6 @@ private struct IntegrationEnvironment {
         if sendAuthHeader {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
-        // Mirrors the spawn-injected header the real hook command forwards;
-        // SessionStart routing binds on this rather than the cwd.
         if let projectID {
             request.setValue(
                 projectID.uuidString,

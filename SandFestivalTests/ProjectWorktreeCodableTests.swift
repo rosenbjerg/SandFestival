@@ -7,9 +7,6 @@ struct ProjectWorktreeCodableTests {
 
     @Test("legacy JSON without worktreeInfo decodes with worktreeInfo == nil")
     func legacyJSONDecodesWithoutWorktreeInfo() throws {
-        // Mirrors what a pre-duplicate-projects projects.json looks like —
-        // the key is simply absent. Synthesised Codable should treat
-        // missing optional keys as nil.
         let legacyJSON = """
         [
           {
@@ -53,8 +50,6 @@ struct ProjectWorktreeCodableTests {
 
     @Test("worktreeInfo recorded before baseBranch existed still decodes")
     func worktreeInfoWithoutBaseBranchDecodes() throws {
-        // A projects.json written before the sidebar started measuring
-        // divergence: worktreeInfo is there, but has no baseBranch key.
         let legacyJSON = """
         [
           {

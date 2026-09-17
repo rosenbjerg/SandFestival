@@ -105,8 +105,6 @@ struct SessionManagerUnseenOutputTests {
 
     // MARK: - Helpers
 
-    /// The manager selects the first project on load, so `projects[0]` is
-    /// the viewed one and `projects[1]` is off-screen.
     private func makeManager() throws -> (SessionManager, [Project]) {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("SessionManagerUnseenOutputTests-\(UUID().uuidString)", isDirectory: true)

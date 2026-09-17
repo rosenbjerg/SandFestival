@@ -40,7 +40,6 @@ struct SettingsJSONManagerTests {
         #expect(json["theme"] as? String == "dark")
         let hooks = try #require(json["hooks"] as? [String: Any])
         let sessionStart = try #require(hooks["SessionStart"] as? [[String: Any]])
-        // user's original command hook is still there alongside our HTTP one
         let teamGroupExists = sessionStart.contains { group in
             (group["matcher"] as? String) == "team"
         }
@@ -105,9 +104,6 @@ struct SettingsJSONManagerTests {
         let url = temporaryURL()
         let manager = SettingsJSONManager(fileURL: url)
         try manager.uninstall()
-        // No throw, and no file created if there was nothing to write.
-        // The file may or may not exist depending on implementation; we just
-        // require it doesn't contain our entries.
         if FileManager.default.fileExists(atPath: url.path) {
             let json = try parsedSettings(at: url)
             #expect(collectOurURLs(in: json).isEmpty)
@@ -121,7 +117,7 @@ struct SettingsJSONManagerTests {
         #expect(try !manager.isInstalled(port: 51789))
         try manager.install(port: 51789)
         #expect(try manager.isInstalled(port: 51789))
-        #expect(try !manager.isInstalled(port: 51790))  // different port
+        #expect(try !manager.isInstalled(port: 51790))
     }
 
     @Test("malformed JSON throws SettingsJSONManagerError.malformedJSON")
@@ -146,8 +142,6 @@ struct SettingsJSONManagerTests {
         let url = temporaryURL()
         try seed(url: url, content: #"{ "theme": "dark" }"#)
         let fileManager = FileManager.default
-        // Drop all permissions: the file exists but can't be read. `try?` used
-        // to swallow that and treat the file as empty — which then wiped it.
         try fileManager.setAttributes([.posixPermissions: 0], ofItemAtPath: url.path)
         defer { try? fileManager.setAttributes([.posixPermissions: 0o644], ofItemAtPath: url.path) }
 
@@ -156,7 +150,6 @@ struct SettingsJSONManagerTests {
             try manager.install(port: 51789)
         }
 
-        // Restore read access and confirm the user's content survived untouched.
         try fileManager.setAttributes([.posixPermissions: 0o644], ofItemAtPath: url.path)
         let json = try parsedSettings(at: url)
         #expect(json["theme"] as? String == "dark")
@@ -194,7 +187,6 @@ struct SettingsJSONManagerTests {
     @Test("detectInstallState reports outdated when a legacy http entry is present")
     func detectStateOutdatedForLegacyHttpEntry() throws {
         let url = temporaryURL()
-        // Seed every event with the old `type: "http"` shape we used to ship.
         var hooks: [String: Any] = [:]
         let legacyEntry: [String: Any] = [
             "type": "http",
@@ -228,12 +220,9 @@ struct SettingsJSONManagerTests {
         let json = try parsedSettings(at: url)
         let hooks = try #require(json["hooks"] as? [String: Any])
         let preGroups = try #require(hooks["PreToolUse"] as? [[String: Any]])
-        // Our PreToolUse entry must live in a group whose matcher is the
-        // tool name — otherwise we'd fire a curl on every tool call.
         let ourGroup = try #require(preGroups.first { containsOurEntry($0) })
         #expect((ourGroup["matcher"] as? String) == "AskUserQuestion")
 
-        // Every other event we install stays scoped to the empty matcher.
         for event in HookEvent.allCases where event != .preToolUse {
             let groups = try #require(hooks[event.rawValue] as? [[String: Any]])
             let group = try #require(groups.first { containsOurEntry($0) })
@@ -247,8 +236,6 @@ struct SettingsJSONManagerTests {
         let manager = SettingsJSONManager(fileURL: url)
         try manager.install(port: 51789)
 
-        // Tamper the matcher to simulate a previous install where PreToolUse
-        // was registered with the empty matcher (would fire on every tool).
         var json = try parsedSettings(at: url)
         var hooks = try #require(json["hooks"] as? [String: Any])
         var preGroups = try #require(hooks["PreToolUse"] as? [[String: Any]])
@@ -286,9 +273,7 @@ struct SettingsJSONManagerTests {
         for event in HookEvent.allCases {
             let groups = try #require(allHooks[event.rawValue] as? [[String: Any]])
             let entries = groups.flatMap { ($0["hooks"] as? [[String: Any]]) ?? [] }
-            // No more legacy http entries
             #expect(!entries.contains { ($0["type"] as? String) == "http" })
-            // At least one current command entry referencing our sentinel
             #expect(entries.contains {
                 ($0["type"] as? String) == "command"
                     && (($0["command"] as? String)?.contains(HookEntryFactory.sourceSentinel) ?? false)
@@ -348,8 +333,6 @@ struct SettingsJSONManagerTests {
     }
 
     private func extractHookURL(from command: String) -> String? {
-        // Pulls a `http://127.0.0.1:<port>/event?source=sand-festival` token
-        // out of the curl command string the factory produces.
         guard let range = command.range(of: #"http://127\.0\.0\.1:\d+/event\?source=sand-festival"#,
                                         options: .regularExpression) else { return nil }
         return String(command[range])

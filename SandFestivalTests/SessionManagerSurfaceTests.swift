@@ -43,7 +43,6 @@ struct SessionManagerSurfaceTests {
         let (manager, projects) = try makeManager()
         manager.shouldSurfaceOnActivity = { true }
 
-        // .stopped → .idle via .started — not a surface trigger
         manager.session(for: projects[2].id)?.apply(event: .started)
 
         #expect(manager.projects.map(\.id) == projects.map(\.id))
@@ -82,15 +81,12 @@ struct SessionManagerSurfaceTests {
             parentProjectID: parent.id
         )
         let other = Project(name: "Other", path: URL(fileURLWithPath: "/tmp/other"))
-        // Parent block sits behind an unrelated top-level project.
         try store.save([other, parent, child])
         let manager = SessionManager(store: store)
         manager.shouldSurfaceOnActivity = { true }
 
         manager.session(for: child.id)?.apply(event: .working)
 
-        // The parent block moves to the front; the child rides along and
-        // stays contiguous under its parent rather than being orphaned at 0.
         #expect(manager.projects.map(\.id) == [parent.id, child.id, other.id])
     }
 

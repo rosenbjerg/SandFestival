@@ -39,14 +39,11 @@ struct ProjectDuplicateDraftTests {
         var draft = makeDraft(sourcePath: "/Users/me/repo", sourceName: "Demo")
         draft.branchName = "new-feature"
         draft.refreshDerivedFields()
-        // User overrides the suggested name.
         draft.name = "My Custom Name"
         draft.nameUserEdited = true
-        // Then keeps tweaking the branch.
         draft.branchName = "other-feature"
         draft.refreshDerivedFields()
         #expect(draft.name == "My Custom Name")
-        // Path still tracks because the user didn't touch it.
         #expect(draft.pathString == "/Users/me/repo/.worktrees/other-feature")
     }
 
@@ -60,7 +57,6 @@ struct ProjectDuplicateDraftTests {
         draft.branchName = "other-feature"
         draft.refreshDerivedFields()
         #expect(draft.pathString == "/elsewhere/custom-dir")
-        // Name still tracks.
         #expect(draft.name == "Demo (other-feature)")
     }
 
@@ -122,27 +118,19 @@ struct ProjectDuplicateDraftTests {
             isGitRepo: true,
             isGitInstalled: false
         )
-        // The view hides the section entirely; the draft should match so a
-        // hidden default-on flag can't influence isValid behind the user's
-        // back.
         #expect(draft.isGitRepo == true)
         #expect(draft.isGitInstalled == false)
         #expect(draft.createWorktree == false)
-        // And a no-worktree duplicate is still valid out of the box.
         #expect(draft.isValid)
     }
 
     @Test("isValid for a no-worktree duplicate only requires a name")
     func noWorktreeValidationOnlyNeedsName() {
         var draft = makeDraft(sourcePath: "/Users/me/notes", sourceName: "Notes", isGitRepo: false)
-        // Default name = source name, so a freshly-built no-worktree draft is already valid.
         #expect(draft.isValid)
-        // Blank name invalidates it.
         draft.name = "   "
         draft.nameUserEdited = true
         #expect(!draft.isValid)
-        // Branch and path are irrelevant in this mode — even with both
-        // blank, a sensible name keeps us valid.
         draft.name = "Notes (copy)"
         #expect(draft.isValid)
     }
@@ -154,9 +142,8 @@ struct ProjectDuplicateDraftTests {
         draft.pathUserEdited = true
         let expected = (("~/elsewhere/twin") as NSString).expandingTildeInPath
         #expect(draft.resolvedPathString == expected)
-        // Sanity: the expansion actually changed something — guards against
-        // a test environment where `~` doesn't expand (would let a regression
-        // slip through silently).
+        // Guards against an environment where `~` doesn't expand, which would
+        // let a regression through silently.
         #expect(!draft.resolvedPathString.hasPrefix("~"))
     }
 
@@ -205,8 +192,6 @@ struct ProjectDuplicateDraftTests {
         draft.refreshDerivedFields()
         #expect(draft.isValid)
 
-        // A branch that isn't in the local-branch list shouldn't validate —
-        // the picker wouldn't have offered it, and git would just fail.
         draft.branchName = "ghost-branch"
         draft.refreshDerivedFields()
         #expect(!draft.isValid)
@@ -237,10 +222,6 @@ struct ProjectDuplicateDraftTests {
             availableBranches: ["main"],
             branchesInUse: ["main"]
         )
-        // New-branch mode is creating a fresh branch, so a name that isn't in
-        // the existing list (or even one that collides with an in-use branch
-        // name — git will be the one to complain) is still considered valid
-        // from the draft's perspective.
         draft.worktreeMode = .newBranch
         draft.branchName = "brand-new"
         draft.refreshDerivedFields()
@@ -270,9 +251,6 @@ struct ProjectDuplicateDraftTests {
 
     @Test("duplicating a duplicate anchors the new child to the top-level ancestor")
     func resolvedParentAnchorsToAncestorNotChild() {
-        // The sidebar renders only two levels, so a duplicate whose parent is
-        // itself a child would render nowhere. A duplicate of a duplicate must
-        // hang off the top-level ancestor, not the intermediate child.
         let topLevelID = UUID()
         let childSource = Project(
             name: "Demo (feature-x)",
@@ -338,13 +316,11 @@ struct ProjectDuplicateDraftTests {
         var draft = makeDraft(sourcePath: "/Users/me/repo", sourceName: "Demo")
         draft.branchName = "new-feature"
         draft.refreshDerivedFields()
-        // Pin the path at the occupied directory.
         draft.pathString = occupied.path
         draft.pathUserEdited = true
         #expect(draft.blockingIssue == .pathOccupied)
         #expect(!draft.isValid)
 
-        // An existing *empty* directory is acceptable — git reuses it.
         let empty = fileManager.temporaryDirectory
             .appendingPathComponent("dup-empty-\(UUID())", isDirectory: true)
         try fileManager.createDirectory(at: empty, withIntermediateDirectories: true)
@@ -374,9 +350,6 @@ struct ProjectDuplicateDraftTests {
 
     @Test("a worktree child reads the base remembered against its top-level ancestor")
     func rememberedBaseSharedAcrossLineage() {
-        // Duplicating a worktree child passes that child's path as the source
-        // repo, so keying the memory by path would start it out empty. The
-        // lineage id keeps one memory per repo.
         let topLevelID = UUID()
         let store = makeStore()
         store.remember("main", for: topLevelID)
@@ -421,11 +394,9 @@ struct ProjectDuplicateDraftTests {
             isGitInstalled: true
         )
         #expect(draft.baseBranch == "gone")
-        // The async branch list lands and the remembered branch isn't in it.
         draft.availableBranches = ["main", "develop"]
         draft.pruneUnknownBaseBranch()
         #expect(draft.baseBranch == nil)
-        // The memory itself is untouched — only a successful create rewrites it.
         #expect(draft.rememberedBaseBranch == "gone")
     }
 
@@ -448,9 +419,6 @@ struct ProjectDuplicateDraftTests {
 
     @Test("pruning against an empty branch list is a no-op")
     func pruneNoOpsWhileBranchesUnknown() {
-        // An empty list means the listing failed or hasn't arrived — not
-        // evidence the branch is gone. Clearing here would blank the field
-        // during the load on every open.
         let source = Project(name: "Demo", path: URL(fileURLWithPath: "/Users/me/repo"))
         let store = makeStore()
         store.remember("main", for: source.id)
@@ -472,13 +440,10 @@ struct ProjectDuplicateDraftTests {
         let refs = ["main", "develop", "feature/Login", "feature/signup", "hotfix/crash"]
             .map { GitRef(name: $0, kind: .local) }
         func names(_ matched: [GitRef]) -> [String] { matched.map(\.name) }
-        // An empty or whitespace filter returns everything, order preserved.
         #expect(BranchPickerField.matching(refs, filter: "") == refs)
         #expect(BranchPickerField.matching(refs, filter: "   ") == refs)
-        // Substring match, case-insensitive.
         #expect(names(BranchPickerField.matching(refs, filter: "feature")) == ["feature/Login", "feature/signup"])
         #expect(names(BranchPickerField.matching(refs, filter: "LOGIN")) == ["feature/Login"])
-        // No match yields an empty list.
         #expect(BranchPickerField.matching(refs, filter: "ghost").isEmpty)
     }
 
@@ -500,8 +465,6 @@ struct ProjectDuplicateDraftTests {
             availableBranches: ["main", "feature-x"]
         )
         draft.remoteBranches = ["origin/main", "origin/release"]
-        // `main` and `origin/main` are different commits — branching off the
-        // remote one is the whole point when the local branch has gone stale.
         #expect(draft.baseRefs == [
             GitRef(name: "main", kind: .local),
             GitRef(name: "feature-x", kind: .local),
@@ -563,8 +526,6 @@ struct ProjectDuplicateDraftTests {
         draft.branchName = "origin/feat/foo"
         #expect(draft.isRemoteSelection)
         #expect(draft.resolvedLocalBranch == "feat/foo")
-        // Name and path follow the local branch, not the remote ref — a
-        // worktree at `.worktrees/origin/feat/foo` would be nonsense.
         draft.refreshDerivedFields()
         #expect(draft.name == "Demo (feat/foo)")
         #expect(draft.pathString == "/Users/me/repo/.worktrees/feat/foo")
@@ -592,8 +553,6 @@ struct ProjectDuplicateDraftTests {
             availableBranches: ["main"]
         )
         draft.remoteBranches = ["origin/feat"]
-        // Contrived, but typing the ref verbatim in new-branch mode still
-        // has to mean "create a branch called that".
         draft.branchName = "origin/feat"
         #expect(draft.isRemoteSelection == false)
         #expect(draft.resolvedLocalBranch == "origin/feat")
@@ -612,8 +571,6 @@ struct ProjectDuplicateDraftTests {
         draft.refreshDerivedFields()
         #expect(draft.blockingIssue == nil)
 
-        // A local branch appearing under it — a list that went stale while
-        // the sheet was open — blocks the create rather than letting git fail.
         draft.availableBranches = ["main", "theirs"]
         #expect(draft.blockingIssue == .branchAlreadyExists(branch: "theirs"))
     }
@@ -657,8 +614,6 @@ struct ProjectDuplicateDraftTests {
         var draft = makeDraft(sourcePath: base.path, sourceName: "Demo")
         draft.branchName = "feat/foo"
         draft.refreshDerivedFields()
-        // Targets <base>/.worktrees/feat/foo, and git hasn't created either
-        // intermediate yet — so the panel has to fall back to <base>.
         #expect(draft.suggestedParentDir == (base.path as NSString).standardizingPath)
     }
 
@@ -683,8 +638,6 @@ struct ProjectDuplicateDraftTests {
         )
     }
 
-    /// A store on a throwaway suite, so a base branch remembered on this
-    /// machine can't leak into the drafts under test.
     private func makeStore() -> WorktreeBaseBranchStore {
         let name = "app.sandfestival.tests.duplicate-draft.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!

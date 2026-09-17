@@ -29,7 +29,6 @@ struct SessionComposeArgsTests {
     @Test("default project args resume with the flag in the agent invocation")
     func defaultArgsContinue() throws {
         let result = Session.composeArgs(base: Project.defaultArgs, extraAgentArgs: ["--continue"])
-        // The flag belongs to claude, i.e. after the wrapper's `--` separator.
         let separator = try #require(result.firstIndex(of: "--"))
         #expect(result[separator...].contains("claude"))
         #expect(result.last == "--continue")
