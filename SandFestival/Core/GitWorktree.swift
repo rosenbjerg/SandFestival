@@ -1,25 +1,10 @@
 import Foundation
 
-/// Thin wrapper around `git worktree` and `git branch` calls used by the
-/// project-duplicate flow. Functions are `nonisolated` so callers on the
-/// MainActor can hop to a background `Task` for the blocking
-/// `Process.waitUntilExit()`.
 enum GitWorktree {
-    /// True when a `git` binary is reachable on PATH. Cheap — just a
-    /// filesystem stat per search-path entry, no subprocess. Used by the
-    /// duplicate sheet to hide the Worktree section entirely when there's
-    /// no point offering it: every git-backed mutation would fail with
-    /// `.gitNotFound` on submit anyway, and `listLocalBranches` would
-    /// silently return empty in the meantime.
     static func isGitInstalled() -> Bool {
         CommandResolver.resolve("git") != nil
     }
 
-    /// Conservative check that `name` is a usable `git branch` name, so the
-    /// duplicate sheet can reject a doomed name keystroke-by-keystroke
-    /// instead of letting `git worktree add -b` fail at submit. Pure — no
-    /// subprocess. Mirrors the subset of `git check-ref-format` rules a user
-    /// is likely to trip over by hand; `git` itself remains the final word.
     static func isValidBranchName(_ name: String) -> Bool {
         guard !name.isEmpty, name != "@" else { return false }
         guard !name.hasPrefix("-"), !name.hasPrefix("/"), !name.hasSuffix("/") else { return false }
@@ -30,20 +15,12 @@ enum GitWorktree {
             if forbidden.contains(character) { return false }
             if let scalar = character.unicodeScalars.first, scalar.value < 0x20 { return false }
         }
-        // No slash-separated component may begin with "." or end with ".lock".
         for component in name.split(separator: "/", omittingEmptySubsequences: false) {
             if component.hasPrefix(".") || component.hasSuffix(".lock") { return false }
         }
         return true
     }
 
-    /// True when `path` looks like a git working tree (regular repo *or*
-    /// an existing worktree). A regular repo has `.git` as a directory
-    /// containing `HEAD`; a linked worktree has `.git` as a gitlink file
-    /// `gitdir: <path>` pointing at the worktree's per-worktree gitdir,
-    /// which also contains `HEAD`. We resolve the gitlink and verify a
-    /// `HEAD` exists at the target so stale gitlinks (worktree gitdir
-    /// deleted out from under us) and unrelated `.git` files don't pass.
     static func isGitRepo(at path: URL) -> Bool {
         let fm = FileManager.default
         let gitURL = path.appendingPathComponent(".git")
@@ -73,9 +50,6 @@ enum GitWorktree {
         return fm.fileExists(atPath: gitDir.appendingPathComponent("HEAD").path)
     }
 
-    /// Local branch names in sidebar order (whatever `git branch` returns).
-    /// Empty array on any failure — caller should treat that as "user types
-    /// the base branch manually" rather than surfacing an error.
     nonisolated static func listLocalBranches(at path: URL) -> [String] {
         guard let result = runGit(["branch", "--format=%(refname:short)"], at: path),
               result.exitCode == 0
@@ -86,9 +60,6 @@ enum GitWorktree {
             .filter { !$0.isEmpty }
     }
 
-    /// Remote-tracking branch names (`origin/main`) in `git branch -r` order.
-    /// `origin/HEAD` is dropped: it's a symref onto the remote's default
-    /// branch, not something a user would pick by name.
     nonisolated static func listRemoteBranches(at path: URL) -> [String] {
         guard let result = runGit(["branch", "--remotes", "--format=%(refname:short)"], at: path),
               result.exitCode == 0
@@ -99,25 +70,16 @@ enum GitWorktree {
             .filter { !$0.isEmpty && !$0.hasSuffix("/HEAD") }
     }
 
-    /// True when the repo has at least one remote configured. Tells "no
-    /// remotes at all" apart from "remotes we've never fetched" — both show
-    /// an empty remote branch list, and only the second is worth offering a
-    /// Fetch button for.
     nonisolated static func hasRemotes(at path: URL) -> Bool {
         guard let result = runGit(["remote"], at: path), result.exitCode == 0 else { return false }
         return result.stdout.contains { !$0.isWhitespace }
     }
 
-    /// The local branch name a remote-tracking ref maps onto — everything
-    /// after the remote name. `origin/feat/foo` → `feat/foo`.
     static func localName(forRemoteRef ref: String) -> String {
         guard let slash = ref.firstIndex(of: "/") else { return ref }
         return String(ref[ref.index(after: slash)...])
     }
 
-    /// When the repo last fetched, from `FETCH_HEAD`'s mtime, or `nil` if it
-    /// never has. Lets the duplicate sheet say how stale its remote branch
-    /// list is without paying for a network round trip.
     nonisolated static func lastFetchDate(at path: URL) -> Date? {
         guard let result = runGit(["rev-parse", "--git-path", "FETCH_HEAD"], at: path),
               result.exitCode == 0
@@ -131,9 +93,6 @@ enum GitWorktree {
         return attributes?[.modificationDate] as? Date
     }
 
-    /// `git fetch --prune`. The only call in this file that touches the
-    /// network, so the only one carrying a deadline — an unreachable host
-    /// would otherwise wedge the sheet's refresh indefinitely.
     nonisolated static func fetch(
         at path: URL,
         timeout: TimeInterval = 20
@@ -141,7 +100,6 @@ enum GitWorktree {
         runChecked(["fetch", "--prune"], at: path, timeout: timeout)
     }
 
-    /// Everything the duplicate sheet needs to know about a repo's branches.
     struct BranchSnapshot: Equatable {
         var local: [String] = []
         var remote: [String] = []
@@ -150,11 +108,9 @@ enum GitWorktree {
         var lastFetch: Date?
     }
 
-    /// Gathers the whole snapshot in one hop off the main actor. SwiftUI view
-    /// construction blocks on `waitUntilExit()` otherwise, jamming the runloop
-    /// while the system is trying to present the sheet — same shape as the
-    /// `NonoProfileDiscovery.availableProfilesAsync` fix.
     static func loadBranchSnapshot(at path: URL) async -> BranchSnapshot {
+        // Detached: the waitUntilExit() calls inside would otherwise block the
+        // main actor while the sheet is presenting.
         await Task.detached(priority: .userInitiated) {
             let remotesConfigured = hasRemotes(at: path)
             return BranchSnapshot(
@@ -167,7 +123,6 @@ enum GitWorktree {
         }.value
     }
 
-    /// `git worktree add -b <newBranch> <newPath> [<base>]` from `sourceRepoPath`.
     nonisolated static func addWorktree(
         newBranch: String,
         newPath: URL,
@@ -181,11 +136,6 @@ enum GitWorktree {
         return runChecked(args, at: sourceRepoPath)
     }
 
-    /// `git worktree add <newPath> <existingBranch>` from `sourceRepoPath`.
-    /// Used by the duplicate flow's "continue work on an existing branch" mode.
-    /// Git refuses if the branch is already checked out in another worktree —
-    /// we filter those out in the picker but the caller still surfaces the
-    /// error if a race slips one through.
     nonisolated static func checkoutWorktree(
         existingBranch: String,
         newPath: URL,
@@ -195,11 +145,7 @@ enum GitWorktree {
         return runChecked(args, at: sourceRepoPath)
     }
 
-    /// `git worktree add --track -b <localBranch> <newPath> <remoteRef>` from
-    /// `sourceRepoPath`. A bare `git worktree add <path> origin/feat` checks
-    /// out a *detached HEAD* rather than a branch tracking the remote, which
-    /// is never what "continue work on this branch" is asking for — so
-    /// picking a remote ref has to create the local branch explicitly.
+    // Without `--track -b`, adding a remote ref checks out a detached HEAD.
     nonisolated static func checkoutRemoteWorktree(
         remoteRef: String,
         localBranch: String,
@@ -210,18 +156,10 @@ enum GitWorktree {
         return runChecked(args, at: sourceRepoPath)
     }
 
-    /// Branch short-names currently checked out in any worktree of this repo
-    /// (including the primary working tree). `git worktree add` refuses a
-    /// branch that's in use elsewhere, so the duplicate picker uses this to
-    /// disable those rows. Empty set on parse failure — caller still sees the
-    /// branch as selectable and gets the git error if they actually pick it.
     nonisolated static func listInUseBranches(at sourceRepoPath: URL) -> Set<String> {
         guard let result = runGit(["worktree", "list", "--porcelain"], at: sourceRepoPath),
               result.exitCode == 0
         else { return [] }
-        // Each `branch refs/heads/<name>` line marks a worktree that has that
-        // branch checked out. Detached-HEAD worktrees produce a `detached`
-        // line instead, which we ignore.
         let prefix = "branch refs/heads/"
         var names = Set<String>()
         for line in result.stdout.split(whereSeparator: \.isNewline) {
@@ -233,17 +171,6 @@ enum GitWorktree {
         return names
     }
 
-    /// Samples a working tree's git state.
-    ///
-    /// `--no-optional-locks` is load-bearing, not a nicety: a plain
-    /// `git status` refreshes and rewrites `.git/index`, and this runs on a
-    /// timer against directories a live agent is working in. The flag exists
-    /// for exactly this polling case.
-    /// When `base` is given it wins over the upstream: a worktree branched
-    /// with `-b` has no upstream at all, so porcelain reports no divergence
-    /// and "2 commits ahead of `main`" is the only reading that means
-    /// anything. A base that has since been deleted falls back to the
-    /// upstream rather than erroring.
     nonisolated static func status(at path: URL, base: String? = nil) -> GitStatusResult {
         guard let result = runGit(
             ["--no-optional-locks", "status", "--porcelain=v2", "--branch"],
@@ -259,12 +186,6 @@ enum GitWorktree {
         return .status(status)
     }
 
-    /// Commits separating `base` from HEAD.
-    ///
-    /// `git rev-list --left-right --count <base>...HEAD` prints
-    /// "<left>\t<right>": left counts commits reachable from `base` but not
-    /// HEAD — which is how far *behind* HEAD is — and right the reverse.
-    /// Getting the two round the wrong way inverts the sidebar.
     nonisolated static func divergence(
         from base: String,
         at path: URL
@@ -275,28 +196,19 @@ enum GitWorktree {
         ), result.exitCode == 0
         else { return nil }
         let fields = result.stdout.split(whereSeparator: { $0 == "\t" || $0 == " " || $0.isNewline })
+        // --left-right prints <base-only> then <HEAD-only>: left is behind, right is ahead.
         guard fields.count >= 2, let behind = Int(fields[0]), let ahead = Int(fields[1]) else {
             return nil
         }
         return (ahead: ahead, behind: behind)
     }
 
-    /// Idempotently ensures `.worktrees/` is listed in the source repo's
-    /// `.gitignore`. Creates the file if missing, leaves it alone if a
-    /// covering entry is already present, and is silent on I/O failure —
-    /// gitignore hygiene is a nicety, not load-bearing for the worktree
-    /// itself, so we don't want to surface errors that would block the
-    /// project creation flow.
     nonisolated static func ensureWorktreesIgnored(at repoPath: URL) {
         let gitignore = repoPath.appendingPathComponent(".gitignore")
         let existing: String
         if let data = try? Data(contentsOf: gitignore),
            let text = String(data: data, encoding: .utf8) {
             existing = text
-            // Match the shapes that effectively ignore `.worktrees/` at the
-            // repo root: bare, slash-prefixed, trailing slash, and the
-            // `/*`/`/**` glob suffixes people use when their tooling prefers
-            // explicit children. Comment lines are skipped before matching.
             let pattern = /^\/?\.worktrees(?:\/(?:\*{1,2})?)?$/
             let alreadyHas = text
                 .split(whereSeparator: \.isNewline)
@@ -314,8 +226,6 @@ enum GitWorktree {
         try? appended.write(to: gitignore, atomically: true, encoding: .utf8)
     }
 
-    /// `git worktree remove [--force] <worktreePath>` from `sourceRepoPath`.
-    /// Run from the source repo because the worktree dir may be gone already.
     nonisolated static func removeWorktree(
         worktreePath: URL,
         sourceRepoPath: URL,
@@ -327,11 +237,6 @@ enum GitWorktree {
         return runChecked(args, at: sourceRepoPath)
     }
 
-    /// `git branch -d|-D <name>` from `sourceRepoPath`. `force: false` uses
-    /// `-d` so git refuses to delete an unmerged branch; `force: true` uses
-    /// `-D` and discards unmerged work. Callers should only invoke this
-    /// once the worktree that held the branch has been removed — `-d`
-    /// refuses to delete a branch that's currently checked out elsewhere.
     nonisolated static func deleteBranch(
         name: String,
         sourceRepoPath: URL,
@@ -341,13 +246,6 @@ enum GitWorktree {
         return runChecked(["branch", flag, name], at: sourceRepoPath)
     }
 
-    /// Creates `path` (parents included) if it isn't there yet, then runs
-    /// `git init` in it. Lets the project editor point at a repository the
-    /// user hasn't made yet instead of sending them to a terminal first.
-    ///
-    /// An existing repo at `path` is reinitialized rather than refused —
-    /// `git init` leaves refs, config and the worktree untouched, so the
-    /// "create over a folder that already exists" case costs nothing.
     nonisolated static func initRepository(at path: URL) -> Result<Void, GitWorktreeError> {
         do {
             try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true)
@@ -385,9 +283,7 @@ enum GitWorktree {
         task.executableURL = URL(fileURLWithPath: git)
         task.arguments = args
         task.currentDirectoryURL = cwd
-        // No terminal is attached, so a credential or passphrase prompt would
-        // block until the deadline instead of failing fast. Fetch is the call
-        // that can provoke one.
+        // A credential prompt would otherwise hang fetch until the deadline.
         var environment = ProcessInfo.processInfo.environment
         environment["GIT_TERMINAL_PROMPT"] = "0"
         task.environment = environment
@@ -400,8 +296,6 @@ enum GitWorktree {
         } catch {
             return nil
         }
-        // Terminating the child is what unblocks the reads below — there's no
-        // way to interrupt `readDataToEndOfFile` directly.
         let watchdog = TimeoutWatchdog()
         if let timeout {
             DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
@@ -409,9 +303,8 @@ enum GitWorktree {
                 task.terminate()
             }
         }
-        // Drain both pipes concurrently before waiting. If the child outgrows
-        // the ~64 KB pipe buffer on either stream it blocks on write — and a
-        // `waitUntilExit()` before reading would then deadlock against it.
+        // Both streams concurrently, and before waitUntilExit(): a child that
+        // fills a 64 KB pipe blocks on write, and waiting first deadlocks on it.
         let errDrain = PipeDrain(handle: stderr.fileHandleForReading)
         let outData = stdout.fileHandleForReading.readDataToEndOfFile()
         let errData = errDrain.wait()
@@ -432,16 +325,11 @@ enum GitWorktree {
         var timedOut: Bool = false
     }
 
-    /// Decides the race between the timeout firing and the process exiting on
-    /// its own. `DispatchWorkItem.cancel()` can't stop an item already running,
-    /// so without a claim the watchdog could signal a pid Foundation has
-    /// already reaped — and pids get recycled. Whoever takes the lock first
-    /// wins; the loser does nothing.
+    // A claim, not DispatchWorkItem.cancel(): cancel can't stop a running item,
+    // and terminate() after Foundation reaped the pid may hit a recycled one.
     private nonisolated final class TimeoutWatchdog: @unchecked Sendable {
         private let lock = NSLock()
         private var settled = false
-        /// Only written by the winning claim, and only read once `finish()`
-        /// has returned — by which point no further writes are possible.
         private(set) var didExpire = false
 
         func expire() -> Bool { claim(expired: true) }
@@ -458,10 +346,6 @@ enum GitWorktree {
         }
     }
 
-    /// Reads a pipe to EOF on a background queue so a sibling pipe can be
-    /// drained concurrently on the calling thread — neither child stream can
-    /// fill its buffer and wedge the process while the other is read. All
-    /// access to `data` is confined to `queue`, so the `@unchecked` is sound.
     private nonisolated final class PipeDrain: @unchecked Sendable {
         private let handle: FileHandle
         private var data = Data()
@@ -472,16 +356,12 @@ enum GitWorktree {
             queue.async { self.data = self.handle.readDataToEndOfFile() }
         }
 
-        /// Blocks until the background read finishes, then returns the bytes.
         func wait() -> Data {
             queue.sync { data }
         }
     }
 }
 
-/// A branch the duplicate sheet can offer, tagged with where it came from.
-/// `name` is what git is given verbatim, so a remote ref carries its remote
-/// prefix (`origin/main`).
 struct GitRef: Hashable {
     enum Kind: Hashable {
         case local

@@ -1,13 +1,5 @@
 import Foundation
 
-/// Discovers nono profile names for the project editor's dropdown.
-///
-/// Strategy:
-///   1. Run `nono profile list` and parse the indented profile entries —
-///      this picks up built-ins, packs, and user profiles in one shot.
-///   2. If nono isn't on PATH or the call fails, fall back to scanning
-///      `~/.config/nono/profiles/*.json` and prepending the built-in
-///      `claude-code` default so new projects still get a sensible pick.
 enum NonoProfileDiscovery {
     static let builtInDefault = "claude-code"
 
@@ -18,10 +10,9 @@ enum NonoProfileDiscovery {
         return profilesFromFilesystem()
     }
 
-    /// Async wrapper that runs the (subprocess-spawning) discovery off the
-    /// main actor. Call sites in SwiftUI views block view construction
-    /// otherwise, which makes the project editor sheet feel sluggish.
     static func availableProfilesAsync() async -> [String] {
+        // Detached: waitUntilExit() would otherwise block the main actor
+        // during sheet presentation.
         await Task.detached(priority: .userInitiated) {
             availableProfiles()
         }.value
@@ -36,17 +27,14 @@ enum NonoProfileDiscovery {
         task.arguments = ["profile", "list"]
         let stdout = Pipe()
         task.standardOutput = stdout
-        // We never read stderr; leaving it on an unread Pipe would deadlock if
-        // `nono` wrote more than the pipe buffer holds. Discard it instead.
+        // An unread stderr pipe would deadlock once nono fills it.
         task.standardError = FileHandle.nullDevice
         do {
             try task.run()
         } catch {
             return nil
         }
-        // Read stdout to EOF *before* waiting: reading can't deadlock (the
-        // child keeps draining into us), but waiting first while the pipe
-        // fills would.
+        // Read to EOF before waiting, or a full pipe deadlocks against the child.
         let data = stdout.fileHandleForReading.readDataToEndOfFile()
         task.waitUntilExit()
         guard task.terminationStatus == 0 else { return nil }
@@ -55,9 +43,6 @@ enum NonoProfileDiscovery {
         return parsed.isEmpty ? nil : parsed
     }
 
-    /// Parses the human-readable `nono profile list` output. Entries look
-    /// like a 4-space indent followed by `<name> <description>`; section
-    /// headers (`  Built-in:`) are 2-space indent and end with `:`.
     static func parse(_ text: String) -> [String] {
         var seen = Set<String>()
         var names: [String] = []

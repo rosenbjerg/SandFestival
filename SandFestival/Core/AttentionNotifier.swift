@@ -3,18 +3,6 @@ import Foundation
 import Intents
 import UserNotifications
 
-/// Bridges session state changes to macOS attention surfaces: dock badge
-/// (always reflects current count), dock bounce (only on transitions into
-/// `needsAttention`, only when SandFestival isn't frontmost, and only when
-/// system Focus is off), and user notifications (opt-in, configurable
-/// whether they fire only when SandFestival isn't focused or always).
-///
-/// macOS doesn't ship a public API for "is system Focus on" outside of
-/// Intents framework's `INFocusStatusCenter`, which is gated on user
-/// authorization. When authorization hasn't been granted we fall through
-/// (treat Focus as off) — bouncing in that mode is the conservative choice
-/// because the user can mute it via `dockBounceStyle` or by disabling
-/// notifications wholesale.
 @MainActor
 final class AttentionNotifier: NSObject {
     private let preferences: AttentionPreferences
@@ -31,9 +19,8 @@ final class AttentionNotifier: NSObject {
             self?.handleStateChange(session: session, from: old, to: new)
         }
 
-        // When the user brings the app to the front, macOS stops any pending
-        // attention bounce on its own — but we need to drop our tracking id
-        // so we don't try to cancel a stale request later.
+        // macOS ends the bounce itself on activation; drop the id so a later
+        // cancel can't hit a reused one.
         activationObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didBecomeActiveNotification,
             object: nil,
@@ -54,8 +41,6 @@ final class AttentionNotifier: NSObject {
 
     // MARK: - Authorization
 
-    /// Triggers the system Focus-status prompt if it hasn't been answered
-    /// yet. No-op when the user has already accepted or denied.
     func requestFocusAuthorization() {
         let center = INFocusStatusCenter.default
         guard center.authorizationStatus == .notDetermined else { return }
@@ -66,9 +51,6 @@ final class AttentionNotifier: NSObject {
         INFocusStatusCenter.default.authorizationStatus
     }
 
-    /// Requests notification permission. If the user denies, the
-    /// notifications-enabled preference is flipped back off so the UI
-    /// reflects the effective state instead of lying about it.
     @discardableResult
     func requestNotificationAuthorization() async -> Bool {
         let center = UNUserNotificationCenter.current()
@@ -109,9 +91,8 @@ final class AttentionNotifier: NSObject {
         if decision.shouldNotify, let event {
             postNotification(for: session, event: event, state: new)
         }
-        // Only clean up when the user has *resolved* an attention state —
-        // `working → idle` (a finishedOutputting notification we just
-        // posted) must not be withdrawn the same tick.
+        // Not `!new.needsAttention` alone: working → idle would withdraw the
+        // finishedOutputting notification just posted.
         if old.needsAttention, !new.needsAttention {
             cancelBounceIfNoAttentionRemains()
             withdrawNotification(for: session.project.id)
@@ -156,9 +137,6 @@ final class AttentionNotifier: NSObject {
         content.body = Self.notificationBody(for: event, state: state)
         content.sound = .default
         content.userInfo = [Self.projectIDKey: session.project.id.uuidString]
-        // One identifier per project means a subsequent transition (e.g.
-        // waitingForPermission → errored) updates the same banner rather
-        // than stacking duplicates in Notification Center.
         let request = UNNotificationRequest(
             identifier: Self.notificationIdentifier(for: session.project.id),
             content: content,
@@ -211,9 +189,7 @@ extension AttentionNotifier: UNUserNotificationCenterDelegate {
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping @Sendable (UNNotificationPresentationOptions) -> Void
     ) {
-        // Force in-app delivery so the .always notification setting actually
-        // shows banners when SandFestival is frontmost — the default would
-        // silently suppress them.
+        // Without this the .always trigger shows nothing while SandFestival is frontmost.
         completionHandler([.banner, .sound])
     }
 
@@ -236,9 +212,6 @@ extension AttentionNotifier: UNUserNotificationCenterDelegate {
     }
 }
 
-/// Pure decision logic split out so it's testable without spinning up
-/// AppKit or a real Focus center. The notifier owns side effects;
-/// `decide` only answers "given the world right now, what should fire?"
 struct AttentionDecision: Equatable, Sendable {
     var shouldBounce: Bool
     var shouldNotify: Bool

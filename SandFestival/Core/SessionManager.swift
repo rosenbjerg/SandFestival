@@ -12,10 +12,6 @@ final class SessionManager {
     private(set) var lastPersistError: String?
     private(set) var terminalFontSize: CGFloat = SessionManager.defaultFontSize
     private(set) var terminalScrollback: Int = SessionManager.defaultScrollback
-    /// Opt-in flag mirroring SwiftTerm's `setUseMetal`. The GPU path can shave
-    /// real CPU on busy multi-session setups but the SwiftTerm docs flag it as
-    /// "still evolving" — we keep it off by default and let the user flip it
-    /// from preferences.
     private(set) var useMetalRenderer: Bool = false
 
     static let defaultFontSize: CGFloat = 13
@@ -23,10 +19,6 @@ final class SessionManager {
     static let maxFontSize: CGFloat = 32
     private static let fontSizeKey = "terminal.fontSize"
 
-    /// Scrollback covers a few screens of Claude output without ballooning
-    /// memory across many always-resident terminal views (DetailPaneView
-    /// keeps every session's view in the hierarchy, so the cost is linear
-    /// in project count).
     static let defaultScrollback: Int = 2_000
     static let minScrollback: Int = 500
     static let maxScrollback: Int = 50_000
@@ -37,36 +29,11 @@ final class SessionManager {
     @ObservationIgnored private(set) var adapter: (any AgentAdapter)?
     @ObservationIgnored private var router: AgentEventRouter?
 
-    /// Forwards every real session state transition (`from`, `to`) to a
-    /// single subscriber — owned by the App layer and used by
-    /// `AttentionNotifier` to drive dock badge / bounce / notifications.
-    /// Single observer is fine: only one component cares cross-session today,
-    /// and a one-to-one closure beats a publisher for this scope.
     @ObservationIgnored var sessionStateObserver: ((Session, SessionState, SessionState) -> Void)?
-
-    /// Fires when a session stops working, which is when the project's files
-    /// have just finished changing — the moment a git sample is worth taking.
-    /// Deliberately its own slot rather than a second `sessionStateObserver`:
-    /// that one belongs to the attention pipeline, and the two have nothing
-    /// to say to each other.
     @ObservationIgnored var sessionDidFinishWork: ((Project) -> Void)?
-
-    /// Fires when the answer to "is any session working?" flips, and only
-    /// then — `KeepAwake` holds the idle-sleep assertion on `true` and drops
-    /// it on `false`. Its own slot for the same reason `sessionDidFinishWork`
-    /// is: it has nothing to say to the attention pipeline.
     @ObservationIgnored var anyWorkingDidChange: ((Bool) -> Void)?
     @ObservationIgnored private var anyWorking = false
-
-    /// Gates the "auto-surface to row 0 on Claude-driven activity" behavior.
-    /// App layer wires this to AttentionPreferences so Core stays free of the
-    /// preference type. Defaults to off — bare `SessionManager()` (and tests)
-    /// see the previous behavior unless they opt in.
     @ObservationIgnored var shouldSurfaceOnActivity: () -> Bool = { false }
-
-    /// Whether the user can currently see the selected session. Injected so
-    /// tests can stage "finished while the app was in the background"
-    /// without touching AppKit.
     @ObservationIgnored var isAppActive: () -> Bool = { NSApp.isActive }
 
     @ObservationIgnored private var persistDebounceTask: Task<Void, Never>?
@@ -134,12 +101,6 @@ final class SessionManager {
         }
     }
 
-    /// Keeps the flat `projects` array in display order: a duplicate is
-    /// inserted directly after the parent's existing children (so siblings
-    /// stay adjacent), or right after the parent itself when there are
-    /// none yet. Returns `nil` when the parent isn't in the list — caller
-    /// falls back to a plain append, which also re-parents to top level on
-    /// next render because the parent reference no longer resolves.
     private func insertionIndex(forChildOf parentID: Project.ID) -> Int? {
         guard let parentIndex = projects.firstIndex(where: { $0.id == parentID }) else { return nil }
         var insertAt = parentIndex + 1
@@ -168,12 +129,6 @@ final class SessionManager {
         persist()
     }
 
-    /// Replaces the flat `projects` order with `newOrder` after sanity
-    /// checks. Used by the sidebar's hierarchical drag-reorder, which
-    /// computes the new order externally (moving parent + children as a
-    /// block) and just hands the resulting array back here. The set of ids
-    /// must match exactly — otherwise the call is a no-op so a malformed
-    /// caller can't accidentally drop or duplicate projects.
     func replaceProjectsOrder(_ newOrder: [Project]) {
         guard newOrder.count == projects.count else { return }
         guard Set(newOrder.map(\.id)) == Set(projects.map(\.id)) else { return }
@@ -189,10 +144,6 @@ final class SessionManager {
         sessions.removeValue(forKey: id)
         refreshAnyWorking()
         projects.removeAll { $0.id == id }
-        // Any duplicates of the removed project become top-level on their
-        // own — preserve them rather than cascade-removing. The user can
-        // delete them individually if they want, including the worktree
-        // cleanup sheet.
         for index in projects.indices where projects[index].parentProjectID == id {
             projects[index].parentProjectID = nil
         }
@@ -200,12 +151,8 @@ final class SessionManager {
             selectedProjectID = projects.first?.id
         }
         persist()
-        // Hard-kill last, and hold the Session strongly for the duration: the
-        // project is going away, so nono's post-kill confirmation prompt has no
-        // one to answer it, and the terminal view has to outlive the kill for
-        // SwiftTerm's exit monitor to reap the child. Detached from the UI
-        // update because a plain removal has nothing to wait for — the worktree
-        // path in `ProjectRemovalView` awaits `terminateSessionAndWait` instead.
+        // Hold the Session through the kill: its terminal view must outlive it
+        // for SwiftTerm's exit monitor to reap the child.
         if let removedSession {
             Task { await removedSession.forceStopAndWait() }
         }
@@ -213,13 +160,6 @@ final class SessionManager {
 
     // MARK: - Session control
 
-    /// Kills a session's whole process group and waits for confirmation that
-    /// nothing in it is still running. Destructive flows that touch the
-    /// project's files — worktree removal above all — must await this before
-    /// they start, so `git` never races a live agent and a nono sitting on its
-    /// denied-paths prompt can't hold the directory open. Returns false when
-    /// something outlived the timeout, which callers should treat as "do not
-    /// proceed".
     func terminateSessionAndWait(id: Project.ID, timeout: Duration = .seconds(5)) async -> Bool {
         guard let session = sessions[id] else { return true }
         if let project = projects.first(where: { $0.id == id }) {
@@ -237,39 +177,25 @@ final class SessionManager {
         return sessions[id]
     }
 
-    /// Live sessions whose state needs the user's attention, in sidebar order.
-    /// Used by the dock-badge / bounce logic in AttentionNotifier so the
-    /// sidebar and notifications stay in agreement about what "needs
-    /// attention" means.
     var attentionSessions: [Session] {
         projects.compactMap { sessions[$0.id] }
             .filter { $0.state.needsAttention }
     }
 
-    /// Selects a project and brings the app to the front. The
-    /// notification-tap handler and any future deep-link entry point route
-    /// through here so the three-step (select / activate / front) dance
-    /// lives in exactly one place.
     func focus(projectID: Project.ID) {
         selectedProjectID = projectID
         NSApp.activate(ignoringOtherApps: true)
         NSApp.windows.first?.makeKeyAndOrderFront(nil)
     }
 
-    /// Makes the selected session's terminal the window's first responder so
-    /// keystrokes land in the PTY immediately. Scheduled on the next runloop
-    /// tick because callers (app-activation, selection-change) fire before
-    /// the window has finished settling its responder chain.
     func focusSelectedTerminal() {
         guard let session = selectedSession() else { return }
+        // Next tick: callers fire before the window has settled its responder chain.
         DispatchQueue.main.async {
             session.terminalView.window?.makeFirstResponder(session.terminalView)
         }
     }
 
-    /// The user is now looking at the selected session — selection changed
-    /// or the app came to the front — so whatever it finished while they
-    /// weren't is no longer unseen.
     func markSelectedSessionSeen() {
         selectedSession()?.markOutputSeen()
     }
@@ -292,12 +218,6 @@ final class SessionManager {
         session.restart()
     }
 
-    /// Restarts every running session so each resumes its conversation on the
-    /// freshly-updated agent binary. Invoked by "Update Claude Code" after a
-    /// successful `claude update` (which must finish first, or the relaunch
-    /// picks up the old binary). Iterates in sidebar order; stopped sessions
-    /// are left alone. Mirrors `restartSession`'s adapter notification so
-    /// per-process bindings are dropped before each relaunch re-registers.
     func restartAllRunningContinuing() {
         for project in projects {
             guard let session = sessions[project.id], session.state.isRunning else { continue }
@@ -318,18 +238,9 @@ final class SessionManager {
         let session = Session(project: project)
         session.terminalView.font = currentTerminalFont()
         session.terminalView.getTerminal().changeScrollback(terminalScrollback)
-        // Provider rather than a snapshot so a session created before the user
-        // flips the preference still applies the latest value when its view
-        // enters a window. `applyMetalRenderer` handles live transitions for
-        // sessions already on screen.
         session.terminalView.useMetalProvider = { [weak self] in
             self?.useMetalRenderer ?? false
         }
-        // Pure black + ANSI "white" (≈ light gray) is what makes plain text
-        // look dull. A near-black background (Terminal.app's Pro theme is
-        // similar) and an off-white default foreground push contrast back up
-        // for non-styled output without affecting Claude Code's own ANSI
-        // colors.
         session.terminalView.nativeBackgroundColor = NSColor(white: 0.11, alpha: 1.0)
         session.terminalView.nativeForegroundColor = NSColor(white: 0.94, alpha: 1.0)
         session.spawnEnvProvider = { [weak self] project in
@@ -365,11 +276,6 @@ final class SessionManager {
         anyWorkingDidChange?(now)
     }
 
-    /// A turn that ends while the session isn't on screen is worth an unread
-    /// mark; anything that moves the session on from `.idle` — a new turn, an
-    /// attention state with its own badge, a stop — supersedes it. "Finished"
-    /// reuses `AttentionEvent.finishedOutputting` so the sidebar dot and the
-    /// notification agree on what counts.
     private func trackUnseenOutput(session: Session, from old: SessionState, to new: SessionState) {
         if old == .idle {
             session.markOutputSeen()
@@ -381,43 +287,26 @@ final class SessionManager {
         }
     }
 
-    /// The notRunningOverlay's Start button (and the toolbar Start when
-    /// stopped) holds first-responder when clicked; when the overlay drops
-    /// out of the hierarchy on the start transition, AppKit doesn't promote
-    /// the now-visible terminal, so the next keystroke goes nowhere. Hop
-    /// first-responder back to the terminal whenever the selected session
-    /// enters a running state — `focusSelectedTerminal` already dispatches
-    /// async, so the responder change lands after SwiftUI removes the
-    /// overlay subtree.
+    // When the not-running overlay leaves the hierarchy AppKit doesn't promote
+    // the terminal to first responder, so the next keystroke would go nowhere.
     private func refocusIfStartTransition(projectID: Project.ID, from old: SessionState, to new: SessionState) {
         guard projectID == selectedProjectID else { return }
         guard !old.isRunning, new.isRunning else { return }
         focusSelectedTerminal()
     }
 
-    /// Every transition *out of* `.working` counts as work finishing —
-    /// pausing for a permission prompt leaves the tree just as changed as
-    /// going idle does, and both are worth resampling.
     private func notifyIfWorkFinished(projectID: Project.ID, from old: SessionState, to new: SessionState) {
         guard old == .working, new != .working else { return }
         guard let project = projects.first(where: { $0.id == projectID }) else { return }
         sessionDidFinishWork?(project)
     }
 
-    /// Lifts `projectID` to row 0 when Claude reports activity worth surfacing,
-    /// gated on the user's preference. State equality is already guaranteed by
-    /// `Session.transition` (which is the only caller of `onStateChanged`), so
-    /// "burst" duplicates from same-state events can't reach here. The in-memory
-    /// move is immediate; the disk write is debounced so a flurry of transitions
-    /// coalesces into one `projects.json` write.
     private func surfaceIfActivityTrigger(projectID: Project.ID, to state: SessionState) {
         guard shouldSurfaceOnActivity() else { return }
         guard SessionManager.isActivitySurfaceTrigger(state) else { return }
         guard let triggered = projects.first(where: { $0.id == projectID }) else { return }
-        // The sidebar renders a child project under its parent, so moving a
-        // lone child to row 0 surfaces nothing and splits it from its parent
-        // in the flat array. Resolve to the top-level ancestor and lift that
-        // ancestor together with its children, as one contiguous block.
+        // Lift the whole parent block: moving a lone child splits it from its
+        // parent in the flat array.
         let anchorID = triggered.parentProjectID ?? triggered.id
         guard let anchorIndex = projects.firstIndex(where: { $0.id == anchorID }),
               anchorIndex != 0
@@ -470,8 +359,6 @@ final class SessionManager {
     }
 
     func currentTerminalFont() -> NSFont {
-        // .medium reads noticeably crisper than .regular on dark backgrounds
-        // — the slightly thicker stroke survives anti-aliasing better.
         NSFont.monospacedSystemFont(ofSize: terminalFontSize, weight: .medium)
     }
 
@@ -497,10 +384,6 @@ final class SessionManager {
 
     // MARK: - GPU rendering
 
-    /// Flips the SwiftTerm Metal renderer on every live session. `try?` because
-    /// `setUseMetal` throws on hosts without a Metal device — silently falling
-    /// back to CoreGraphics matches what `viewDidMoveToWindow` does for new
-    /// sessions and avoids surfacing an error path users can't act on.
     func applyMetalRenderer(_ enabled: Bool) {
         guard enabled != useMetalRenderer else { return }
         useMetalRenderer = enabled

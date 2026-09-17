@@ -1,10 +1,6 @@
 import Foundation
 import Observation
 
-/// User-facing knobs for how SandFestival pulls attention when a session
-/// enters a `needsAttention` state. Backed by UserDefaults; defaults are
-/// registered in `init` so a freshly-installed copy behaves predictably
-/// without sprinkling `?? default` at every read site.
 @MainActor
 @Observable
 final class AttentionPreferences {
@@ -36,10 +32,6 @@ final class AttentionPreferences {
         }
     }
 
-    /// Which session-state transitions should pull the user's attention
-    /// (dock bounce + banner notification). Persisted as the raw-value
-    /// strings of `AttentionEvent`. Unknown stored values are dropped on
-    /// load — older builds writing this key won't poison a newer schema.
     var enabledEvents: Set<AttentionEvent> {
         didSet {
             guard enabledEvents != oldValue else { return }
@@ -70,10 +62,6 @@ final class AttentionPreferences {
         self.enabledEvents = Set(storedEvents.compactMap(AttentionEvent.init(rawValue:)))
     }
 
-    /// What ships on for a fresh install: every existing attention state
-    /// plus the new `finishedOutputting` cue (the headline reason for
-    /// adding per-event control). `stopped` stays off by default — it's
-    /// the noisiest signal and easily inferred from the dock.
     static let defaultEnabledEvents: Set<AttentionEvent> = [
         .permissionRequested,
         .inputRequested,
@@ -91,9 +79,6 @@ final class AttentionPreferences {
     }
 }
 
-/// Mirrors `NSApplication.RequestUserAttentionType`. `.critical` keeps the
-/// Dock icon bouncing until SandFestival is brought to the front;
-/// `.informational` bounces once.
 enum DockBounceStyle: String, CaseIterable, Identifiable, Sendable {
     case informational
     case critical
@@ -101,8 +86,6 @@ enum DockBounceStyle: String, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
 }
 
-/// When the user has opted into delivering notifications, this controls
-/// whether they fire only when SandFestival isn't focused, or always.
 enum NotificationTrigger: String, CaseIterable, Identifiable, Sendable {
     case unfocusedOnly
     case always

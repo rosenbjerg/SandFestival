@@ -1,17 +1,9 @@
 import Foundation
 
-/// Pure state machine: maps `(currentState, event) → nextState`. Lives
-/// separately from `Session` so it can be tested without spinning up a
-/// process.
 enum SessionStateMachine {
     static func next(from current: SessionState, event: AgentEvent) -> SessionState {
-        // .stopped is a terminal sink from any state.
         if case .stopped = event { return .stopped }
 
-        // `.sessionRestarted` drives the same transitions as `.started`; it
-        // exists as a distinct case so `Session.apply` can react to it (by
-        // clearing the stale terminal title) without the state machine
-        // needing to know about that side effect.
         switch current {
         case .starting:
             switch event {
@@ -48,6 +40,7 @@ enum SessionStateMachine {
             }
 
         case .waitingForPermission, .blockedByAutoMode:
+            // No .userInteracted here: typing at a permission prompt isn't a grant.
             switch event {
             case .working: return .working
             case .idle: return .idle

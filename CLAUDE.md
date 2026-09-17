@@ -47,6 +47,15 @@ The token never appears in settings.json. **Don't** add code that logs it.
 
 PATH precedence in `Session.composeEnvironment(inherited:projectEnv:extra:)`: project/adapter override → inherited parent PATH → `CommandResolver.defaultPathString`. Don't revert to clobbering — that silently breaks mise/asdf/non-default installs.
 
+## Process termination
+
+- Sessions are spawned through `forkpty`, whose child `setsid`s, so the pid we hold (the nono wrapper) is its own group leader and every descendant inherits the group. `ProcessGroupTerminator` signals the **group**: nono outlives its child on purpose (it can sit on the PTY asking about denied paths), and a SIGKILLed wrapper leaves the agent orphaned under launchd with its cwd still open
+- `target(leader:processGroup:)` degrades to `.single` when `getpgid` ≠ pid — that shape means a recycled pid or an unexpected spawn, and the group would belong to strangers. `liveMembers` must resolve the **same** target: `KERN_PROC_PGRP` for a `.single` pid matches nothing, and an empty sweep reads as "confirmed gone" — which is what `ProjectRemovalView` waits on before `git worktree remove`
+- `descendants(ofAnyOf:)` is captured **before** the first signal. A descendant that `setsid`s is invisible to the group query; its parent chain is the only link, and that breaks when the parent dies. `TrackedProcess` carries the start time so a re-signal on a later sweep can't hit a recycled pid; tracked pids are signalled individually, never with `killpg`
+- Zombies count as dead (no fds, no cwd) and a failed `sysctl` counts as alive. The failure modes are asymmetric: a false survivor is a refused removal the user can retry, a false empty deletes a worktree under a live agent
+- `Session.stop()` sends SIGINT to the wrapper pid rather than calling SwiftTerm's `terminate()`, which closes the PTY and kills nono's post-stop prompt. `forceStopAndWait` guards on `LocalProcess.running`, not `state`, and drains SwiftTerm's exit monitor afterward so `waitpid` reaps the child
+- Known gap: a process forked after the last snapshot that `setsid`s and whose parent dies before the next sweep is unreachable. Closing it needs `kqueue`/`EVFILT_PROC` with `NOTE_TRACK` armed before the spawn
+
 ## Continuation (resume previous conversation)
 
 "Continue" launches the agent with resume flags instead of a fresh start. The flags come from `AgentAdapter.continuationArgs` (Claude Code: `["--continue"]`; default empty, so `Session.canContinue` is false and the UI hides Continue for agents without the concept). `Session.composeArgs(base:extraAgentArgs:)` appends them to the **agent** portion — after the `--` separator when there is one, else to the whole argv. The launch flavor is remembered in `Session.extraAgentArgs` and replayed on auto-restart, so restarting a continued session continues again rather than dropping to a fresh start. If there's no prior conversation, claude exits with its own error, which the startup-failure path surfaces in the not-running overlay.

@@ -13,9 +13,6 @@ enum SessionState: Equatable {
 }
 
 extension SessionState {
-    /// Short, localized name for the state. Used by the sidebar status
-    /// dot's accessibility label and anywhere else the UI needs to say
-    /// "what is this session doing right now" in one word.
     var displayLabel: String {
         switch self {
         case .starting: return String(localized: "status.starting")
@@ -38,11 +35,8 @@ extension SessionState {
         }
     }
 
-    /// True when there's an OS-level process behind the session that the UI
-    /// should treat as alive (toolbar shows Stop, no "not running" overlay).
-    /// `.errored` joins `.stopped` because the only path to errored today is
-    /// `Session.start()` failing to resolve the command — no process was
-    /// spawned, so Stop would be a no-op and the overlay should offer Start.
+    // .errored has no process behind it: only command resolution fails into it.
+    // An adapter emitting .errored for a live process would need this revisited.
     var isRunning: Bool {
         switch self {
         case .stopped, .errored:

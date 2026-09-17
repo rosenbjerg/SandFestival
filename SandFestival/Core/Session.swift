@@ -8,71 +8,26 @@ import SwiftTerm
 final class Session: Identifiable {
     var project: Project
     private(set) var state: SessionState = .stopped
-    /// True between the first soft-stop (`stop()` / `restart()`) and the
-    /// process actually exiting. The toolbar reads this to flip the Stop
-    /// button to "Force Stop" so a second click escalates to SIGKILL.
     private(set) var softStopRequested: Bool = false
-    /// Wall-clock instant the session entered its current state. The sidebar
-    /// uses this to display "waiting Xm" while in attention states; it is
-    /// **not** bumped by same-state events, so the count reflects "how long
-    /// has Claude been waiting on you" rather than "when did the last hook
-    /// fire".
     private(set) var enteredCurrentStateAt: Date = Date()
     private(set) var lastError: String?
-    /// Latest terminal title emitted by the child process (claude sets this
-    /// via the OSC 0/2 escape sequence to summarise the current task). Cleared
-    /// on start/stop so a stale title never outlives the process.
     private(set) var terminalTitle: String?
-    /// Claude finished a turn while nobody was looking at this session. The
-    /// sidebar shows it as an unread dot until the user views the session or
-    /// the state moves on from `.idle`. Set and cleared by `SessionManager`,
-    /// which is what knows about selection and app activity.
     private(set) var hasUnseenOutput = false
-    /// Output has landed below a scrolled-up viewport. The detail pane offers
-    /// a jump to the bottom while this is set.
     private(set) var hasOutputBelowViewport = false
 
     @ObservationIgnored let terminalView: SessionTerminalView
     @ObservationIgnored private let processBridge: ProcessBridge
 
-    /// Returns env additions to merge into the spawn env. Wired by
-    /// SessionManager so every start() — toolbar, overlay, auto-restart —
-    /// picks up the current adapter's prepareSpawn output.
     @ObservationIgnored var spawnEnvProvider: ((Project) -> [String: String])?
-
-    /// Returns the agent args that resume the previous conversation (Claude
-    /// Code: `["--continue"]`), or empty when the adapter has no such concept.
-    /// Wired by SessionManager from the active adapter; gates the "Continue"
-    /// affordance via `canContinue`.
     @ObservationIgnored var continuationArgsProvider: (() -> [String])?
-
-    /// The agent args the current/last launch used (empty for a fresh start,
-    /// the continuation flag for "Continue"). Reused on auto-restart so a
-    /// restart of a continued session continues again rather than starting
-    /// fresh.
     @ObservationIgnored private var extraAgentArgs: [String] = []
 
-    /// Whether "Continue" is meaningful for this session — true once an
-    /// adapter that supports resuming is wired. Drives the UI affordance.
     var canContinue: Bool {
         !(continuationArgsProvider?() ?? []).isEmpty
     }
 
-    /// Called after a successful spawn so adapters can register a handle.
     @ObservationIgnored var onDidSpawn: ((Project) -> Void)?
-
-    /// Called after the OS-level process exits — including unexpected exits
-    /// the user didn't trigger. Adapters use this to drop any per-process
-    /// state (Claude Code clears its live cwd→project binding here so a
-    /// later hand-launched `claude` from the same cwd doesn't attach to the
-    /// dead session). User-initiated stop/restart paths also fire this once
-    /// the kill takes effect — duplicate cleanup is harmless.
     @ObservationIgnored var onDidTerminate: ((Project) -> Void)?
-
-    /// Fires when the session moves from one state to another. Same-state
-    /// "transitions" don't fire. Wired by SessionManager so cross-session
-    /// coordinators (attention notifier, etc.) can react without each owning
-    /// a separate observation tracker.
     @ObservationIgnored var onStateChanged: ((SessionState, SessionState) -> Void)?
 
     var id: Project.ID { project.id }
@@ -112,9 +67,6 @@ final class Session: Identifiable {
         launch(extraAgentArgs: [])
     }
 
-    /// Starts the agent so it resumes the previous conversation instead of a
-    /// fresh one (Claude Code: `claude --continue`). No-op when the adapter
-    /// has no continuation concept — `canContinue` gates the UI affordance.
     func startContinuing() {
         launch(extraAgentArgs: continuationArgsProvider?() ?? [])
     }
@@ -142,19 +94,11 @@ final class Session: Identifiable {
             currentDirectory: project.path.path
         )
         processStartedAt = Date()
-        // Fallback transition to .idle so the UI shows life even when no
-        // adapter is feeding events. When the real adapter delivers .started,
-        // the state machine treats it as a no-op.
+        // Without this a session whose adapter never reports sits in .starting forever.
         transition(to: .idle)
         onDidSpawn?(project)
     }
 
-    /// Builds the argv for a launch, appending `extraAgentArgs` to the agent
-    /// portion. With a `--` separator the extras land after the agent's own
-    /// args (e.g. `nono run … -- claude --enable-auto-mode --continue`);
-    /// without one the command itself is the agent, so they append to the
-    /// whole array. Pure + static so the placement is testable without
-    /// spawning a process.
     static func composeArgs(base: [String], extraAgentArgs: [String]) -> [String] {
         guard !extraAgentArgs.isEmpty else { return base }
         if base.contains("--") {
@@ -164,20 +108,14 @@ final class Session: Identifiable {
         return base + extraAgentArgs
     }
 
-    /// Soft stop: SIGINT the wrapper PID so nono can run its post-kill prompt
-    /// on the still-attached PTY. SwiftTerm's `terminate()` would close the
-    /// PTY, flip `running` to false (silently dropping further keystrokes),
-    /// and cancel the child monitor — none of which we want while nono is
-    /// asking the user to confirm something. The natural exit path
-    /// (`childMonitor` → `handleProcessTerminated`) flips us to `.stopped`
-    /// once nono actually exits.
+    // SIGINT, not SwiftTerm's terminate(): terminate() closes the PTY, which kills
+    // nono's post-stop prompt and silently drops the keystrokes answering it.
     func stop() {
         guard state.isRunning else { return }
         let pid = terminalView.process.shellPid
         guard pid != 0 else { return }
         wantsStop = true
-        // Clear any queued restart: a stop after a restart() request must
-        // actually stop. forceStop() already does this; stop() must too.
+        // A stop after a queued restart() must actually stop.
         wantsRestart = false
         softStopRequested = true
         kill(pid, SIGINT)
@@ -196,14 +134,6 @@ final class Session: Identifiable {
         }
     }
 
-    /// Restarts the session so the relaunch **resumes** the prior conversation
-    /// regardless of how it was originally launched. Used by "Update Claude
-    /// Code" to apply a freshly-installed binary to every live session without
-    /// dropping its conversation. Overwrites `extraAgentArgs` with the
-    /// continuation flag so `handleProcessTerminated`'s auto-relaunch continues
-    /// even for a session that started fresh; falls back to a plain
-    /// `startContinuing()` (a no-op continuation when the adapter has none)
-    /// while stopped.
     func restartContinuing() {
         let continuation = continuationArgsProvider?() ?? []
         if state.isRunning {
@@ -219,20 +149,8 @@ final class Session: Identifiable {
         }
     }
 
-    /// Hard stop: SIGKILL the wrapper's whole process group. Unblocks the
-    /// "nono is wedged on its prompt and won't quit" case after a soft stop.
-    /// The *group* rather than the wrapper pid because nono outlives its child
-    /// on purpose — after the agent dies it can sit on the PTY asking whether
-    /// denied paths should be added to the profile — and because killing only
-    /// the wrapper orphans the agent instead of ending it. Neither can trap
-    /// SIGKILL, so the OS-level death is guaranteed and the existing
-    /// `childMonitor` → `handleProcessTerminated` path runs normally; we don't
-    /// have to yank the PTY ourselves. Cancels any queued restart so "Force
-    /// Stop" really means stop, not restart.
-    ///
-    /// Deliberately does *not* snapshot descendants the way `forceStopAndWait`
-    /// does. Nothing here is gated on the kill having landed, so paying for a
-    /// process-table scan on a synchronous UI action would buy nothing.
+    // The whole group, not the wrapper pid: nono outlives its child on purpose,
+    // and killing only the wrapper orphans the agent instead of ending it.
     func forceStop() {
         guard state.isRunning else { return }
         let pid = terminalView.process.shellPid
@@ -242,41 +160,23 @@ final class Session: Identifiable {
         ProcessGroupTerminator.signalGroup(leader: pid, signal: SIGKILL)
     }
 
-    /// Hard stop that **confirms** the kill: SIGKILLs the process group and
-    /// every descendant captured beforehand, then polls until none of them can
-    /// still run code. Returns true once they're all gone, false if something
-    /// outlived `timeout`.
-    ///
-    /// Destructive callers must use this rather than `forceStop()`. `kill`
-    /// returning 0 only means the signal was queued; `git worktree remove`
-    /// racing a still-live agent (or a nono that's mid-prompt about denied
-    /// paths) is exactly the case we have to rule out before touching the
-    /// filesystem. Awaiting the sweep also keeps the terminal view — and so
-    /// SwiftTerm's exit monitor, which is what calls `waitpid` — alive long
-    /// enough to reap the child instead of leaving a zombie behind.
-    ///
-    /// Guarded on `LocalProcess.running` rather than `state`: once the exit has
-    /// been observed the pid is stale, and signalling a recycled pid is worse
-    /// than doing nothing.
     @discardableResult
     func forceStopAndWait(timeout: Duration = .seconds(5)) async -> Bool {
         let pid = terminalView.process.shellPid
+        // Guard on the process, not `state`: once the exit was observed the pid
+        // may be recycled, and signalling a recycled pid is worse than nothing.
         guard terminalView.process.running, pid != 0 else { return true }
         wantsStop = true
         wantsRestart = false
         softStopRequested = false
-        // Snapshot before signalling. A descendant that called `setsid` is
-        // invisible to the group query, so the parent chain is the only thing
-        // still tying it to us — and that chain breaks the moment the parent
-        // dies and the orphan reparents to launchd.
+        // Snapshot before signalling: a setsid'd descendant is reachable only
+        // through its parent chain, which breaks the moment the parent dies.
         let tracked = ProcessGroupTerminator.descendants(of: pid)
         ProcessGroupTerminator.signalAll(leader: pid, tracked: tracked, signal: SIGKILL)
 
         let clear = await waitForGroupToClear(leader: pid, tracked: tracked, timeout: timeout)
-        // Give the exit monitor its turn on the main queue so `waitpid` runs
-        // and the session lands in `.stopped` before the caller drops us.
-        // Bounded separately and much tighter than the kill budget: the group
-        // is already gone by here, so this is pure bookkeeping.
+        // Let SwiftTerm's exit monitor run waitpid before the caller drops us,
+        // or the child is left a zombie.
         if clear {
             await drainTerminationCallback()
         }
@@ -294,11 +194,8 @@ final class Session: Identifiable {
             let survivors = ProcessGroupTerminator.liveMembers(leader: pid, tracked: tracked)
             if survivors.isEmpty { return true }
             guard ContinuousClock.now < deadline else { return false }
-            // Widen from the survivors while their parent links still resolve:
-            // anything forked after the last snapshot is only reachable until
-            // its parent dies. Re-signal every sweep too — a process that
-            // forked past the first delivery never saw it, and SIGKILL is
-            // idempotent for everyone who did.
+            // Re-widen and re-signal each sweep: anything forked since the last
+            // snapshot never saw the first SIGKILL.
             tracked.formUnion(ProcessGroupTerminator.descendants(ofAnyOf: Set(survivors)))
             ProcessGroupTerminator.signalAll(leader: pid, tracked: tracked, signal: SIGKILL)
             try? await Task.sleep(for: Session.terminationPollInterval)
@@ -335,25 +232,17 @@ final class Session: Identifiable {
     // MARK: - Agent event ingestion
 
     func apply(event: AgentEvent) {
-        // `/resume` and `/clear` mint a new session_id over the live OS
-        // process, so neither `start()` nor `handleProcessTerminated()`
-        // runs to clear the old conversation's OSC-set title. Drop it
-        // here — the next OSC the new conversation emits will repopulate.
         if case .sessionRestarted = event {
             terminalTitle = nil
         }
         let next = SessionStateMachine.next(from: state, event: event)
-        guard next != state else { return }  // Same-state events are intentional no-ops here.
+        guard next != state else { return }
         transition(to: next)
         if case .errored(let reason) = next {
             lastError = reason
         }
     }
 
-    /// Called when the user types into this session's terminal. Routed
-    /// through the state machine so the guard ("only `.waitingForIdle`
-    /// reacts") lives in one place — every other state ignores the event.
-    /// See `AgentEvent.userInteracted` for the rationale.
     func handleUserKeystroke() {
         apply(event: .userInteracted)
     }
@@ -366,22 +255,16 @@ final class Session: Identifiable {
         softStopRequested = false
         processStartedAt = nil
 
-        // Surface unexpected exits (non-zero status, or any exit within the
-        // startup window) so the user can see why nono/claude died instead of
-        // just watching the terminal flash. User-initiated stop/restart paths
-        // bypass this because the SIGTERM we sent isn't a failure.
         if !userInitiated, exitCode != 0 || runDuration < Session.startupFailureWindow {
             lastError = formatExitFailure(exitCode: exitCode)
         }
 
-        // Notify before `.stopped` so adapters drop per-process state before
-        // any restart re-registers fresh bindings for the same cwd.
+        // Must precede the relaunch: the adapter's unbind would otherwise wipe
+        // the fresh spawn's registration.
         onDidTerminate?(project)
         transition(to: .stopped)
         if wantsRestart {
             wantsRestart = false
-            // Preserve the launch flavor: restarting a continued session
-            // continues again rather than dropping back to a fresh start.
             launch(extraAgentArgs: extraAgentArgs)
         }
     }
@@ -412,9 +295,6 @@ final class Session: Identifiable {
 
     private func updateTerminalTitle(_ title: String) {
         var trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        // Claude Code prefixes its title with a status symbol and a space
-        // (e.g. "✳ Summary"). Drop that leading glyph + whitespace so the
-        // sidebar subtitle shows only the summary.
         if let first = trimmed.unicodeScalars.first,
            !CharacterSet.alphanumerics.contains(first) {
             let afterSymbol = trimmed.dropFirst()
@@ -443,35 +323,17 @@ final class Session: Identifiable {
         )
     }
 
-    /// The parent environment with the user's interactive-shell PATH overlaid.
-    /// Shared with the `claude auth login` window so both spawn paths resolve
-    /// `nono` and `claude` the same way.
     static func inheritedEnvironment() -> [String] {
         var inherited = Terminal.getEnvironmentVariables()
-        // Block briefly on first call after launch so the very first
-        // session start picks up the real shell PATH instead of racing
-        // background resolution and silently falling back.
+        // Blocks on the first call: the first session start would otherwise
+        // race the background resolution and fall back to launchd's PATH.
         if let shellPath = UserShellPath.current(blockingUpTo: 0.8) {
-            // Launchd hands GUI apps a minimal PATH that omits mise/asdf
-            // shims, ~/.cargo/bin, fnm, and similar — so nono spawns
-            // claude with a PATH that can't see tools the user expects.
-            // Overlay the resolved interactive-shell PATH so the sandbox
-            // child sees what Terminal would.
             inherited.removeAll { $0.hasPrefix("PATH=") }
             inherited.append("PATH=\(shellPath)")
         }
         return inherited
     }
 
-    /// PATH precedence is: explicit project/adapter override → inherited
-    /// PATH (the user's resolved shell PATH from `UserShellPath`, or the
-    /// parent process PATH if resolution hasn't completed) →
-    /// `CommandResolver`'s hardcoded fallback. Older behavior replaced
-    /// every inherited PATH with the fallback unconditionally, which
-    /// silently broke setups that put `claude` / `nono` in non-system
-    /// locations (mise, asdf, ~/.cargo/bin, etc.). Extracted as a pure
-    /// static so the precedence rules can be tested without spinning up
-    /// a Session.
     static func composeEnvironment(
         inherited: [String],
         projectEnv: [String: String],

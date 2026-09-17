@@ -1,11 +1,6 @@
 import Foundation
 
 enum SidebarFilter {
-    /// Projects the sidebar should show for `query`. A parent survives when
-    /// it or any of its children matches; a child survives when it matches
-    /// or its parent did, so a hit is never orphaned from the row it nests
-    /// under. `branch` supplies the live worktree branch, which is what the
-    /// row displays in place of the path — so it's what people type.
     static func visibleIDs(
         projects: [Project],
         query: String,
