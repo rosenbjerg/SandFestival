@@ -39,11 +39,6 @@ struct ContentView: View {
             manager.focusSelectedTerminal()
             statusStore.refreshAll(projects: manager.projects)
         }
-        // Backstop only. Sampling is normally driven by sessions finishing
-        // work; this covers a worktree changed from outside the app, and
-        // covers only what's on screen so the cost stays flat as projects
-        // accumulate. Idle in the background — an inactive app has no one
-        // reading the sidebar.
         .task(id: manager.selectedProjectID) {
             while !Task.isCancelled {
                 if let project = manager.projects.first(where: { $0.id == manager.selectedProjectID }) {
@@ -111,10 +106,6 @@ struct ContentView: View {
         }
     }
 
-    /// macOS shows `navigationTitle — navigationSubtitle` in the window title
-    /// bar. We surface the selected project as the title and the terminal's
-    /// OSC 0/2 title as the subtitle so the title bar mirrors what the user is
-    /// looking at in the detail pane.
     private var windowTitle: String {
         guard let id = manager.selectedProjectID,
               let project = manager.projects.first(where: { $0.id == id })
@@ -163,9 +154,8 @@ struct ContentView: View {
             set: { newValue in
                 guard !newValue else { return }
                 manualHookSheet = false
-                // Only the auto-prompt path should be sticky-skipped; if the
-                // user opened the sheet manually they're not declining
-                // anything by closing it.
+                // Closing a manually opened sheet isn't a decline; only the
+                // auto-prompt is sticky-skipped.
                 if claudeCodeAdapter.needsInstallation {
                     hookSheetSkipped = true
                 }

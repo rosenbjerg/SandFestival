@@ -2,17 +2,13 @@ import AppKit
 import SwiftUI
 
 enum ProjectEditorTarget: Identifiable {
-    /// `seedFolder` pre-fills name + path when the editor is opened from a
-    /// folder drop; nil for the plain "Add project" button.
     case add(seedFolder: URL?)
     case edit(Project)
 
     var id: String {
         switch self {
-        // The seed folder is part of the identity: `sheet(item:)` keys on
-        // `id`, so without it a re-seeded `.add` (a folder dropped while the
-        // Add sheet is already open) would look like the same item and be
-        // silently ignored.
+        // The seed is part of the id: sheet(item:) would otherwise ignore a
+        // folder dropped while the Add sheet is already open.
         case .add(let seedFolder): return "add:\(seedFolder?.absoluteString ?? "")"
         case .edit(let project): return project.id.uuidString
         }
@@ -190,10 +186,6 @@ struct ProjectEditorView: View {
         }
     }
 
-    /// Names and creates a fresh `git init` repo, so adding a project that
-    /// doesn't exist yet doesn't mean a detour to a terminal. A save panel
-    /// rather than an open panel: the point is naming a folder that isn't
-    /// there, which an open panel can only do through its New Folder button.
     private func createRepository() {
         let panel = NSSavePanel()
         panel.canCreateDirectories = true
@@ -228,9 +220,6 @@ struct ProjectEditorView: View {
 
 // MARK: - Draft model
 
-/// View-model for `ProjectEditorView`. Internal (not `fileprivate`) so the
-/// path-resolution and validity behavior can be unit-tested without standing
-/// up the SwiftUI view — same rationale as `ProjectDuplicateDraft`.
 struct ProjectDraft {
     var name: String
     var pathString: String
@@ -239,18 +228,10 @@ struct ProjectDraft {
     var agentArgsText: String
     var envEntries: [EnvEntry]
     var autoStart: Bool
-    /// nil means "no --profile flag". Only meaningful when the command is nono.
     var nonoProfile: String?
-    /// Discovered profiles plus the current selection, so a value not in
-    /// the discovered list still renders rather than silently resetting.
-    /// Populated asynchronously by the editor view so the sheet can open
-    /// without waiting on a `nono profile list` subprocess.
     var discoveredProfiles: [String] = []
 
-    /// Whether a `git` binary is on PATH. The editor hides "New Repository…"
-    /// when it isn't — `git init` is the whole of what the button does, so
-    /// it could only ever fail. Resolved once at init rather than in `body`,
-    /// which would stat PATH on every keystroke.
+    // A let, not computed: from `body` it would stat PATH on every keystroke.
     let isGitInstalled: Bool
 
     init(seedFolder: URL? = nil, isGitInstalled: Bool? = nil) {
@@ -306,26 +287,17 @@ struct ProjectDraft {
             ProjectDraft.isExistingDirectory(resolvedPathString)
     }
 
-    /// The path the user typed, trimmed and tilde-expanded. The text field
-    /// accepts shell-style paths like `~/code/foo`, but `URL(fileURLWithPath:)`
-    /// doesn't expand `~` — so resolve it once here and feed the result to
-    /// both the validity check and `materialize`, keeping them in agreement
-    /// (same approach as `ProjectDuplicateDraft.resolvedPathString`).
+    // URL(fileURLWithPath:) doesn't expand `~`; without this we'd create a directory named "~".
     var resolvedPathString: String {
         let trimmed = pathString.trimmingCharacters(in: .whitespaces)
         return (trimmed as NSString).expandingTildeInPath
     }
 
-    /// True when the user has typed a path that isn't an existing directory.
-    /// Drives the inline hint; an empty field shows nothing because the
-    /// disabled Save button is explanation enough.
     var pathIsMissing: Bool {
         !pathString.trimmingCharacters(in: .whitespaces).isEmpty
             && !ProjectDraft.isExistingDirectory(resolvedPathString)
     }
 
-    /// Checks an already-resolved path. Tilde expansion happens once in
-    /// `resolvedPathString`, so `isValid` and `materialize` see the same path.
     private static func isExistingDirectory(_ path: String) -> Bool {
         guard !path.isEmpty else { return false }
         var isDirectory: ObjCBool = false

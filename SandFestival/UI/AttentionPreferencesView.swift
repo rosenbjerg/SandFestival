@@ -106,7 +106,6 @@ struct AttentionPreferencesView: View {
         case .notDetermined:
             Button(String(localized: "preferences.dock.focus.grant")) {
                 notifier?.requestFocusAuthorization()
-                // The system prompt is async; re-read shortly after.
                 Task {
                     try? await Task.sleep(for: .seconds(1))
                     focusAuthorization = notifier?.focusAuthorizationStatus ?? .notDetermined

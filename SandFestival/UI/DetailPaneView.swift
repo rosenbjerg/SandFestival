@@ -8,11 +8,6 @@ struct DetailPaneView: View {
 
     var body: some View {
         ZStack {
-            // Hosting all sessions in a ZStack keeps every terminal view in the
-            // view hierarchy regardless of selection, preserving scrollback.
-            // Visibility is signalled via NSView.isHidden inside TerminalPaneView
-            // so AppKit skips drawing for non-selected sessions instead of
-            // compositing a fully transparent layer.
             ForEach(manager.projects) { project in
                 if let session = manager.session(for: project.id) {
                     sessionPane(
@@ -84,17 +79,14 @@ struct DetailPaneView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.regularMaterial)
-        // Without an explicit pointer style, SwiftTerm's cursor rect from the
-        // underlying NSView wins and the mouse stays an I-beam over the
-        // overlay. .default forces an arrow on this layer's content rect.
+        // Without this SwiftTerm's cursor rect wins and the overlay shows an I-beam.
         .pointerStyle(.default)
     }
 
     private func newOutputPill(session: Session) -> some View {
         Button {
             session.scrollToBottom()
-            // Same first-responder footgun as the overlay's Start button:
-            // the click leaves focus on the pill, so hand it back.
+            // The click leaves focus on the pill; hand it back to the terminal.
             manager.focusSelectedTerminal()
         } label: {
             Label(String(localized: "detail.new_output"), systemImage: "arrow.down")
@@ -132,8 +124,6 @@ struct DetailPaneView: View {
     @ToolbarContentBuilder
     private func toolbarButtons(for session: Session) -> some ToolbarContent {
         ToolbarItemGroup {
-            // Restart only makes sense for a live process; when stopped it
-            // would just duplicate Start, so hide it and offer Continue instead.
             if session.state.isRunning {
                 Button {
                     session.restart()
@@ -181,10 +171,6 @@ struct DetailPaneView: View {
             }
             .help(String(localized: "detail.toolbar.open_in_finder"))
 
-            // Offered only for top-level projects. Every duplicate anchors to
-            // the top-level ancestor anyway (`resolvedParentProjectID`), so the
-            // toolbar affordance belongs on the row that owns the group —
-            // duplicating a worktree child stays available in its context menu.
             if session.project.parentProjectID == nil {
                 Button {
                     duplicateTarget = session.project

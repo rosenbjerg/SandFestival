@@ -130,8 +130,6 @@ struct SandFestivalApp: App {
         guard manager.adapter == nil else { return }
         do {
             try await manager.attach(adapter: claudeCodeAdapter)
-        } catch {
-            // Adapter logs the failure via `startupError`. App remains usable.
-        }
+        } catch {}
     }
 }

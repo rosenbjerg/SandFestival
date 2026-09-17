@@ -1,9 +1,5 @@
 import SwiftUI
 
-/// Modal for the "Update Claude Code" menu item. Runs `claude update` off the
-/// main actor and, when the user opts in, restarts every running session with
-/// `--continue` so the freshly-installed binary applies immediately without
-/// dropping conversations. Three phases: prompt → running → done.
 struct UpdateClaudeCodeSheet: View {
     @Bindable var manager: SessionManager
     let onClose: () -> Void
@@ -15,7 +11,6 @@ struct UpdateClaudeCodeSheet: View {
     }
 
     @State private var phase: Phase = .prompt
-    /// Default on: the point of updating is usually to run the new version now.
     @State private var restartAfterUpdate = true
     @State private var output = ""
     @State private var succeeded = false
@@ -118,14 +113,11 @@ struct UpdateClaudeCodeSheet: View {
     private func runUpdate() {
         phase = .running
         Task {
-            // Runs on a detached (non-main) task so the blocking waitUntilExit
-            // doesn't freeze the UI; we resume on the main actor to touch state
-            // and the manager.
+            // Detached: runUpdate blocks on waitUntilExit.
             let result = await Task.detached { ClaudeCodeUpdater.runUpdate() }.value
             output = result.output
             succeeded = result.succeeded
-            // Restart only after a successful update — else the relaunch would
-            // pick up the old binary.
+            // Only after success, or the relaunch picks up the old binary.
             if result.succeeded && restartAfterUpdate {
                 manager.restartAllRunningContinuing()
             }

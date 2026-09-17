@@ -1,11 +1,6 @@
 import AppKit
 import SwiftUI
 
-/// Sheet that creates a sibling `Project`. By default the new project is
-/// backed by a fresh `git worktree`, but the user can opt out — in that
-/// case the duplicate shares the source's path and only differs in name /
-/// auto-start. Either way the new project records `parentProjectID` so
-/// the sidebar can render it grouped underneath its source.
 struct ProjectDuplicateView: View {
     let source: Project
     let onCreate: (Project) -> Void
@@ -17,8 +12,6 @@ struct ProjectDuplicateView: View {
     @State private var isFetching = false
     @State private var fetchError: String?
 
-    /// Seeds the base-branch field on open and is written back on a successful
-    /// create, so the next duplicate in this lineage defaults to the same base.
     private let baseBranchStore: WorktreeBaseBranchStore
 
     init(source: Project, onCreate: @escaping (Project) -> Void, onCancel: @escaping () -> Void) {
@@ -174,9 +167,7 @@ struct ProjectDuplicateView: View {
         )
     }
 
-    /// Refreshes the branch lists even when the fetch itself failed: a
-    /// multi-remote fetch can update some refs and still exit non-zero, and
-    /// the failure is reported alongside rather than instead of the result.
+    // Refresh even on failure: a multi-remote fetch can update refs and still exit non-zero.
     private func fetch() {
         isFetching = true
         fetchError = nil
@@ -200,24 +191,16 @@ struct ProjectDuplicateView: View {
         draft.pruneUnknownBaseBranch()
     }
 
-    // The name and path fields keep tracking the branch name until the user
-    // edits them manually. These bindings flip the "user edited" flags when
-    // the value diverges from the auto-derived default.
     private var branchBinding: Binding<String> {
         Binding(
             get: { draft.branchName },
             set: { newValue in
-                // Spaces aren't valid in branch names; fold them to dashes as
-                // the user types so the field never holds an invalid value.
                 draft.branchName = newValue.replacingOccurrences(of: " ", with: "-")
                 draft.refreshDerivedFields()
             }
         )
     }
 
-    // The existing-branch picker models "no branch picked" as nil; bridge that
-    // onto the draft's non-optional branchName. Picking still re-derives the
-    // name and path fields, exactly like typing into the new-branch field.
     private var existingBranchBinding: Binding<String?> {
         Binding(
             get: { draft.branchName.isEmpty ? nil : draft.branchName },
@@ -248,11 +231,6 @@ struct ProjectDuplicateView: View {
         )
     }
 
-    // Toggling "Create git worktree" off should leave the name field in a
-    // sensible state. Tracking-mode names like "Demo (feature-x)" stop
-    // making sense when we're no longer making a feature-x branch, so we
-    // reset the auto-derived name back to the source name. A name the user
-    // explicitly typed is left alone.
     private var createWorktreeBinding: Binding<Bool> {
         Binding(
             get: { draft.createWorktree },
@@ -263,13 +241,6 @@ struct ProjectDuplicateView: View {
         )
     }
 
-    // The branch field means different things in each mode (text to create
-    // vs. branch to check out), so clear it when the user flips modes —
-    // otherwise typing "feat-x" then switching to "Existing branch" leaves a
-    // value that doesn't match any local branch and disables the confirm
-    // button without explanation. The base branch resets to the remembered
-    // default rather than to nil, so a round trip through Existing branch
-    // doesn't quietly cost the user their usual base.
     private var modeBinding: Binding<WorktreeMode> {
         Binding(
             get: { draft.worktreeMode },
@@ -277,6 +248,8 @@ struct ProjectDuplicateView: View {
                 guard newValue != draft.worktreeMode else { return }
                 draft.worktreeMode = newValue
                 draft.branchName = ""
+                // The remembered default, not nil: a round trip through
+                // Existing branch must not drop the user's usual base.
                 draft.baseBranch = draft.rememberedBaseBranch
                 draft.pruneUnknownBaseBranch()
                 draft.refreshDerivedFields()
@@ -297,10 +270,6 @@ struct ProjectDuplicateView: View {
         }
     }
 
-    /// Whether `command` resolves to the nono sandbox wrapper, so the
-    /// `--allow <repo>` grant only gets injected into args nono understands.
-    /// Matches on the basename so a full path like `/usr/local/bin/nono`
-    /// still counts.
     private func isNono(_ command: String) -> Bool {
         (command as NSString).lastPathComponent == "nono"
     }
@@ -312,7 +281,6 @@ struct ProjectDuplicateView: View {
         errorMessage = nil
 
         guard snapshot.createWorktree else {
-            // No-worktree duplicate: share the source path, no git work.
             let project = Project(
                 name: trimmedName,
                 path: source.path,
@@ -329,9 +297,6 @@ struct ProjectDuplicateView: View {
         }
 
         let trimmedBranch = snapshot.branchName.trimmingCharacters(in: .whitespaces)
-        // The branch the project ends up on: identical to `trimmedBranch`
-        // everywhere except a remote pick, where `origin/feat` becomes the
-        // tracking branch `feat`.
         let localBranch = snapshot.resolvedLocalBranch
         let isRemote = snapshot.isRemoteSelection
         let resolvedPath = snapshot.resolvedPathString
@@ -342,18 +307,10 @@ struct ProjectDuplicateView: View {
         let sourceRepoPath = source.path
         let newPath = URL(fileURLWithPath: resolvedPath)
 
-        // Only manage the gitignore when the worktree lands inside the
-        // source repo's default `.worktrees/` directory. If the user
-        // pointed it elsewhere (a sibling dir, a totally separate path)
-        // we don't know what pattern to ignore, and guessing would pollute
-        // their gitignore.
         let worktreesDir = sourceRepoPath.appendingPathComponent(".worktrees").path + "/"
         let shouldUpdateGitignore = newPath.path.hasPrefix(worktreesDir)
 
         let mode = snapshot.worktreeMode
-        // Only new-branch mode actually uses a base. The field can still hold
-        // a remembered value in existing-branch mode, where recording it
-        // would claim a fork point the worktree was never created from.
         let recordedBase = mode == .newBranch ? base.flatMap { $0.isEmpty ? nil : $0 } : nil
 
         Task {
@@ -391,18 +348,9 @@ struct ProjectDuplicateView: View {
                 isCreating = false
                 switch result {
                 case .success:
-                    // Remember the base for next time — only in new-branch
-                    // mode, where it was actually used. Checking out an
-                    // existing branch takes no base, so it mustn't clobber
-                    // the stored default.
                     if mode == .newBranch {
                         baseBranchStore.remember(base, for: snapshot.resolvedParentProjectID)
                     }
-                    // The worktree's `.git` is a gitlink into the source
-                    // repo's `.git/worktrees/…`, so the sandbox needs the
-                    // source repo root granted or every git command 401s with
-                    // "operation not permitted". Only meaningful for the nono
-                    // wrapper — leave a custom command's args untouched.
                     let args = isNono(source.command)
                         ? NonoWorktreeArgs.grantingRepoAccess(
                             repoPath: sourceRepoPath.path,
@@ -435,16 +383,11 @@ struct ProjectDuplicateView: View {
 
 // MARK: - Draft
 
-/// Which side of the worktree section the user is interacting with: creating
-/// a brand-new branch or checking out one that already exists in the repo.
 enum WorktreeMode: Hashable {
     case newBranch
     case existingBranch
 }
 
-/// The first reason the duplicate sheet can't be submitted — used both to
-/// gate the Confirm button and to explain *why* it's disabled. Catches the
-/// cases that would otherwise only surface as a raw `git` error at submit.
 enum DuplicateBlockingIssue: Equatable {
     case nameEmpty
     case branchEmpty
@@ -455,9 +398,6 @@ enum DuplicateBlockingIssue: Equatable {
     case branchInUse
     case pathOccupied
 
-    /// A user-facing explanation, or `nil` for issues self-evident from a
-    /// blank field — no point captioning an empty box with "Branch is
-    /// required".
     var inlineMessage: String? {
         switch self {
         case .nameEmpty, .branchEmpty, .pathEmpty:
@@ -476,9 +416,6 @@ enum DuplicateBlockingIssue: Equatable {
     }
 }
 
-/// View-model for `ProjectDuplicateView`. Lives at module scope (not
-/// fileprivate) so the auto-derivation behavior can be unit-tested without
-/// instantiating the SwiftUI view.
 struct ProjectDuplicateDraft {
     var name: String
     var branchName: String
@@ -493,41 +430,16 @@ struct ProjectDuplicateDraft {
     let sourceName: String
     let parentDir: String
     let sourcePath: URL
-    /// The `parentProjectID` to stamp on the duplicate. The sidebar renders
-    /// only two levels (top-level rows, then one pass of their children), so
-    /// a duplicate whose parent is itself a child would render nowhere —
-    /// orphaned in `projects.json` with no row. Anchoring every duplicate of
-    /// a lineage to the top-level ancestor keeps them visible as siblings
-    /// under that ancestor.
-    ///
-    /// Doubles as the key `WorktreeBaseBranchStore` remembers the base branch
-    /// under, so a parent and all its worktree children share one memory.
+    // The top-level ancestor, never source.id: the sidebar renders two levels,
+    // so a grandchild would have no row.
     let resolvedParentProjectID: UUID
-    /// The base branch remembered from the last worktree created in this
-    /// lineage, or `nil` when there's nothing remembered. Seeds `baseBranch`
-    /// and is restored when the user flips modes back to New branch.
     let rememberedBaseBranch: String?
-    /// Populated asynchronously by the view's `.task` so sheet construction
-    /// doesn't block on a `git branch` subprocess on the main thread — same
-    /// pattern as `ProjectEditorView`'s `discoveredProfiles`.
     var availableBranches: [String]
-    /// Remote-tracking branches (`origin/main`), carrying their remote prefix.
     var remoteBranches: [String]
-    /// Branches currently checked out in another worktree (incl. the source's
-    /// own HEAD). Shown disabled in the existing-branch picker because
-    /// `git worktree add <path> <branch>` refuses them.
     var branchesInUse: Set<String>
-    /// Whether the repo has any remote configured at all. Gates the fetch
-    /// row: an empty `remoteBranches` means either "no remotes" or "never
-    /// fetched", and only the second is worth offering a Fetch button for.
     var hasRemotes: Bool
-    /// Mtime of `FETCH_HEAD`, for captioning how stale `remoteBranches` is.
     var lastFetch: Date?
     let isGitRepo: Bool
-    /// Whether a `git` binary is on PATH. The Worktree section hides itself
-    /// when this is false even if `isGitRepo` is true — there'd be no way
-    /// to act on it. Kept separate from `isGitRepo` so tests can exercise
-    /// each gate independently.
     let isGitInstalled: Bool
 
     init(
@@ -540,14 +452,7 @@ struct ProjectDuplicateDraft {
         isGitRepo: Bool? = nil,
         isGitInstalled: Bool? = nil
     ) {
-        // Default to `<source>/.worktrees/<branch>` — matches the
-        // convention most worktree tooling (Cursor, recent VSCode
-        // extensions, etc.) defaults to, and keeps each repo's worktrees
-        // grouped under the repo itself rather than scattering them
-        // across the source's parent directory. Users still get a path
-        // field they can edit if they want a different location.
         let parent = source.path.appendingPathComponent(".worktrees").path
-        // Tests inject overrides to avoid shelling out to git.
         let resolvedIsGitRepo = isGitRepo ?? GitWorktree.isGitRepo(at: source.path)
         let resolvedIsGitInstalled = isGitInstalled ?? GitWorktree.isGitInstalled()
         let lineageID = source.parentProjectID ?? source.id
@@ -557,8 +462,6 @@ struct ProjectDuplicateDraft {
         self.sourcePath = source.path
         self.resolvedParentProjectID = lineageID
         self.rememberedBaseBranch = remembered
-        // Branches start empty; the view's `.task` swaps them in once the
-        // off-main-thread subprocess returns.
         self.availableBranches = availableBranches ?? []
         self.remoteBranches = remoteBranches ?? []
         self.branchesInUse = branchesInUse ?? []
@@ -567,37 +470,25 @@ struct ProjectDuplicateDraft {
         self.isGitInstalled = resolvedIsGitInstalled
         self.name = source.name
         self.branchName = ""
-        // Pre-selected before the branch list has loaded, so the field shows
-        // the remembered base immediately instead of flickering through
-        // "Current HEAD". `pruneUnknownBaseBranch()` drops it after the load
-        // if the branch is gone.
         self.baseBranch = remembered
         self.pathString = parent
         self.autoStart = source.autoStart
-        // Default to "make a worktree" when we can — that's the path users
-        // following the duplicate flow usually want. Sources where the
-        // section won't even be shown (non-git, or git missing entirely)
-        // start with the toggle off so a hidden-but-defaulted-on flag can't
-        // affect validity.
+        // Off when the section is hidden: a hidden-but-on toggle would still gate validity.
         self.createWorktree = resolvedIsGitRepo && resolvedIsGitInstalled
         self.worktreeMode = .newBranch
     }
 
     var isValid: Bool { blockingIssue == nil }
 
-    /// Refs offerable as the base for a new branch. Remotes are deliberately
-    /// *not* deduped against locals here: `main` and `origin/main` are
-    /// different commits, and reaching for the remote one is the whole point
-    /// when the local branch has fallen behind.
+    // Not deduped against locals, unlike checkoutRefs: `main` and `origin/main`
+    // are different commits, and the remote one is the point when local is behind.
     var baseRefs: [GitRef] {
         availableBranches.map { GitRef(name: $0, kind: .local) }
             + remoteBranches.map { GitRef(name: $0, kind: .remote) }
     }
 
-    /// Refs offerable in existing-branch mode. Here remotes *are* deduped
-    /// against locals: picking one creates a local tracking branch by the
-    /// remote's short name, which git refuses when that name is taken — and
-    /// the existing local branch is what the user wanted anyway.
+    // Deduped, unlike baseRefs: a remote pick creates a local tracking branch
+    // by short name, which git refuses when that name is already taken.
     var checkoutRefs: [GitRef] {
         let locals = Set(availableBranches)
         return availableBranches.map { GitRef(name: $0, kind: .local) }
@@ -606,30 +497,17 @@ struct ProjectDuplicateDraft {
                 .map { GitRef(name: $0, kind: .remote) }
     }
 
-    /// True when the branch field holds a remote-tracking ref. Recovered by
-    /// membership rather than stored, exactly like `branchesInUse`, so there's
-    /// no second copy of the picker's state to drift.
     var isRemoteSelection: Bool {
         guard worktreeMode == .existingBranch else { return false }
         return remoteBranches.contains(branchName.trimmingCharacters(in: .whitespaces))
     }
 
-    /// The local branch this duplicate will end up on. A remote pick creates
-    /// a tracking branch named after the remote's short name, so `origin/feat`
-    /// resolves to `feat` — which is what the project name, the worktree path
-    /// and `WorktreeInfo` all need to use.
     var resolvedLocalBranch: String {
         let trimmed = branchName.trimmingCharacters(in: .whitespaces)
         guard isRemoteSelection else { return trimmed }
         return GitWorktree.localName(forRemoteRef: trimmed)
     }
 
-    /// The first problem that blocks submission, or `nil` when the form is
-    /// ready. Catches the doomed cases — invalid branch name, a branch that
-    /// already exists, an occupied target path — that would otherwise only
-    /// surface as a raw `git` error after the user clicks Confirm. The path
-    /// check stats the filesystem; one `stat` per keystroke is cheap and is
-    /// what makes the collision visible up front.
     var blockingIssue: DuplicateBlockingIssue? {
         guard !name.trimmingCharacters(in: .whitespaces).isEmpty else { return .nameEmpty }
         guard createWorktree else { return nil }
@@ -639,24 +517,16 @@ struct ProjectDuplicateDraft {
         switch worktreeMode {
         case .newBranch:
             guard GitWorktree.isValidBranchName(trimmedBranch) else { return .branchNameInvalid }
-            // `git worktree add -b` refuses a branch name that already exists.
-            // `availableBranches` is empty while still loading — treat that as
-            // "can't tell yet" and let git be the backstop.
             if availableBranches.contains(trimmedBranch) {
                 return .branchAlreadyExists(branch: trimmedBranch)
             }
         case .existingBranch:
             if remoteBranches.contains(trimmedBranch) {
-                // The picker hides remote refs whose short name is taken, but
-                // a list that went stale while the sheet was open could still
-                // offer one — and the tracking branch couldn't be created.
                 let local = GitWorktree.localName(forRemoteRef: trimmedBranch)
                 if availableBranches.contains(local) {
                     return .branchAlreadyExists(branch: local)
                 }
             } else {
-                // The branch must be a real local branch and not already
-                // checked out elsewhere — otherwise `git worktree add` fails.
                 guard availableBranches.contains(trimmedBranch) else { return .branchNotLocal }
                 guard !branchesInUse.contains(trimmedBranch) else { return .branchInUse }
             }
@@ -665,9 +535,8 @@ struct ProjectDuplicateDraft {
         return nil
     }
 
-    /// True when something already lives at the resolved worktree path that
-    /// would make `git worktree add` fail. An existing *empty* directory is
-    /// fine — git reuses it — so only a file or a non-empty directory counts.
+    // Not a bare fileExists: git reuses an empty directory, so only a file or
+    // a non-empty directory blocks.
     private var pathIsOccupied: Bool {
         let path = resolvedPathString
         guard !path.isEmpty else { return false }
@@ -679,36 +548,19 @@ struct ProjectDuplicateDraft {
         return !contents.isEmpty
     }
 
-    /// Clears a pre-selected base branch that turned out not to exist — a
-    /// remembered branch that has since been deleted or renamed. Called once
-    /// the async branch list lands, so the field falls back to the visible
-    /// "Current HEAD" sentinel rather than letting `git worktree add` fail at
-    /// submit. A still-empty branch list means the listing failed (or hasn't
-    /// arrived), which is not evidence the branch is gone.
     mutating func pruneUnknownBaseBranch() {
+        // An empty list means the listing failed or hasn't landed, not that the branch is gone.
         guard !availableBranches.isEmpty, let base = baseBranch else { return }
         guard !availableBranches.contains(base), !remoteBranches.contains(base) else { return }
         baseBranch = nil
     }
 
-    /// The path the user typed, trimmed and tilde-expanded. The text
-    /// field accepts shell-style paths like `~/code/foo` because that's
-    /// what people type into a path field — but `URL(fileURLWithPath:)`
-    /// doesn't expand `~`, so we'd otherwise create a directory literally
-    /// named `~`. Run expansion once here so both the URL we pass to
-    /// `git worktree add` and the prefix check against the source's
-    /// `.worktrees/` directory see the resolved path.
+    // URL(fileURLWithPath:) doesn't expand `~`; without this we'd create a directory named "~".
     var resolvedPathString: String {
         let trimmed = pathString.trimmingCharacters(in: .whitespaces)
         return (trimmed as NSString).expandingTildeInPath
     }
 
-    /// Auto-fills `name` and `pathString` from the current branch name, but
-    /// only for fields the user hasn't typed into yet. Once a field has been
-    /// edited it stops tracking, so the branch field can be tweaked
-    /// afterwards without clobbering custom values. When `createWorktree` is
-    /// off the branch is irrelevant — fall back to the source name / parent
-    /// dir for the auto-derived fields.
     mutating func refreshDerivedFields() {
         let effectiveBranch = createWorktree ? resolvedLocalBranch : ""
         if !nameUserEdited {
@@ -720,21 +572,15 @@ struct ProjectDuplicateDraft {
         }
     }
 
-    /// Name to prefill the save panel's name field with. Derived from the
-    /// path the sheet currently targets, *not* from the branch: a branch
-    /// like `feat/foo` targets `.worktrees/feat/foo`, and a `/` handed to
-    /// the name field comes back as `feat:foo` — macOS forbids the
-    /// separator in a filename.
+    // From the path, not the branch: a `/` in a branch name comes back from
+    // the panel as `:`.
     var suggestedDirName: String {
         let leaf = (resolvedPathString as NSString).lastPathComponent
         return leaf.isEmpty ? sourceName : leaf
     }
 
-    /// Directory to open the save panel in: the deepest ancestor of the
-    /// targeted path that actually exists. `NSSavePanel` silently ignores a
-    /// `directoryURL` that isn't there — and the default target sits under
-    /// `.worktrees/`, which git only creates during `worktree add` — so
-    /// without the walk up the panel opens somewhere unrelated.
+    // NSSavePanel silently ignores a directoryURL that doesn't exist, and
+    // `.worktrees/` usually doesn't yet.
     var suggestedParentDir: String {
         let target = resolvedPathString
         let start = target.isEmpty

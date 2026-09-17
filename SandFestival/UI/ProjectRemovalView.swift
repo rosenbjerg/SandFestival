@@ -1,14 +1,7 @@
 import SwiftUI
 
-/// Confirmation sheet shown when removing a project that was created via
-/// "Duplicate…". Lets the user pick whether to also `git worktree remove`
-/// the worktree directory, optionally `git branch -d|-D` the branch the
-/// worktree was tracking, and whether to force both past their safety
-/// checks.
 struct ProjectRemovalView: View {
     let project: Project
-    /// Kills the project's session and reports whether the whole process group
-    /// is confirmed gone. Awaited before any `git` command runs.
     let onTerminate: () async -> Bool
     let onRemove: () -> Void
     let onClose: () -> Void
@@ -18,11 +11,6 @@ struct ProjectRemovalView: View {
     @State private var force: Bool = false
     @State private var isWorking: Bool = false
     @State private var errorMessage: String?
-    /// True once `git worktree remove` succeeded. Used to flip the sheet
-    /// into a "partial-failure acknowledgement" state when the worktree
-    /// went away but the follow-up `git branch -d` failed — the user
-    /// can't meaningfully retry (the worktree is already gone), so we
-    /// just keep the error visible and let them confirm dismissal.
     @State private var partialFailureAfterRemoval: Bool = false
 
     private var hasBranch: Bool {
@@ -45,9 +33,7 @@ struct ProjectRemovalView: View {
                         .truncationMode(.middle)
                 }
                 .onChange(of: removeWorktree) { _, newValue in
-                    // You can't `git branch -d` a branch that's currently
-                    // checked out in a worktree, so the branch toggle only
-                    // makes sense when the worktree is being removed too.
+                    // git refuses to delete a branch still checked out in the worktree.
                     if !newValue { deleteBranch = false }
                 }
 
@@ -117,12 +103,8 @@ struct ProjectRemovalView: View {
         isWorking = true
 
         Task {
-            // Kill first, and only proceed once the kill is *confirmed*. git
-            // must not delete the worktree out from under a live agent, and the
-            // wrapper has to be gone rather than merely asked to quit: nono
-            // deliberately outlives its child so it can ask about paths the
-            // agent was denied, and that prompt would sit on a PTY belonging to
-            // a project the user just deleted.
+            // Confirmed dead, not merely signalled: git must not remove the
+            // worktree under a live agent.
             guard await onTerminate() else {
                 isWorking = false
                 errorMessage = String(localized: "removal.error.session_still_running")
@@ -165,11 +147,6 @@ struct ProjectRemovalView: View {
                         errorMessage = err.errorDescription
                     }
                 case .branchFailedAfterRemoval(let err):
-                    // Worktree is gone, but the branch survived. Surface
-                    // the branch-delete error so the user knows what
-                    // failed, and switch the sheet to a single
-                    // acknowledgement button — they can't retry from
-                    // here without recreating the worktree.
                     errorMessage = String(
                         format: String(localized: "removal.error.branch_after_removal"),
                         err.errorDescription ?? ""

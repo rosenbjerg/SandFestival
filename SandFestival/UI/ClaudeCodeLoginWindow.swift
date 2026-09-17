@@ -3,11 +3,6 @@ import Observation
 import SwiftTerm
 import SwiftUI
 
-/// Drives the one-off `claude auth login` process behind the login window.
-///
-/// Deliberately not a `Session`: it has no project, no hooks, and no
-/// `SAND_FESTIVAL_TOKEN` / `SAND_FESTIVAL_PROJECT_ID` in its environment, so
-/// nothing it does can bind to a project or reach the sidebar.
 @Observable
 @MainActor
 final class ClaudeCodeLoginController {
@@ -65,9 +60,6 @@ final class ClaudeCodeLoginController {
         )
     }
 
-    /// SIGINT rather than a group kill: nono may still be draining its own
-    /// output, and the login child is short-lived and harmless to leave to a
-    /// graceful exit.
     func cancel() {
         if case .running = phase {
             let pid = terminalView.process.shellPid
@@ -94,8 +86,6 @@ private final class LoginProcessBridge: NSObject, LocalProcessTerminalViewDelega
     }
 }
 
-/// A window rather than a sheet: the flow leaves for the browser and comes
-/// back, so the main window has to stay usable while it's open.
 struct ClaudeCodeLoginWindow: View {
     static let windowID = "claude-code-login"
 

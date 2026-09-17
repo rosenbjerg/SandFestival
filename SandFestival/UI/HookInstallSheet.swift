@@ -20,9 +20,6 @@ struct HookInstallSheet: View {
     // MARK: - Install prompt
 
     private var installBody: some View {
-        // The sheet doubles as both the first-run consent prompt and a
-        // manual reinstall surface. Swap the copy based on whether the
-        // hooks are already installed so the verbs match.
         let isReinstall = !adapter.needsInstallation
 
         return VStack(alignment: .leading, spacing: 16) {

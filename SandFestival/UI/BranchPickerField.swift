@@ -1,44 +1,15 @@
 import SwiftUI
 
-/// Branch picker for the duplicate sheet. A flat `Menu` is unusable on a repo
-/// with dozens of branches, so this opens a popover with a live text filter
-/// and a scrollable list. It backs both branch fields:
-///
-/// - the existing-branch picker, where nothing is selected until the user
-///   picks a branch and branches checked out in another worktree are shown
-///   disabled with an "(in use)" suffix — `git worktree add` refuses them;
-/// - the base-branch picker, where `nil` is a valid choice (the "Current
-///   HEAD" sentinel) and every branch is selectable — `git worktree add -b`
-///   happily branches off a branch that's live in another worktree.
-///
-/// Internal (not `fileprivate`) so the filter logic can be unit-tested
-/// without standing up the view.
 struct BranchPickerField: View {
-    /// How the picker presents a `nil` selection.
     enum EmptySelection {
-        /// `nil` is a real, pickable choice — the base-branch picker's
-        /// "Current HEAD". A row with this label sits atop the list and the
-        /// button shows it whenever no branch is selected.
         case sentinel(label: String)
-        /// `nil` means "nothing picked yet". The button shows `text`, or
-        /// `loading` until the async branch list lands.
         case placeholder(text: String, loading: String)
     }
 
-    /// The `LabeledContent` label for the field.
     let label: String
-    /// Local branches first, then remote-tracking ones. The two are rendered
-    /// as separate sections, but only once a remote is actually present —
-    /// a repo without one shouldn't grow a lone "Local" caption.
     let refs: [GitRef]
-    /// Branches checked out in another worktree, shown disabled. Empty for
-    /// pickers where an in-use branch is still a valid choice (a base branch).
     var inUse: Set<String> = []
     let empty: EmptySelection
-    /// `nil` means no branch is selected — a valid state for a `.sentinel`
-    /// picker, the not-yet-picked state for a `.placeholder` one. The
-    /// binding's setter is free to re-derive dependent fields, so picking a
-    /// branch flows through exactly like typing one.
     @Binding var selection: String?
 
     @State private var isExpanded = false
@@ -60,8 +31,6 @@ struct BranchPickerField: View {
                 }
             }
             .buttonStyle(.bordered)
-            // Nothing to pick until the async branch list lands — unless a
-            // sentinel is present, which is always a valid choice on its own.
             .disabled(refs.isEmpty && sentinelLabel == nil)
             .popover(isPresented: $isExpanded, arrowEdge: .bottom) {
                 popover
@@ -69,15 +38,12 @@ struct BranchPickerField: View {
         }
     }
 
-    /// The sentinel's row label, or `nil` for a `.placeholder` picker.
     private var sentinelLabel: String? {
         if case .sentinel(let label) = empty { return label }
         return nil
     }
 
     private var hasSelection: Bool {
-        // A sentinel is itself a real choice, so a `nil` selection still
-        // reads as "selected" when one is configured.
         if sentinelLabel != nil { return true }
         return !(selection ?? "").trimmingCharacters(in: .whitespaces).isEmpty
     }
@@ -115,8 +81,6 @@ struct BranchPickerField: View {
 
             Divider()
 
-            // A sentinel is always pickable, so the empty state only stands
-            // in when there's genuinely nothing to show.
             if filtered.isEmpty && sentinelLabel == nil {
                 Text(String(localized: "duplicate.field.existing_branch.no_matches"))
                     .font(.callout)
@@ -146,8 +110,6 @@ struct BranchPickerField: View {
         .onAppear { searchFocused = true }
     }
 
-    /// The "no specific branch" row — always at the top, never filtered out,
-    /// so the default choice stays reachable however the user has searched.
     @ViewBuilder
     private func sentinelRow(_ label: String) -> some View {
         Button {
@@ -216,15 +178,11 @@ struct BranchPickerField: View {
         isExpanded = false
     }
 
-    /// Enter in the search field commits the first selectable match — the
-    /// fast path for "I know the branch, just let me type it".
     private func pickFirstMatch() {
         guard let match = filtered.first(where: { !inUse.contains($0.name) }) else { return }
         pick(match.name)
     }
 
-    /// Case-insensitive substring filter. Pure, so the filtering behavior is
-    /// unit-testable without instantiating the view.
     static func matching(_ refs: [GitRef], filter: String) -> [GitRef] {
         let query = filter.trimmingCharacters(in: .whitespaces)
         guard !query.isEmpty else { return refs }

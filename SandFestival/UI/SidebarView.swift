@@ -8,8 +8,6 @@ struct SidebarView: View {
     @Binding var duplicateTarget: Project?
     @Binding var removalTarget: Project?
 
-    /// Persisted across launches as a comma-joined list of UUID strings.
-    /// Parents default to expanded; this holds the ids the user folded up.
     @AppStorage("sidebar.collapsedParents") private var collapsedParentsStorage: String = ""
     @State private var query = ""
 
@@ -36,10 +34,6 @@ struct SidebarView: View {
                         }
                     }
                 }
-                // `moveTopLevelBlocks` maps the List's offsets onto the
-                // unfiltered top-level order, so a drag on a filtered list
-                // would reorder the wrong rows. Reordering waits for the
-                // filter to clear.
                 .onMove(perform: moveHandler)
             }
             .listStyle(.sidebar)
@@ -65,10 +59,8 @@ struct SidebarView: View {
         .navigationSplitViewColumnWidth(min: 220, ideal: 260)
     }
 
-    /// Laid out as an ordinary row above the list rather than via
-    /// `.searchable(placement: .sidebar)`, which hoists the field into the
-    /// column chrome without insetting a sidebar whose root is a `VStack` —
-    /// the first project row ended up underneath it.
+    // Not .searchable(placement: .sidebar): that hoists the field into the
+    // column chrome and the first project row lands underneath it.
     private var filterField: some View {
         HStack(spacing: 4) {
             Image(systemName: "magnifyingglass")
@@ -125,10 +117,6 @@ struct SidebarView: View {
         return { moveTopLevelBlocks(fromOffsets: $0, toOffset: $1) }
     }
 
-    /// Translates a top-level `.onMove` (which only knows about block
-    /// indices) into a flat-array reorder, keeping each parent's children
-    /// glued underneath. The List's `.onMove` semantics: `destination` is
-    /// the slot index in the *original* top-level order to insert before.
     private func moveTopLevelBlocks(fromOffsets source: IndexSet, toOffset destination: Int) {
         var blocks: [[Project]] = topLevelProjects.map { parent in
             [parent] + children(of: parent.id)
@@ -143,12 +131,10 @@ struct SidebarView: View {
     }
 
     @ViewBuilder
+    // The async hops below are load-bearing: menu actions run in the
+    // event-tracking runloop mode, and a sheet set from there stays queued
+    // until the app loses focus.
     private func contextMenu(for project: Project) -> some View {
-        // Action closures run inside the menu's event-tracking runloop
-        // mode; setting @State here leaves the resulting `.sheet` queued
-        // until the runloop returns to default — which used to wait until
-        // the app lost focus. Async hop lets the menu tear down first.
-        // Plain NSWorkspace calls don't present a sheet, so they skip it.
         Button(String(localized: "sidebar.row.open_in_finder")) {
             NSWorkspace.shared.open(project.path)
         }
@@ -175,10 +161,6 @@ struct SidebarView: View {
         }
     }
 
-    /// Plain projects skip the confirmation sheet and remove immediately
-    /// (preserves the pre-duplicate behavior). Worktree-backed projects
-    /// route through `removalTarget` so ContentView can ask whether to also
-    /// run `git worktree remove`.
     private func requestRemoval(project: Project) {
         if project.worktreeInfo != nil {
             removalTarget = project
@@ -197,15 +179,10 @@ struct SidebarView: View {
         collapsedParentsStorage = ids.map(\.uuidString).joined(separator: ",")
     }
 
-    /// A dropped item seeds a project only when it's an actual directory —
-    /// dropping a file onto the sidebar is rejected rather than creating a
-    /// project rooted at a non-folder path.
     private func isDirectory(_ url: URL) -> Bool {
         (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
     }
 
-    /// Opens a new Terminal.app session rooted at the project folder. Silent
-    /// no-op if Terminal can't be resolved — there's no sensible fallback.
     private func openInTerminal(_ project: Project) {
         guard let terminalURL = NSWorkspace.shared.urlForApplication(
             withBundleIdentifier: "com.apple.Terminal"
@@ -249,18 +226,11 @@ struct SidebarView: View {
         }
         .padding(.leading, CGFloat(indent) * 12)
         .padding(.vertical, 2)
-        // `.listStyle(.sidebar)` overrides the horizontal half of
-        // `listRowInsets` with the source-list table's own row metrics, so
-        // negative padding is the only lever that widens the content. Drop it
-        // and the name and git line start truncating again at the minimum
-        // column width.
+        // .listStyle(.sidebar) overrides listRowInsets horizontally; this is
+        // the only lever, and without it rows truncate at the minimum width.
         .padding(.horizontal, -6)
     }
 
-    /// A worktree row spends its second line on git state instead of the
-    /// path: `<repo>/.worktrees/<branch>` is long, head-truncated, and mostly
-    /// restates the row's own name. Everything else — and a worktree whose
-    /// first sample hasn't landed — keeps the path.
     @ViewBuilder
     private func secondaryLine(for project: Project) -> some View {
         if project.worktreeInfo != nil, let result = statusStore.result(for: project.id) {
@@ -304,8 +274,6 @@ struct SidebarView: View {
         }
     }
 
-    /// Spells out what the arrows count. Two bare numbers are only
-    /// interpretable if you already know which branch this one forked from.
     private func comparisonHelp(for status: GitStatus) -> String {
         guard let ref = status.comparisonRef else { return "" }
         return String(
@@ -316,10 +284,6 @@ struct SidebarView: View {
         )
     }
 
-    /// The branch git reports right now, not the one `WorktreeInfo` recorded
-    /// at creation — a session that switched branches should show where it
-    /// actually is, and naming the recorded branch while detached would be a
-    /// lie rather than a fallback.
     private func branchLabel(for status: GitStatus) -> String {
         guard let branch = status.branch, !branch.isEmpty else {
             return String(localized: "sidebar.row.git.detached")
@@ -327,9 +291,6 @@ struct SidebarView: View {
         return branch
     }
 
-    /// Renders the chevron toggle for a parent row, or a same-width empty
-    /// gutter for children / leaf parents — keeping the status dot column
-    /// aligned across the whole sidebar.
     @ViewBuilder
     private func disclosureCell(for id: Project.ID, hasChildren: Bool) -> some View {
         if hasChildren, !isFiltering {
