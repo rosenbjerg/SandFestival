@@ -9,7 +9,6 @@ final class ClaudeCodeAdapter: AgentAdapter {
 
     let defaultCommand = Project.defaultCommand
     let defaultArgs = Project.defaultArgs
-    /// `claude --continue` resumes the most recent conversation in the cwd.
     let continuationArgs = ["--continue"]
 
     private(set) var needsInstallation = false
@@ -26,9 +25,6 @@ final class ClaudeCodeAdapter: AgentAdapter {
     @ObservationIgnored private var listener: HookListener?
     @ObservationIgnored private weak var eventSink: AgentEventSink?
 
-    /// Fixed port the listener binds to. Surfaced here so the adapter and
-    /// settings.json factory share one source of truth. Configurable via
-    /// init for test isolation; production always uses the default.
     @ObservationIgnored private let port: UInt16
 
     init(
@@ -72,9 +68,6 @@ final class ClaudeCodeAdapter: AgentAdapter {
 
     func prepareSpawn(project: Project) -> SpawnEnvironment {
         bindings.registerPendingSpawn(projectID: project.id)
-        // The project id is injected too so the hook command can name its
-        // owning project in every event — routing by id, not cwd, keeps two
-        // projects that share a working directory from colliding.
         var additions = ["SAND_FESTIVAL_PROJECT_ID": project.id.uuidString]
         if let token { additions["SAND_FESTIVAL_TOKEN"] = token }
         return SpawnEnvironment(additions: additions)
@@ -124,10 +117,6 @@ final class ClaudeCodeAdapter: AgentAdapter {
 
         let projectID: UUID?
         var isRebind = false
-        // SessionStart names its owning project via the spawn-injected header;
-        // every later event for that conversation routes by session_id. `cd`
-        // mid-session therefore can't detach a session, and two projects that
-        // share a cwd never collide.
         if payload.hookEventName == HookEvent.sessionStart.rawValue,
            let headerID = projectIDHeader.flatMap(UUID.init(uuidString:)) {
             switch bindings.bindOnSessionStart(sessionID: payload.sessionID, projectID: headerID) {
@@ -146,11 +135,6 @@ final class ClaudeCodeAdapter: AgentAdapter {
         guard let projectID else { return }
 
         if var event = HookPayloadTranslator.translate(payload) {
-            // SessionStart after `/resume` or `/clear` arrives as `.started`
-            // from the translator, but the live OS process means we also
-            // need to drop the previous conversation's terminal title.
-            // `.sessionRestarted` carries the same state-machine semantics
-            // and adds that side effect.
             if isRebind, case .started = event {
                 event = .sessionRestarted
             }

@@ -7,17 +7,7 @@ enum HookListenerError: Error, Equatable {
     case invalidPort
 }
 
-/// Listens on `127.0.0.1:port` for HTTP POSTs from Claude Code's hook
-/// handlers. Production always uses `HookListener.defaultPort`; the port is
-/// fixed because a stable value lets the hook entries in
-/// `~/.claude/settings.json` stay correct across app restarts without
-/// rewriting on every launch. The init parameter exists so tests can bind
-/// to an alternate port without colliding with a running app. If the
-/// chosen port is in use, `start()` surfaces `.bindFailed` instead of
-/// wandering to another port.
 final class HookListener: @unchecked Sendable {
-    /// Picked once for SandFestival; changing this forces every hook entry
-    /// to be rewritten, so don't change it lightly.
     static let defaultPort: UInt16 = 51789
 
     let port: UInt16
@@ -37,7 +27,6 @@ final class HookListener: @unchecked Sendable {
         self.onEvent = onEvent
     }
 
-    /// Binds the listener to `port`. Throws `.bindFailed` if it's already in use.
     func start() async throws {
         guard await tryStart(port: port) != nil else {
             throw HookListenerError.bindFailed(port: port)
@@ -45,11 +34,8 @@ final class HookListener: @unchecked Sendable {
     }
 
     func stop() {
-        // `listener` is otherwise assigned only from the NWListener state
-        // handler, which runs on `queue`. Route the teardown through the same
-        // serial queue so the two accesses can't race. `stop()` is always
-        // called off `queue` (from the MainActor adapter), so `sync` here
-        // can't deadlock.
+        // `listener` is otherwise touched only on `queue`. Never call this from
+        // `queue` itself — the sync would deadlock.
         queue.sync {
             listener?.cancel()
             listener = nil
@@ -130,11 +116,6 @@ final class HookListener: @unchecked Sendable {
                 let raw = String(data: headerBytes, encoding: .utf8) ?? ""
                 self.dispatchAfterHeaders(connection: connection, headerString: raw, bodySoFar: bodySoFar)
             } else if error != nil || isComplete || buffer.count > HookListener.maxHeaderBytes {
-                // No terminator yet and either the peer stopped sending or it's
-                // flooding us pre-auth — a legitimate hook request's headers
-                // are a few hundred bytes, never anywhere near the cap. Drop
-                // the connection rather than letting `accumulated` grow without
-                // bound.
                 connection.cancel()
             } else {
                 self.readHeaders(connection: connection, accumulated: buffer)
@@ -152,10 +133,7 @@ final class HookListener: @unchecked Sendable {
             return
         }
         let target = headers.contentLength
-        // A negative Content-Length is malformed and would crash `consumeBody`
-        // via `prefix(_:)`; an oversized one would let an authenticated client
-        // force unbounded body buffering. A real hook payload is well under
-        // the cap.
+        // A negative Content-Length would crash prefix(_:) in consumeBody.
         guard target >= 0 else {
             sendResponse(connection: connection, status: 400, reason: "Bad Request")
             return
@@ -200,14 +178,7 @@ final class HookListener: @unchecked Sendable {
 
     // MARK: - Helpers
 
-    /// Upper bound on the request-header section. Hook requests carry only a
-    /// handful of short headers, so 64 KB is purely a guard against a runaway
-    /// or hostile local process streaming bytes that never terminate.
     private static let maxHeaderBytes = 1 << 16
-
-    /// Upper bound on the request body. Hook payloads are small JSON objects;
-    /// 1 MB is a generous ceiling that still bounds memory if a client sends
-    /// an absurd Content-Length.
     private static let maxBodyBytes = 1 << 20
 
     private static let headerTerminator: [UInt8] = [0x0d, 0x0a, 0x0d, 0x0a]

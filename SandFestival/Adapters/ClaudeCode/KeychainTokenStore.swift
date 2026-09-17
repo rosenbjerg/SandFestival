@@ -1,10 +1,6 @@
 import Foundation
 import Security
 
-/// Pluggable token source for `ClaudeCodeAdapter`. Production uses
-/// `KeychainTokenStore`; tests can swap in an in-memory implementation so
-/// the adapter doesn't reach into the developer's keychain just to run a
-/// hook-routing assertion.
 protocol TokenStore {
     func loadOrCreate() throws -> String
 }
@@ -18,7 +14,6 @@ struct KeychainTokenStore: TokenStore {
         self.account = account
     }
 
-    /// Returns the persisted token, generating and storing a new UUID if none exists.
     func loadOrCreate() throws -> String {
         if let existing = try load() { return existing }
         let token = UUID().uuidString
@@ -56,7 +51,6 @@ struct KeychainTokenStore: TokenStore {
             kSecAttrAccount as String: account,
             kSecValueData as String: Data(token.utf8),
         ]
-        // Replace any existing value for this (service, account) pair.
         let deleteQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,

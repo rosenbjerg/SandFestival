@@ -1,7 +1,5 @@
 import Foundation
 
-/// Drives the state machine with a canned event sequence — used by previews
-/// and tests, never wired in production.
 @MainActor
 final class MockAdapter: AgentAdapter {
     static let id = "mock"

@@ -11,19 +11,12 @@ enum SettingsJSONManagerError: Error, Equatable {
     case writeFailed(String)
 }
 
-/// Reflects how our hooks compare to what SandFestival currently installs.
-/// `outdated` is the upgrade path: we already have the user's consent, so
-/// the adapter rewrites silently rather than re-prompting.
 enum HookInstallState: Equatable {
     case notInstalled
     case outdated
     case current
 }
 
-/// Merges/removes Sand Festival hook entries in `~/.claude/settings.json`
-/// without disturbing any other settings the user has added. All writes go
-/// through a tempfile + fsync + rename so a crash mid-write can't damage
-/// the user's existing config.
 struct SettingsJSONManager {
     let fileURL: URL
 
@@ -43,10 +36,6 @@ struct SettingsJSONManager {
         try detectInstallState(port: port) == .current
     }
 
-    /// Distinguishes between "no hooks installed", "hooks installed but in an
-    /// old format that needs rewriting", and "hooks match the current factory
-    /// output". The adapter uses this to silently migrate without re-asking
-    /// the user for consent.
     func detectInstallState(port: UInt16, events: [HookEvent] = HookEvent.allCases) throws -> HookInstallState {
         let settings = try readSettings()
         let expected = HookEntryFactory.entry(port: port)
@@ -108,12 +97,10 @@ struct SettingsJSONManager {
         do {
             data = try Data(contentsOf: fileURL)
         } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
-            // No settings.json yet — a fresh install. Start from an empty object.
             return [:]
         } catch {
-            // The file exists but can't be read (permissions, I/O error, an
-            // exclusive lock). Refuse to proceed: writing now would replace
-            // the user's real config with nothing but our hook entries.
+            // Not `[:]` like the missing-file case: a write now would replace
+            // the user's config with nothing but our hooks.
             throw SettingsJSONManagerError.readFailed(String(describing: error))
         }
         if data.isEmpty { return [:] }
