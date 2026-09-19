@@ -184,6 +184,39 @@
         }
       }
     },
+    "detail.toolbar.attention" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Needs Attention"
+          }
+        }
+      }
+    },
+    "detail.toolbar.attention.empty" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing needs attention"
+          }
+        }
+      }
+    },
+    "detail.toolbar.attention.item" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — %@"
+          }
+        }
+      }
+    },
     "detail.toolbar.continue" : {
       "localizations" : {
         "en" : {
@@ -1234,6 +1267,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Signed in."
+          }
+        }
+      }
+    },
+    "menu.go" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go"
+          }
+        }
+      }
+    },
+    "menu.go.next_attention" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next Needing Attention"
+          }
+        }
+      }
+    },
+    "menu.go.previous_attention" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previous Needing Attention"
           }
         }
       }

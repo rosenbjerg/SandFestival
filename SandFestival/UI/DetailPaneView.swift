@@ -24,8 +24,45 @@ struct DetailPaneView: View {
         .toolbar {
             if let session = manager.selectedSession() {
                 toolbarButtons(for: session)
+
+                ToolbarSpacer(.fixed)
+            }
+
+            ToolbarItem {
+                attentionMenu
             }
         }
+    }
+
+    private var attentionMenu: some View {
+        let sessions = manager.attentionSessions
+        return Menu {
+            if sessions.isEmpty {
+                Text(String(localized: "detail.toolbar.attention.empty"))
+            } else {
+                ForEach(sessions, id: \.id) { session in
+                    Button(String(
+                        format: String(localized: "detail.toolbar.attention.item"),
+                        session.project.name,
+                        session.state.displayLabel
+                    )) {
+                        manager.focus(projectID: session.id)
+                    }
+                }
+            }
+        } label: {
+            Label {
+                if !sessions.isEmpty {
+                    Text(sessions.count, format: .number)
+                        .monospacedDigit()
+                }
+            } icon: {
+                Image(systemName: sessions.isEmpty ? "bell" : "bell.fill")
+            }
+            .labelStyle(.titleAndIcon)
+        }
+        .help(String(localized: "detail.toolbar.attention"))
+        .accessibilityLabel(String(localized: "detail.toolbar.attention"))
     }
 
     @ViewBuilder

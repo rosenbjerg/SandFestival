@@ -71,6 +71,20 @@ struct SandFestivalApp: App {
                 }
             }
 
+            CommandMenu(String(localized: "menu.go")) {
+                Button(String(localized: "menu.go.next_attention")) {
+                    manager.focusNextAttention()
+                }
+                .keyboardShortcut("]", modifiers: [.command, .shift])
+                .disabled(manager.attentionSessions.isEmpty)
+
+                Button(String(localized: "menu.go.previous_attention")) {
+                    manager.focusPreviousAttention()
+                }
+                .keyboardShortcut("[", modifiers: [.command, .shift])
+                .disabled(manager.attentionSessions.isEmpty)
+            }
+
             CommandGroup(after: .toolbar) {
                 Button(String(localized: "view.terminal.font.larger")) {
                     manager.bumpTerminalFontSize(by: 1)

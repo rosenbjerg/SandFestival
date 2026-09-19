@@ -188,6 +188,36 @@ final class SessionManager {
         NSApp.windows.first?.makeKeyAndOrderFront(nil)
     }
 
+    func focusNextAttention() {
+        focusAttention(forward: true)
+    }
+
+    func focusPreviousAttention() {
+        focusAttention(forward: false)
+    }
+
+    private func focusAttention(forward: Bool) {
+        guard let next = Self.nextAttentionProjectID(
+            in: attentionSessions.map(\.id),
+            after: selectedProjectID,
+            forward: forward
+        ) else { return }
+        focus(projectID: next)
+    }
+
+    static func nextAttentionProjectID(
+        in ordered: [Project.ID],
+        after current: Project.ID?,
+        forward: Bool = true
+    ) -> Project.ID? {
+        guard !ordered.isEmpty else { return nil }
+        guard let current, let index = ordered.firstIndex(of: current) else {
+            return forward ? ordered.first : ordered.last
+        }
+        let step = forward ? 1 : ordered.count - 1
+        return ordered[(index + step) % ordered.count]
+    }
+
     func focusSelectedTerminal() {
         guard let session = selectedSession() else { return }
         // Next tick: callers fire before the window has settled its responder chain.
