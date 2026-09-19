@@ -124,6 +124,8 @@ struct DetailPaneView: View {
     @ToolbarContentBuilder
     private func toolbarButtons(for session: Session) -> some ToolbarContent {
         ToolbarItemGroup {
+            lifecycleButton(for: session)
+
             if session.state.isRunning {
                 Button {
                     session.restart()
@@ -131,28 +133,6 @@ struct DetailPaneView: View {
                     Label(String(localized: "detail.toolbar.restart"), systemImage: "arrow.clockwise")
                 }
                 .help(String(localized: "detail.toolbar.restart"))
-            }
-
-            Button {
-                if session.state.isRunning {
-                    if session.softStopRequested {
-                        session.forceStop()
-                    } else {
-                        session.stop()
-                    }
-                } else {
-                    session.start()
-                }
-            } label: {
-                if session.state.isRunning {
-                    if session.softStopRequested {
-                        Label(String(localized: "detail.toolbar.force_stop"), systemImage: "xmark.octagon.fill")
-                    } else {
-                        Label(String(localized: "detail.toolbar.stop"), systemImage: "stop.fill")
-                    }
-                } else {
-                    Label(String(localized: "detail.toolbar.start"), systemImage: "play.fill")
-                }
             }
 
             if !session.state.isRunning, session.canContinue {
@@ -163,7 +143,11 @@ struct DetailPaneView: View {
                 }
                 .help(String(localized: "detail.toolbar.continue.help"))
             }
+        }
 
+        ToolbarSpacer(.fixed)
+
+        ToolbarItemGroup {
             Button {
                 NSWorkspace.shared.open(session.project.path)
             } label: {
@@ -189,6 +173,33 @@ struct DetailPaneView: View {
                 Label(String(localized: "detail.toolbar.edit"), systemImage: "pencil")
             }
             .help(String(localized: "detail.toolbar.edit"))
+        }
+    }
+
+    @ViewBuilder
+    private func lifecycleButton(for session: Session) -> some View {
+        if !session.state.isRunning {
+            Button {
+                session.start()
+            } label: {
+                Label(String(localized: "detail.toolbar.start"), systemImage: "play.fill")
+            }
+            .help(String(localized: "detail.toolbar.start"))
+        } else if session.softStopRequested {
+            Button {
+                session.forceStop()
+            } label: {
+                Label(String(localized: "detail.toolbar.force_stop"), systemImage: "xmark.octagon.fill")
+            }
+            .tint(.red)
+            .help(String(localized: "detail.toolbar.force_stop"))
+        } else {
+            Button {
+                session.stop()
+            } label: {
+                Label(String(localized: "detail.toolbar.stop"), systemImage: "stop.fill")
+            }
+            .help(String(localized: "detail.toolbar.stop"))
         }
     }
 }
