@@ -11,6 +11,7 @@ final class SessionManager {
     var selectedProjectID: Project.ID?
     private(set) var lastPersistError: String?
     private(set) var terminalFontSize: CGFloat = SessionManager.defaultFontSize
+    private(set) var terminalFontFamily: String = ""
     private(set) var terminalScrollback: Int = SessionManager.defaultScrollback
     private(set) var useMetalRenderer: Bool = false
 
@@ -18,6 +19,7 @@ final class SessionManager {
     static let minFontSize: CGFloat = 9
     static let maxFontSize: CGFloat = 32
     private static let fontSizeKey = "terminal.fontSize"
+    private static let fontFamilyKey = "terminal.fontFamily"
 
     static let defaultScrollback: Int = 2_000
     static let minScrollback: Int = 500
@@ -45,11 +47,13 @@ final class SessionManager {
 
         UserDefaults.standard.register(defaults: [
             SessionManager.fontSizeKey: Double(SessionManager.defaultFontSize),
+            SessionManager.fontFamilyKey: "",
             SessionManager.scrollbackKey: SessionManager.defaultScrollback,
             SessionManager.useMetalKey: false,
         ])
         let storedFontSize = CGFloat(UserDefaults.standard.double(forKey: SessionManager.fontSizeKey))
         terminalFontSize = SessionManager.clampFontSize(storedFontSize)
+        terminalFontFamily = UserDefaults.standard.string(forKey: SessionManager.fontFamilyKey) ?? ""
         let storedScrollback = UserDefaults.standard.integer(forKey: SessionManager.scrollbackKey)
         terminalScrollback = SessionManager.clampScrollback(storedScrollback)
         useMetalRenderer = UserDefaults.standard.bool(forKey: SessionManager.useMetalKey)
@@ -367,7 +371,7 @@ final class SessionManager {
         }
     }
 
-    // MARK: - Terminal font size
+    // MARK: - Terminal font
 
     func bumpTerminalFontSize(by delta: CGFloat) {
         applyTerminalFontSize(SessionManager.clampFontSize(terminalFontSize + delta))
@@ -377,19 +381,30 @@ final class SessionManager {
         applyTerminalFontSize(SessionManager.defaultFontSize)
     }
 
-    private func applyTerminalFontSize(_ size: CGFloat) {
+    func applyTerminalFontSize(_ size: CGFloat) {
         let clamped = SessionManager.clampFontSize(size)
         guard clamped != terminalFontSize else { return }
         terminalFontSize = clamped
         UserDefaults.standard.set(Double(clamped), forKey: SessionManager.fontSizeKey)
+        refreshTerminalFonts()
+    }
+
+    func applyTerminalFontFamily(_ family: String) {
+        guard family != terminalFontFamily else { return }
+        terminalFontFamily = family
+        UserDefaults.standard.set(family, forKey: SessionManager.fontFamilyKey)
+        refreshTerminalFonts()
+    }
+
+    func currentTerminalFont() -> NSFont {
+        TerminalFont.resolve(family: terminalFontFamily, size: terminalFontSize)
+    }
+
+    private func refreshTerminalFonts() {
         let font = currentTerminalFont()
         for session in sessions.values {
             session.terminalView.font = font
         }
-    }
-
-    func currentTerminalFont() -> NSFont {
-        NSFont.monospacedSystemFont(ofSize: terminalFontSize, weight: .medium)
     }
 
     private static func clampFontSize(_ size: CGFloat) -> CGFloat {

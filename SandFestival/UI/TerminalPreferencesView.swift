@@ -5,9 +5,35 @@ struct TerminalPreferencesView: View {
 
     @State private var draft: Int = SessionManager.defaultScrollback
     @State private var useMetalDraft: Bool = false
+    @State private var familyDraft: String = ""
+    @State private var sizeDraft: Double = Double(SessionManager.defaultFontSize)
 
     var body: some View {
         Form {
+            Section(String(localized: "preferences.terminal.font.section")) {
+                Picker(String(localized: "preferences.terminal.font.family.label"), selection: $familyDraft) {
+                    Text(String(localized: "preferences.terminal.font.family.system"))
+                        .tag("")
+                    Divider()
+                    ForEach(TerminalFont.monospacedFamilies, id: \.self) { family in
+                        Text(family)
+                            .font(.custom(family, size: 13))
+                            .tag(family)
+                    }
+                }
+
+                Stepper(
+                    value: $sizeDraft,
+                    in: Double(SessionManager.minFontSize)...Double(SessionManager.maxFontSize),
+                    step: 1
+                ) {
+                    LabeledContent(String(localized: "preferences.terminal.font.size.label")) {
+                        Text(formattedSize(sizeDraft))
+                            .monospacedDigit()
+                    }
+                }
+            }
+
             Section(String(localized: "preferences.terminal.scrollback.section")) {
                 Stepper(
                     value: $draft,
@@ -42,6 +68,10 @@ struct TerminalPreferencesView: View {
         .onAppear {
             draft = manager.terminalScrollback
             useMetalDraft = manager.useMetalRenderer
+            familyDraft = TerminalFont.isAvailable(family: manager.terminalFontFamily)
+                ? manager.terminalFontFamily
+                : ""
+            sizeDraft = Double(manager.terminalFontSize)
         }
         .onChange(of: draft) { _, newValue in
             manager.applyTerminalScrollback(newValue)
@@ -49,6 +79,16 @@ struct TerminalPreferencesView: View {
         .onChange(of: useMetalDraft) { _, newValue in
             manager.applyMetalRenderer(newValue)
         }
+        .onChange(of: familyDraft) { _, newValue in
+            manager.applyTerminalFontFamily(newValue)
+        }
+        .onChange(of: sizeDraft) { _, newValue in
+            manager.applyTerminalFontSize(CGFloat(newValue))
+        }
+    }
+
+    private func formattedSize(_ value: Double) -> String {
+        String(format: String(localized: "preferences.terminal.font.size.unit"), Int(value))
     }
 
     private func formattedLines(_ value: Int) -> String {
