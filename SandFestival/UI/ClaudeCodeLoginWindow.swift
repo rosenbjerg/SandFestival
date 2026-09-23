@@ -98,7 +98,7 @@ struct ClaudeCodeLoginWindow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(String(localized: "login.intro"))
-                .font(.callout)
+                .interfaceFont(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 16)

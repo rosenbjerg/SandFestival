@@ -57,12 +57,12 @@ struct ProjectEditorView: View {
                     }
                     if draft.pathIsMissing {
                         Label(String(localized: "editor.field.path.not_found"), systemImage: "exclamationmark.triangle")
-                            .font(.callout)
+                            .interfaceFont(.callout)
                             .foregroundStyle(.secondary)
                     }
                     if let repositoryError {
                         Text(repositoryError)
-                            .font(.callout)
+                            .interfaceFont(.callout)
                             .foregroundStyle(.red)
                             .textSelection(.enabled)
                     }
@@ -131,7 +131,7 @@ struct ProjectEditorView: View {
                 text: $draft.agentArgsText
             )
             Text(String(localized: "editor.field.args.help"))
-                .font(.caption)
+                .interfaceFont(.caption)
                 .foregroundStyle(.secondary)
         }
     }
@@ -139,9 +139,9 @@ struct ProjectEditorView: View {
     private func argsBlock(title: String, text: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.callout)
+                .interfaceFont(.callout)
             TextEditor(text: text)
-                .font(.system(.body, design: .monospaced))
+                .interfaceFont(.body, design: .monospaced)
                 .frame(minHeight: 80)
                 .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(.tertiary))
         }

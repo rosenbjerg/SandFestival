@@ -26,7 +26,7 @@ struct HookInstallSheet: View {
             Text(isReinstall
                 ? String(localized: "hooks.install.title.reinstall")
                 : String(localized: "hooks.install.title"))
-                .font(.title2)
+                .interfaceFont(.title2)
                 .bold()
 
             Text(isReinstall
@@ -37,7 +37,7 @@ struct HookInstallSheet: View {
             if let error = adapter.lastInstallError {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
                     .foregroundStyle(.red)
-                    .font(.callout)
+                    .interfaceFont(.callout)
             }
 
             HStack {
@@ -73,16 +73,16 @@ struct HookInstallSheet: View {
     private func preview_body(_ preview: SettingsDiffPreview) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(String(localized: "hooks.preview.title"))
-                .font(.title3)
+                .interfaceFont(.title3)
                 .bold()
 
             VStack(alignment: .leading, spacing: 8) {
                 Text(String(localized: "hooks.preview.before"))
-                    .font(.headline)
+                    .interfaceFont(.headline)
                 previewBox(text: preview.before, height: 180)
 
                 Text(String(localized: "hooks.preview.after"))
-                    .font(.headline)
+                    .interfaceFont(.headline)
                 previewBox(text: preview.after, height: 240)
             }
 
@@ -101,7 +101,7 @@ struct HookInstallSheet: View {
     private func previewBox(text: String, height: CGFloat) -> some View {
         ScrollView {
             Text(text.isEmpty ? "{}" : text)
-                .font(.system(.callout, design: .monospaced))
+                .interfaceFont(.callout, design: .monospaced)
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(8)

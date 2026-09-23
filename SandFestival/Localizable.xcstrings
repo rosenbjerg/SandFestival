@@ -1553,6 +1553,76 @@
         }
       }
     },
+    "preferences.interface.text_size.description" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scales the text SandFestival draws itself — sidebar, panels, sheets and preferences. The terminal keeps its own font, and macOS owns the menu bar."
+          }
+        }
+      }
+    },
+    "preferences.interface.text_size.extra_large" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extra Large"
+          }
+        }
+      }
+    },
+    "preferences.interface.text_size.label" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App text"
+          }
+        }
+      }
+    },
+    "preferences.interface.text_size.large" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Large"
+          }
+        }
+      }
+    },
+    "preferences.interface.text_size.medium" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default"
+          }
+        }
+      }
+    },
+    "preferences.interface.text_size.section" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text Size"
+          }
+        }
+      }
+    },
+    "preferences.interface.text_size.small" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Small"
+          }
+        }
+      }
+    },
     "preferences.keep_awake.description" : {
       "localizations" : {
         "en" : {
@@ -1728,6 +1798,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Attention"
+          }
+        }
+      }
+    },
+    "preferences.tab.interface" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interface"
           }
         }
       }

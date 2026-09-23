@@ -18,7 +18,7 @@ struct UpdateClaudeCodeSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(title)
-                .font(.title2)
+                .interfaceFont(.title2)
                 .bold()
 
             switch phase {
@@ -81,7 +81,7 @@ struct UpdateClaudeCodeSheet: View {
 
             if succeeded && restartAfterUpdate {
                 Label(String(localized: "update.done.restart_note"), systemImage: "arrow.clockwise")
-                    .font(.callout)
+                    .interfaceFont(.callout)
                     .foregroundStyle(.secondary)
             }
 
@@ -98,7 +98,7 @@ struct UpdateClaudeCodeSheet: View {
     private func outputBox(_ text: String) -> some View {
         ScrollView {
             Text(text)
-                .font(.system(.callout, design: .monospaced))
+                .interfaceFont(.callout, design: .monospaced)
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(8)

@@ -21,7 +21,7 @@ struct ProjectRemovalView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(String(format: String(localized: "removal.title"), project.name))
-                .font(.headline)
+                .interfaceFont(.headline)
 
             if let info = project.worktreeInfo {
                 Text(String(format: String(localized: "removal.body"), info.branch, project.displayPath))
@@ -54,7 +54,7 @@ struct ProjectRemovalView: View {
 
             if let errorMessage {
                 Text(errorMessage)
-                    .font(.callout)
+                    .interfaceFont(.callout)
                     .foregroundStyle(.red)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)

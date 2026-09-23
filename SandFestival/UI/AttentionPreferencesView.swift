@@ -20,7 +20,7 @@ struct AttentionPreferencesView: View {
                 }
 
                 Text(String(localized: "preferences.section.events.description"))
-                    .font(.caption)
+                    .interfaceFont(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -38,7 +38,7 @@ struct AttentionPreferencesView: View {
                 .pickerStyle(.radioGroup)
 
                 Text(bounceDescription)
-                    .font(.caption)
+                    .interfaceFont(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -72,7 +72,7 @@ struct AttentionPreferencesView: View {
 
                 if preferences.notificationsEnabled, notificationAuthorization == .denied {
                     Text(String(localized: "preferences.notifications.permission_denied"))
-                        .font(.caption)
+                        .interfaceFont(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -85,7 +85,7 @@ struct AttentionPreferencesView: View {
                 )
 
                 Text(String(localized: "preferences.sidebar.auto_surface_active.description"))
-                    .font(.caption)
+                    .interfaceFont(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -113,12 +113,12 @@ struct AttentionPreferencesView: View {
             }
         case .denied, .restricted:
             Text(String(localized: "preferences.dock.focus.denied"))
-                .font(.caption)
+                .interfaceFont(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         case .authorized:
             Text(String(localized: "preferences.dock.focus.authorized"))
-                .font(.caption)
+                .interfaceFont(.caption)
                 .foregroundStyle(.secondary)
         @unknown default:
             EmptyView()

@@ -26,7 +26,7 @@ struct BranchPickerField: View {
                         .foregroundStyle(hasSelection ? .primary : .secondary)
                     Spacer()
                     Image(systemName: "chevron.up.chevron.down")
-                        .font(.caption)
+                        .interfaceFont(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -83,7 +83,7 @@ struct BranchPickerField: View {
 
             if filtered.isEmpty && sentinelLabel == nil {
                 Text(String(localized: "duplicate.field.existing_branch.no_matches"))
-                    .font(.callout)
+                    .interfaceFont(.callout)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding()
@@ -125,7 +125,7 @@ struct BranchPickerField: View {
         if !refs.isEmpty {
             if showsSectionHeaders {
                 Text(title)
-                    .font(.caption)
+                    .interfaceFont(.caption)
                     .fontWeight(.semibold)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 10)

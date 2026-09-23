@@ -211,7 +211,7 @@ struct SidebarView: View {
                 secondaryLine(for: project)
                 if let title = session?.terminalTitle {
                     Text(title)
-                        .font(.caption2)
+                        .interfaceFont(.caption2)
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -237,7 +237,7 @@ struct SidebarView: View {
             gitLine(for: project, result: result)
         } else {
             Text(project.displayPath)
-                .font(.caption)
+                .interfaceFont(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.head)
@@ -249,7 +249,7 @@ struct SidebarView: View {
         switch result {
         case .unavailable:
             Text(String(localized: "sidebar.row.git.missing"))
-                .font(.caption)
+                .interfaceFont(.caption)
                 .foregroundStyle(.orange)
                 .lineLimit(1)
         case .status(let status):
@@ -267,7 +267,7 @@ struct SidebarView: View {
                     Text(String(format: String(localized: "sidebar.row.git.changed"), status.changedFiles))
                 }
             }
-            .font(.caption)
+            .interfaceFont(.caption)
             .foregroundStyle(.secondary)
             .monospacedDigit()
             .help(comparisonHelp(for: status))
@@ -298,7 +298,7 @@ struct SidebarView: View {
                 toggleCollapse(id)
             } label: {
                 Image(systemName: collapsedParents.contains(id) ? "chevron.right" : "chevron.down")
-                    .font(.caption2)
+                    .interfaceFont(.caption2)
                     .foregroundStyle(.secondary)
                     .frame(width: 10, height: 12)
             }
@@ -316,7 +316,7 @@ struct SidebarView: View {
         switch session.state {
         case .working:
             Text(session.enteredCurrentStateAt, style: .relative)
-                .font(.caption2)
+                .interfaceFont(.caption2)
                 .foregroundStyle(.tertiary)
                 .monospacedDigit()
         case .waitingForPermission:
@@ -346,7 +346,7 @@ struct SidebarView: View {
 
     private func attentionLabel(_ text: String, color: Color) -> some View {
         Text(text)
-            .font(.caption2)
+            .interfaceFont(.caption2)
             .fontWeight(.semibold)
             .foregroundStyle(color)
             .padding(.horizontal, 6)

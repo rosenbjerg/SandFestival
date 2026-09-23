@@ -49,7 +49,7 @@ struct TerminalPreferencesView: View {
                 Text(String(format: String(localized: "preferences.terminal.scrollback.description"),
                             SessionManager.minScrollback,
                             SessionManager.maxScrollback))
-                    .font(.caption)
+                    .interfaceFont(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -58,7 +58,7 @@ struct TerminalPreferencesView: View {
                 Toggle(String(localized: "preferences.terminal.metal.label"), isOn: $useMetalDraft)
 
                 Text(String(localized: "preferences.terminal.metal.description"))
-                    .font(.caption)
+                    .interfaceFont(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

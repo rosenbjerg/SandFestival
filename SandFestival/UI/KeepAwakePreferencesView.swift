@@ -19,7 +19,7 @@ struct KeepAwakePreferencesView: View {
                 }
 
                 Text(String(localized: "preferences.keep_awake.description"))
-                    .font(.caption)
+                    .interfaceFont(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

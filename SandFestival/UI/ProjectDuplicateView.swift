@@ -71,7 +71,7 @@ struct ProjectDuplicateView: View {
                             }
                             if let hint = draft.blockingIssue?.inlineMessage {
                                 Label(hint, systemImage: "exclamationmark.triangle")
-                                    .font(.callout)
+                                    .interfaceFont(.callout)
                                     .foregroundStyle(.secondary)
                             }
                         }
@@ -86,7 +86,7 @@ struct ProjectDuplicateView: View {
                 if let errorMessage {
                     Section {
                         Text(errorMessage)
-                            .font(.callout)
+                            .interfaceFont(.callout)
                             .foregroundStyle(.red)
                             .textSelection(.enabled)
                     }
@@ -101,7 +101,7 @@ struct ProjectDuplicateView: View {
                 if isCreating {
                     ProgressView().controlSize(.small)
                     Text(String(localized: "duplicate.progress"))
-                        .font(.callout)
+                        .interfaceFont(.callout)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -142,13 +142,13 @@ struct ProjectDuplicateView: View {
             }
             if let fetchError {
                 Text(fetchError)
-                    .font(.caption)
+                    .interfaceFont(.caption)
                     .foregroundStyle(.red)
                     .lineLimit(2)
                     .textSelection(.enabled)
             } else {
                 Text(lastFetchCaption)
-                    .font(.caption)
+                    .interfaceFont(.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer()

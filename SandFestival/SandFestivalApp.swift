@@ -10,6 +10,7 @@ struct SandFestivalApp: App {
     @State private var attentionNotifier: AttentionNotifier?
     @State private var statusStore = WorktreeStatusStore()
     @State private var keepAwakePreferences = KeepAwakePreferences()
+    @State private var interfacePreferences = InterfacePreferences()
     @State private var keepAwake: KeepAwake?
     @State private var manualHookSheet = false
     @State private var updateSheet = false
@@ -26,6 +27,7 @@ struct SandFestivalApp: App {
                 editorTarget: $editorTarget
             )
                 .frame(minWidth: 900, minHeight: 600)
+                .interfaceTextScale(interfacePreferences.textSize.scale)
                 .task {
                     if attentionNotifier == nil {
                         attentionNotifier = AttentionNotifier(
@@ -105,11 +107,20 @@ struct SandFestivalApp: App {
 
         Window(String(localized: "window.claude_login.title"), id: ClaudeCodeLoginWindow.windowID) {
             ClaudeCodeLoginWindow(manager: manager)
+                .interfaceTextScale(interfacePreferences.textSize.scale)
         }
         .defaultSize(width: 760, height: 520)
 
         Settings {
             TabView {
+                InterfacePreferencesView(preferences: interfacePreferences)
+                    .tabItem {
+                        Label(
+                            String(localized: "preferences.tab.interface"),
+                            systemImage: "textformat.size"
+                        )
+                    }
+
                 AttentionPreferencesView(
                     preferences: attentionPreferences,
                     notifier: attentionNotifier
@@ -137,6 +148,7 @@ struct SandFestivalApp: App {
                         )
                     }
             }
+            .interfaceTextScale(interfacePreferences.textSize.scale)
         }
     }
 

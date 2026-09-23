@@ -88,11 +88,11 @@ struct DetailPaneView: View {
     private func notRunningOverlay(session: Session) -> some View {
         VStack(spacing: 12) {
             Text(String(localized: session.lastError == nil ? "detail.not_running.title" : "detail.not_running.failed_title"))
-                .font(.headline)
+                .interfaceFont(.headline)
             if let reason = session.lastError {
                 ScrollView {
                     Text(reason)
-                        .font(.system(.callout, design: .monospaced))
+                        .interfaceFont(.callout, design: .monospaced)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.leading)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -127,7 +127,7 @@ struct DetailPaneView: View {
             manager.focusSelectedTerminal()
         } label: {
             Label(String(localized: "detail.new_output"), systemImage: "arrow.down")
-                .font(.callout)
+                .interfaceFont(.callout)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
         }
@@ -146,7 +146,7 @@ struct DetailPaneView: View {
                 .font(.system(size: 36))
                 .foregroundStyle(.tertiary)
             Text(String(localized: "detail.empty.title"))
-                .font(.title3)
+                .interfaceFont(.title3)
                 .foregroundStyle(.secondary)
             if manager.projects.isEmpty {
                 Button(String(localized: "detail.empty.add_project")) {

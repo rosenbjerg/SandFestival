@@ -145,7 +145,15 @@ Viewport pinning (scrolled-up sessions not getting yanked to the bottom by strea
 - Settings: `~/.claude/settings.json` (POSIX tempfile + fsync + rename)
 - Terminal font size: UserDefaults `terminal.fontSize`, registered via `UserDefaults.register(defaults:)` (don't use a 0-fallback)
 - Terminal font family: UserDefaults `terminal.fontFamily`, empty meaning the system monospaced font. `TerminalFont.resolve` falls back to it whenever the family doesn't resolve, and the picker only offers `isFixedPitch` families — a proportional terminal font shreds SwiftTerm's cell grid
+- Interface text size: UserDefaults `interface.textSize` via `InterfacePreferences` (`InterfaceTextSize` raw value; absent or unknown means `.medium`)
 - Worktree base branch: UserDefaults `duplicate.baseBranch` via `WorktreeBaseBranchStore` — a `lineage-id → branch` map, written only on a successful new-branch duplicate. Keyed by `ProjectDuplicateDraft.resolvedParentProjectID` (the top-level ancestor), so a parent and all its worktree children share one memory; keying by path would fragment it because duplicating a child passes *that child's* worktree path as the source repo. An absent entry means "Current HEAD", so picking the sentinel forgets rather than stores
+
+## Interface text size
+
+- macOS SwiftUI **ignores** `dynamicTypeSize` (verified: an override changes nothing), so app text scales only because we do it. Every user-facing `Text`/`Label` uses `.interfaceFont(.caption)` rather than `.font(.caption)`; `InterfaceFont.resolve` reads the `interfaceTextScale` environment value and rebuilds the style off `NSFont.preferredFont(forTextStyle:)` at the scaled point size, weight included
+- At `.medium` the modifier hands back the plain style font and the root override is `nil`, so the default install renders byte-identical to before the setting existed. Keep that property — it's what makes the whole pass safe
+- `.interfaceTextScale(_:)` is applied per **scene** (main window, login window, Settings); sheets inherit it from their presenter. A new scene that forgets it silently renders at 1.0. It also sets the root `.font`, which is what scales unstyled text and control labels
+- Literal `.font(.system(size:))` glyphs (`StatusDot`, the empty-state icon) are deliberately left out — they sit in fixed frames and would clip. The menu bar and window chrome belong to macOS and don't scale either
 
 ## Localization
 
