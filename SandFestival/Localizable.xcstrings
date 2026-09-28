@@ -280,6 +280,17 @@
         }
       }
     },
+    "detail.toolbar.open_in_terminal" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open in Terminal"
+          }
+        }
+      }
+    },
     "detail.toolbar.restart" : {
       "extractionState" : "manual",
       "localizations" : {

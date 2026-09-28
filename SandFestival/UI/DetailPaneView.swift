@@ -192,6 +192,13 @@ struct DetailPaneView: View {
             }
             .help(String(localized: "detail.toolbar.open_in_finder"))
 
+            Button {
+                OpenInTerminal.open(session.project.path)
+            } label: {
+                Label(String(localized: "detail.toolbar.open_in_terminal"), systemImage: "terminal")
+            }
+            .help(String(localized: "detail.toolbar.open_in_terminal"))
+
             if session.project.parentProjectID == nil {
                 Button {
                     duplicateTarget = session.project

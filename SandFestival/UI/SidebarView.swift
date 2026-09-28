@@ -139,7 +139,7 @@ struct SidebarView: View {
             NSWorkspace.shared.open(project.path)
         }
         Button(String(localized: "sidebar.row.open_in_terminal")) {
-            openInTerminal(project)
+            OpenInTerminal.open(project.path)
         }
         Divider()
         Button(String(localized: "sidebar.row.edit")) {
@@ -181,18 +181,6 @@ struct SidebarView: View {
 
     private func isDirectory(_ url: URL) -> Bool {
         (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
-    }
-
-    private func openInTerminal(_ project: Project) {
-        guard let terminalURL = NSWorkspace.shared.urlForApplication(
-            withBundleIdentifier: "com.apple.Terminal"
-        ) else { return }
-        NSWorkspace.shared.open(
-            [project.path],
-            withApplicationAt: terminalURL,
-            configuration: NSWorkspace.OpenConfiguration(),
-            completionHandler: nil
-        )
     }
 
     // MARK: - Row
