@@ -11,6 +11,8 @@ enum HookPayloadTranslator {
             return .working
         case HookEvent.preToolUse.rawValue:
             return preToolUseEvent(toolName: payload.toolName)
+        case HookEvent.permissionRequest.rawValue:
+            return .waitingForPermission
         case HookEvent.postToolUse.rawValue:
             if payload.toolName == Self.askUserQuestionTool { return .working }
             return .toolCompleted

@@ -4,6 +4,7 @@ enum HookEvent: String, CaseIterable, Sendable {
     case sessionStart = "SessionStart"
     case userPromptSubmit = "UserPromptSubmit"
     case preToolUse = "PreToolUse"
+    case permissionRequest = "PermissionRequest"
     case postToolUse = "PostToolUse"
     case postToolUseFailure = "PostToolUseFailure"
     case notification = "Notification"

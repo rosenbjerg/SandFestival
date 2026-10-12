@@ -117,6 +117,12 @@ struct HookPayloadTranslatorTests {
         #expect(HookPayloadTranslator.translate(makePayload(event: "PreToolUse", toolName: nil)) == nil)
     }
 
+    @Test("PermissionRequest maps to .waitingForPermission")
+    func permissionRequestMapsToWaitingForPermission() {
+        let payload = makePayload(event: "PermissionRequest", toolName: "Bash")
+        #expect(HookPayloadTranslator.translate(payload) == .waitingForPermission)
+    }
+
     @Test("PostToolUse for AskUserQuestion maps to .working (user answered)")
     func postToolUseAskUserQuestionMapsToWorking() {
         let payload = makePayload(event: "PostToolUse", toolName: "AskUserQuestion")
