@@ -46,6 +46,7 @@ struct ClaudeCodeAdapterIntegrationTests {
             "session_id": "sess-perm",
             "hook_event_name": "Notification",
             "message": "Claude needs your permission to use Bash",
+            "notification_type": "permission_prompt",
         ])
         try await env.sink.waitForEvents(1)
         let received = try #require(env.sink.events.first)

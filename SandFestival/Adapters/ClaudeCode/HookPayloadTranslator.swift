@@ -15,7 +15,7 @@ enum HookPayloadTranslator {
             if payload.toolName == Self.askUserQuestionTool { return .working }
             return nil
         case HookEvent.notification.rawValue:
-            return notificationEvent(message: payload.notificationMessage)
+            return notificationEvent(type: payload.notificationType, message: payload.notificationMessage)
         case HookEvent.stop.rawValue, HookEvent.stopFailure.rawValue:
             return .idle
         case HookEvent.sessionEnd.rawValue:
@@ -31,7 +31,16 @@ enum HookPayloadTranslator {
         return .waitingForInput
     }
 
-    private static func notificationEvent(message: String?) -> AgentEvent? {
+    private static func notificationEvent(type: String?, message: String?) -> AgentEvent? {
+        switch type {
+        case "permission_prompt": return .waitingForPermission
+        case "idle_prompt": return .waitingForInput
+        case .some: return nil
+        case nil: return legacyNotificationEvent(message: message)
+        }
+    }
+
+    private static func legacyNotificationEvent(message: String?) -> AgentEvent? {
         let normalized = (message ?? "").lowercased()
         if normalized.contains("permission") { return .waitingForPermission }
         if normalized.contains("waiting for") || normalized.contains("idle") {

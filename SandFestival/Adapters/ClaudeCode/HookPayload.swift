@@ -5,6 +5,7 @@ struct HookPayload: Equatable {
     let hookEventName: String
     let cwd: URL?
     let notificationMessage: String?
+    let notificationType: String?
     let toolName: String?
 }
 
@@ -27,6 +28,7 @@ enum HookPayloadDecoder {
             hookEventName: hookEventName,
             cwd: (json["cwd"] as? String).map { URL(fileURLWithPath: $0) },
             notificationMessage: json["message"] as? String,
+            notificationType: json["notification_type"] as? String,
             toolName: json["tool_name"] as? String
         )
     }

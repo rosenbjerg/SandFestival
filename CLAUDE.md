@@ -83,6 +83,7 @@ PATH precedence in `Session.composeEnvironment(inherited:projectEnv:extra:)`: pr
 
 - Adding a case to `HookEvent` is enough to ship a new hook: an install missing any event reads `outdated` and is silently rewritten on adapter start, no consent sheet
 - `StopFailure` (turn ended on an API error — rate limit, overloaded, auth) maps to `.idle`, same as `Stop`, because Claude Code fires it **instead of** `Stop`. Without it the session sat in `.working` forever and held keep-awake. Not `.errored`: that state means "no process" (`SessionState.isRunning` is false), so it would cover a live terminal with the not-running overlay and re-enable Start
+- `Notification` is classified by `notification_type` (`permission_prompt`, `idle_prompt`). Any other type is ignored even if its message mentions "permission". The message-text heuristic runs only when the field is absent, for CLIs that predate it
 - No hook fires when the user interrupts with Esc — `Stop` explicitly doesn't run. The session stays `.working` until the next prompt; that's a known gap, not something a hook can close
 
 ## State machine

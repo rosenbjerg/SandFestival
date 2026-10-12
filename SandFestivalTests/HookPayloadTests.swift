@@ -51,6 +51,20 @@ struct HookPayloadDecoderTests {
         #expect(payload?.notificationMessage == "Claude needs your permission to use Bash")
     }
 
+    @Test("captures notification_type")
+    func capturesNotificationType() {
+        let json = """
+        {
+          "session_id": "sess-2",
+          "hook_event_name": "Notification",
+          "message": "Claude needs your permission",
+          "notification_type": "permission_prompt"
+        }
+        """
+        let payload = try? #require(HookPayloadDecoder.decode(Data(json.utf8)))
+        #expect(payload?.notificationType == "permission_prompt")
+    }
+
     @Test("captures tool_name on tool-use payloads")
     func capturesToolName() {
         let json = """
@@ -118,20 +132,38 @@ struct HookPayloadTranslatorTests {
         #expect(HookPayloadTranslator.translate(makePayload(event: "SessionEnd")) == nil)
     }
 
-    @Test("Notification with permission language maps to .waitingForPermission")
-    func notificationPermissionMapsToWaitingForPermission() {
+    @Test("Notification of type permission_prompt maps to .waitingForPermission")
+    func notificationPermissionTypeMapsToWaitingForPermission() {
+        let payload = makePayload(event: "Notification", message: "Claude needs your permission", notificationType: "permission_prompt")
+        #expect(HookPayloadTranslator.translate(payload) == .waitingForPermission)
+    }
+
+    @Test("Notification of type idle_prompt maps to .waitingForInput")
+    func notificationIdleTypeMapsToWaitingForInput() {
+        let payload = makePayload(event: "Notification", message: "Claude is waiting for your input", notificationType: "idle_prompt")
+        #expect(HookPayloadTranslator.translate(payload) == .waitingForInput)
+    }
+
+    @Test("Notification of another type yields no event, whatever its message says")
+    func notificationOtherTypeIgnoresMessage() {
+        let payload = makePayload(event: "Notification", message: "Login permission granted", notificationType: "auth_success")
+        #expect(HookPayloadTranslator.translate(payload) == nil)
+    }
+
+    @Test("Notification without a type falls back to permission language")
+    func notificationLegacyPermissionMapsToWaitingForPermission() {
         let payload = makePayload(event: "Notification", message: "Claude needs your permission to use Bash")
         #expect(HookPayloadTranslator.translate(payload) == .waitingForPermission)
     }
 
-    @Test("Notification with idle language maps to .waitingForInput")
-    func notificationIdleMapsToWaitingForInput() {
+    @Test("Notification without a type falls back to idle language")
+    func notificationLegacyIdleMapsToWaitingForInput() {
         let payload = makePayload(event: "Notification", message: "Claude is waiting for your input")
         #expect(HookPayloadTranslator.translate(payload) == .waitingForInput)
     }
 
-    @Test("Notification with neutral text yields no event")
-    func notificationOtherYieldsNil() {
+    @Test("Notification without a type and with neutral text yields no event")
+    func notificationLegacyOtherYieldsNil() {
         let payload = makePayload(event: "Notification", message: "Something else")
         #expect(HookPayloadTranslator.translate(payload) == nil)
     }
@@ -142,12 +174,18 @@ struct HookPayloadTranslatorTests {
         #expect(HookPayloadTranslator.translate(makePayload(event: "")) == nil)
     }
 
-    private func makePayload(event: String, message: String? = nil, toolName: String? = nil) -> HookPayload {
+    private func makePayload(
+        event: String,
+        message: String? = nil,
+        notificationType: String? = nil,
+        toolName: String? = nil
+    ) -> HookPayload {
         HookPayload(
             sessionID: "sess",
             hookEventName: event,
             cwd: URL(fileURLWithPath: "/tmp"),
             notificationMessage: message,
+            notificationType: notificationType,
             toolName: toolName
         )
     }
