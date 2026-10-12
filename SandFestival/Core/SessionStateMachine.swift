@@ -42,7 +42,7 @@ enum SessionStateMachine {
         case .waitingForPermission, .blockedByAutoMode:
             // No .userInteracted here: typing at a permission prompt isn't a grant.
             switch event {
-            case .working: return .working
+            case .working, .toolCompleted: return .working
             case .idle: return .idle
             case .errored(let reason): return .errored(reason: reason)
             default: return current

@@ -6,6 +6,7 @@ enum AgentEvent: Equatable {
     case working
     case idle
     case waitingForPermission
+    case toolCompleted
     case waitingForInput
     case blockedByAutoMode
     case errored(reason: String)

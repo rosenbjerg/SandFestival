@@ -50,6 +50,22 @@ struct SessionStateMachineTests {
         }
     }
 
+    @Test("permission states + .toolCompleted → working (the approved tool ran)")
+    func permissionStatesResumeOnToolCompleted() {
+        #expect(SessionStateMachine.next(from: .waitingForPermission, event: .toolCompleted) == .working)
+        #expect(SessionStateMachine.next(from: .blockedByAutoMode, event: .toolCompleted) == .working)
+    }
+
+    @Test(".toolCompleted leaves every other state alone")
+    func toolCompletedIsNoopOutsidePermissionStates() {
+        let states: [SessionState] = [
+            .starting, .idle, .working, .waitingForIdle, .errored(reason: "x"), .stopped,
+        ]
+        for state in states {
+            #expect(SessionStateMachine.next(from: state, event: .toolCompleted) == state)
+        }
+    }
+
     @Test("any state + .stopped → stopped")
     func anyStateGoesStoppedOnStopped() {
         let allStates: [SessionState] = [

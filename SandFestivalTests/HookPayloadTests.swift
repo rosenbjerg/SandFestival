@@ -93,10 +93,16 @@ struct HookPayloadTranslatorTests {
         #expect(HookPayloadTranslator.translate(makePayload(event: "UserPromptSubmit")) == .working)
     }
 
-    @Test("PostToolUse for non-AskUserQuestion tools yields no event")
-    func postToolUseYieldsNil() {
-        #expect(HookPayloadTranslator.translate(makePayload(event: "PostToolUse")) == nil)
-        #expect(HookPayloadTranslator.translate(makePayload(event: "PostToolUse", toolName: "Bash")) == nil)
+    @Test("PostToolUse for non-AskUserQuestion tools maps to .toolCompleted")
+    func postToolUseMapsToToolCompleted() {
+        #expect(HookPayloadTranslator.translate(makePayload(event: "PostToolUse")) == .toolCompleted)
+        #expect(HookPayloadTranslator.translate(makePayload(event: "PostToolUse", toolName: "Bash")) == .toolCompleted)
+    }
+
+    @Test("PostToolUseFailure maps to .toolCompleted — an approved tool can still fail")
+    func postToolUseFailureMapsToToolCompleted() {
+        let payload = makePayload(event: "PostToolUseFailure", toolName: "Bash")
+        #expect(HookPayloadTranslator.translate(payload) == .toolCompleted)
     }
 
     @Test("PreToolUse for AskUserQuestion maps to .waitingForInput")
