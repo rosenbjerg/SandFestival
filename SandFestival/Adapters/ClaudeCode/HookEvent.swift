@@ -7,6 +7,7 @@ enum HookEvent: String, CaseIterable, Sendable {
     case postToolUse = "PostToolUse"
     case notification = "Notification"
     case stop = "Stop"
+    case stopFailure = "StopFailure"
     case sessionEnd = "SessionEnd"
 }
 

@@ -16,7 +16,7 @@ enum HookPayloadTranslator {
             return nil
         case HookEvent.notification.rawValue:
             return notificationEvent(message: payload.notificationMessage)
-        case HookEvent.stop.rawValue:
+        case HookEvent.stop.rawValue, HookEvent.stopFailure.rawValue:
             return .idle
         case HookEvent.sessionEnd.rawValue:
             // Not .stopped: SessionEnd also fires for /clear and /resume over a live process.

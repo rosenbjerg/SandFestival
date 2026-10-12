@@ -79,6 +79,12 @@ PATH precedence in `Session.composeEnvironment(inherited:projectEnv:extra:)`: pr
 - Unknown session_ids are silently dropped (claude run from elsewhere)
 - Adapters resolve to a `Project.ID` before reporting — `AgentEventSink.report(projectID:event:)` takes the resolved id directly. Per-agent mapping logic (cwd, session_id, etc.) stays inside the adapter
 
+## Hook → event mapping (HookPayloadTranslator)
+
+- Adding a case to `HookEvent` is enough to ship a new hook: an install missing any event reads `outdated` and is silently rewritten on adapter start, no consent sheet
+- `StopFailure` (turn ended on an API error — rate limit, overloaded, auth) maps to `.idle`, same as `Stop`, because Claude Code fires it **instead of** `Stop`. Without it the session sat in `.working` forever and held keep-awake. Not `.errored`: that state means "no process" (`SessionState.isRunning` is false), so it would cover a live terminal with the not-running overlay and re-enable Start
+- No hook fires when the user interrupts with Esc — `Stop` explicitly doesn't run. The session stays `.working` until the next prompt; that's a known gap, not something a hook can close
+
 ## State machine
 
 - `SessionStateMachine.next(from:event:)` is pure — test without a live process

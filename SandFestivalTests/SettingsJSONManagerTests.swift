@@ -211,6 +211,14 @@ struct SettingsJSONManagerTests {
         #expect(try manager.detectInstallState(port: 51900) == .outdated)
     }
 
+    @Test("detectInstallState reports outdated when an install predates a newly hooked event")
+    func detectStateOutdatedForMissingEvent() throws {
+        let url = temporaryURL()
+        let manager = SettingsJSONManager(fileURL: url)
+        try manager.install(port: 51789, events: HookEvent.allCases.filter { $0 != .stopFailure })
+        #expect(try manager.detectInstallState(port: 51789) == .outdated)
+    }
+
     @Test("install scopes PreToolUse to the AskUserQuestion matcher")
     func installScopesPreToolUseMatcher() throws {
         let url = temporaryURL()

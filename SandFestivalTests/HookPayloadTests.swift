@@ -108,6 +108,11 @@ struct HookPayloadTranslatorTests {
         #expect(HookPayloadTranslator.translate(makePayload(event: "Stop")) == .idle)
     }
 
+    @Test("StopFailure maps to .idle — an API error ends the turn without a Stop")
+    func stopFailureMapsToIdle() {
+        #expect(HookPayloadTranslator.translate(makePayload(event: "StopFailure")) == .idle)
+    }
+
     @Test("SessionEnd yields no event — OS process termination is the authoritative .stopped signal")
     func sessionEndYieldsNil() {
         #expect(HookPayloadTranslator.translate(makePayload(event: "SessionEnd")) == nil)
