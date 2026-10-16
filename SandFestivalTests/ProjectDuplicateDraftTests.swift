@@ -19,7 +19,7 @@ struct ProjectDuplicateDraftTests {
         var draft = makeDraft(sourcePath: "/Users/me/repo", sourceName: "Demo")
         draft.branchName = "new-feature"
         draft.refreshDerivedFields()
-        #expect(draft.name == "Demo (new-feature)")
+        #expect(draft.name == "new-feature")
         #expect(draft.pathString == "/Users/me/repo/.worktrees/new-feature")
     }
 
@@ -57,7 +57,7 @@ struct ProjectDuplicateDraftTests {
         draft.branchName = "other-feature"
         draft.refreshDerivedFields()
         #expect(draft.pathString == "/elsewhere/custom-dir")
-        #expect(draft.name == "Demo (other-feature)")
+        #expect(draft.name == "other-feature")
     }
 
     @Test("isValid requires a non-blank branch, name, and path")
@@ -76,7 +76,7 @@ struct ProjectDuplicateDraftTests {
         var draft = makeDraft(sourcePath: "/Users/me/repo", sourceName: "Demo")
         draft.branchName = "  spaced  "
         draft.refreshDerivedFields()
-        #expect(draft.name == "Demo (spaced)")
+        #expect(draft.name == "spaced")
         #expect(draft.pathString == "/Users/me/repo/.worktrees/spaced")
     }
 
@@ -168,7 +168,7 @@ struct ProjectDuplicateDraftTests {
         var draft = makeDraft(sourcePath: "/Users/me/repo", sourceName: "Demo", isGitRepo: true)
         draft.branchName = "new-feature"
         draft.refreshDerivedFields()
-        #expect(draft.name == "Demo (new-feature)")
+        #expect(draft.name == "new-feature")
         draft.createWorktree = false
         draft.refreshDerivedFields()
         #expect(draft.name == "Demo")
@@ -238,7 +238,7 @@ struct ProjectDuplicateDraftTests {
         draft.worktreeMode = .existingBranch
         draft.branchName = "feature-x"
         draft.refreshDerivedFields()
-        #expect(draft.name == "Demo (feature-x)")
+        #expect(draft.name == "feature-x")
         #expect(draft.pathString == "/Users/me/repo/.worktrees/feature-x")
     }
 
@@ -527,7 +527,7 @@ struct ProjectDuplicateDraftTests {
         #expect(draft.isRemoteSelection)
         #expect(draft.resolvedLocalBranch == "feat/foo")
         draft.refreshDerivedFields()
-        #expect(draft.name == "Demo (feat/foo)")
+        #expect(draft.name == "feat/foo")
         #expect(draft.pathString == "/Users/me/repo/.worktrees/feat/foo")
     }
 

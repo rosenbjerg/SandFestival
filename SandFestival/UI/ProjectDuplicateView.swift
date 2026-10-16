@@ -564,7 +564,7 @@ struct ProjectDuplicateDraft {
     mutating func refreshDerivedFields() {
         let effectiveBranch = createWorktree ? resolvedLocalBranch : ""
         if !nameUserEdited {
-            name = effectiveBranch.isEmpty ? sourceName : "\(sourceName) (\(effectiveBranch))"
+            name = effectiveBranch.isEmpty ? sourceName : effectiveBranch
         }
         if !pathUserEdited {
             let dir = effectiveBranch.isEmpty ? "" : "/\(effectiveBranch)"
