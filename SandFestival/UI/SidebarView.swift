@@ -241,25 +241,35 @@ struct SidebarView: View {
                 .foregroundStyle(.orange)
                 .lineLimit(1)
         case .status(let status):
-            HStack(spacing: 6) {
-                Text(branchLabel(for: status))
+            let branch = branchLabel(for: status)
+            let showsBranch = branch != project.name
+            if showsBranch || status.ahead > 0 || status.behind > 0 || status.changedFiles > 0 {
+                gitStatusLine(status: status, branch: showsBranch ? branch : nil)
+            }
+        }
+    }
+
+    private func gitStatusLine(status: GitStatus, branch: String?) -> some View {
+        HStack(spacing: 6) {
+            if let branch {
+                Text(branch)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                if status.ahead > 0 {
-                    Text(String(format: String(localized: "sidebar.row.git.ahead"), status.ahead))
-                }
-                if status.behind > 0 {
-                    Text(String(format: String(localized: "sidebar.row.git.behind"), status.behind))
-                }
-                if status.changedFiles > 0 {
-                    Text(String(format: String(localized: "sidebar.row.git.changed"), status.changedFiles))
-                }
             }
-            .interfaceFont(.caption)
-            .foregroundStyle(.secondary)
-            .monospacedDigit()
-            .help(comparisonHelp(for: status))
+            if status.ahead > 0 {
+                Text(String(format: String(localized: "sidebar.row.git.ahead"), status.ahead))
+            }
+            if status.behind > 0 {
+                Text(String(format: String(localized: "sidebar.row.git.behind"), status.behind))
+            }
+            if status.changedFiles > 0 {
+                Text(String(format: String(localized: "sidebar.row.git.changed"), status.changedFiles))
+            }
         }
+        .interfaceFont(.caption)
+        .foregroundStyle(.secondary)
+        .monospacedDigit()
+        .help(comparisonHelp(for: status))
     }
 
     private func comparisonHelp(for status: GitStatus) -> String {
