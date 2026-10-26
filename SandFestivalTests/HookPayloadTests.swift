@@ -6,7 +6,7 @@ import Testing
 struct HookPayloadDecoderTests {
 
     @Test("decodes a SessionStart payload with all expected fields")
-    func decodesSessionStart() {
+    func decodesSessionStart() throws {
         let json = """
         {
           "session_id": "sess-1",
@@ -15,10 +15,10 @@ struct HookPayloadDecoderTests {
           "source": "startup"
         }
         """
-        let payload = try? #require(HookPayloadDecoder.decode(Data(json.utf8)))
-        #expect(payload?.sessionID == "sess-1")
-        #expect(payload?.hookEventName == "SessionStart")
-        #expect(payload?.cwd?.path == "/tmp/project")
+        let payload = try #require(HookPayloadDecoder.decode(Data(json.utf8)))
+        #expect(payload.sessionID == "sess-1")
+        #expect(payload.hookEventName == "SessionStart")
+        #expect(payload.cwd?.path == "/tmp/project")
     }
 
     @Test("returns nil for malformed JSON")
@@ -39,7 +39,7 @@ struct HookPayloadDecoderTests {
     }
 
     @Test("captures Notification message text")
-    func capturesNotificationMessage() {
+    func capturesNotificationMessage() throws {
         let json = """
         {
           "session_id": "sess-2",
@@ -47,12 +47,12 @@ struct HookPayloadDecoderTests {
           "message": "Claude needs your permission to use Bash"
         }
         """
-        let payload = try? #require(HookPayloadDecoder.decode(Data(json.utf8)))
-        #expect(payload?.notificationMessage == "Claude needs your permission to use Bash")
+        let payload = try #require(HookPayloadDecoder.decode(Data(json.utf8)))
+        #expect(payload.notificationMessage == "Claude needs your permission to use Bash")
     }
 
     @Test("captures notification_type")
-    func capturesNotificationType() {
+    func capturesNotificationType() throws {
         let json = """
         {
           "session_id": "sess-2",
@@ -61,12 +61,12 @@ struct HookPayloadDecoderTests {
           "notification_type": "permission_prompt"
         }
         """
-        let payload = try? #require(HookPayloadDecoder.decode(Data(json.utf8)))
-        #expect(payload?.notificationType == "permission_prompt")
+        let payload = try #require(HookPayloadDecoder.decode(Data(json.utf8)))
+        #expect(payload.notificationType == "permission_prompt")
     }
 
     @Test("captures tool_name on tool-use payloads")
-    func capturesToolName() {
+    func capturesToolName() throws {
         let json = """
         {
           "session_id": "sess-3",
@@ -74,11 +74,12 @@ struct HookPayloadDecoderTests {
           "tool_name": "AskUserQuestion"
         }
         """
-        let payload = try? #require(HookPayloadDecoder.decode(Data(json.utf8)))
-        #expect(payload?.toolName == "AskUserQuestion")
+        let payload = try #require(HookPayloadDecoder.decode(Data(json.utf8)))
+        #expect(payload.toolName == "AskUserQuestion")
     }
 }
 
+@MainActor
 @Suite("HookPayloadTranslator")
 struct HookPayloadTranslatorTests {
 

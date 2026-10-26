@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import SandFestival
 
+@MainActor
 @Suite("ProjectDuplicateDraft auto-derivation")
 struct ProjectDuplicateDraftTests {
 

@@ -10,7 +10,7 @@ nonisolated struct GitStatus: Equatable {
     var isClean: Bool { changedFiles == 0 }
 }
 
-enum GitStatusResult: Equatable {
+nonisolated enum GitStatusResult: Equatable {
     case unavailable
     case status(GitStatus)
 }

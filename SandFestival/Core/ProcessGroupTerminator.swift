@@ -3,7 +3,7 @@ import Foundation
 
 enum ProcessGroupTerminator {
 
-    enum SignalTarget: Equatable {
+    nonisolated enum SignalTarget: Equatable {
         case group(pid_t)
         case single(pid_t)
     }

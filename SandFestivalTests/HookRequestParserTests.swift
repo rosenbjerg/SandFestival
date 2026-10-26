@@ -5,13 +5,13 @@ import Testing
 struct HookRequestParserTests {
 
     @Test("parses request line and case-insensitive header fields")
-    func parsesRequestLineAndFields() {
+    func parsesRequestLineAndFields() throws {
         let raw = "POST /event HTTP/1.1\r\nHost: 127.0.0.1\r\nAUTHORIZATION: Bearer abc\r\nContent-Length: 12"
-        let headers = try? #require(HookRequestParser.parseHeaders(raw))
-        #expect(headers?.requestLine == "POST /event HTTP/1.1")
-        #expect(headers?.fields["host"] == "127.0.0.1")
-        #expect(headers?.authorization == "Bearer abc")
-        #expect(headers?.contentLength == 12)
+        let headers = try #require(HookRequestParser.parseHeaders(raw))
+        #expect(headers.requestLine == "POST /event HTTP/1.1")
+        #expect(headers.fields["host"] == "127.0.0.1")
+        #expect(headers.authorization == "Bearer abc")
+        #expect(headers.contentLength == 12)
     }
 
     @Test("returns nil for an empty header block")

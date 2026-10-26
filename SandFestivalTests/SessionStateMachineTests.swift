@@ -1,6 +1,7 @@
 import Testing
 @testable import SandFestival
 
+@MainActor
 @Suite("SessionStateMachine")
 struct SessionStateMachineTests {
 

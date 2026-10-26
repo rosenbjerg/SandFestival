@@ -100,7 +100,7 @@ enum GitWorktree {
         runChecked(["fetch", "--prune"], at: path, timeout: timeout)
     }
 
-    struct BranchSnapshot: Equatable {
+    nonisolated struct BranchSnapshot: Equatable {
         var local: [String] = []
         var remote: [String] = []
         var inUse: Set<String> = []
