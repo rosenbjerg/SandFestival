@@ -155,8 +155,6 @@ final class SessionManager {
             selectedProjectID = projects.first?.id
         }
         persist()
-        // Hold the Session through the kill: its terminal view must outlive it
-        // for SwiftTerm's exit monitor to reap the child.
         if let removedSession {
             Task { await removedSession.forceStopAndWait() }
         }

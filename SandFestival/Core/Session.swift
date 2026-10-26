@@ -175,8 +175,7 @@ final class Session: Identifiable {
         ProcessGroupTerminator.signalAll(leader: pid, tracked: tracked, signal: SIGKILL)
 
         let clear = await waitForGroupToClear(leader: pid, tracked: tracked, timeout: timeout)
-        // Let SwiftTerm's exit monitor run waitpid before the caller drops us,
-        // or the child is left a zombie.
+        // Callers act on the stop next, and handleProcessTerminated trails SwiftTerm's ≤0.5s output drain.
         if clear {
             await drainTerminationCallback()
         }
@@ -209,7 +208,7 @@ final class Session: Identifiable {
     }
 
     private static let terminationPollInterval: Duration = .milliseconds(25)
-    private static let terminationDrainPolls = 8
+    private static let terminationDrainPolls = 40
 
     @ObservationIgnored private var wantsRestart = false
     @ObservationIgnored private var wantsStop = false
