@@ -283,8 +283,7 @@ final class Session: Identifiable {
     }
 
     private func recentTerminalOutput(maxLines: Int = 8) -> String {
-        guard let terminal = terminalView.terminal else { return "" }
-        let data = terminal.getBufferAsData()
+        let data = terminalView.getBufferAsData()
         guard let text = String(data: data, encoding: .utf8) else { return "" }
         let lines = text
             .split(omittingEmptySubsequences: false, whereSeparator: { $0.isNewline })

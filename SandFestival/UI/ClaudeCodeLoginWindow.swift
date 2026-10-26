@@ -26,7 +26,7 @@ final class ClaudeCodeLoginController {
         terminalView = view
         view.processDelegate = bridge
         if let font { view.font = font }
-        if let scrollback { view.getTerminal().changeScrollback(scrollback) }
+        if let scrollback { view.changeScrollback(scrollback) }
         bridge.onProcessTerminated = { [weak self] exitCode in
             Task { @MainActor in
                 self?.phase = .finished(exitCode: exitCode)

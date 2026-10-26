@@ -1,23 +1,48 @@
 import AppKit
 import SwiftTerm
+import Synchronization
 
 final class SessionTerminalView: LocalProcessTerminalView {
     var onUserSent: (@MainActor () -> Void)?
     var onOutputBelowViewportChanged: (@MainActor (Bool) -> Void)?
     private var outputBelowViewport = false
+    private var lastObservedPosition: Double = 0
+    nonisolated private let pendingOutputBatches = Mutex(0)
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         disableSelectionClobbering()
+        observeProcessOutput()
     }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         disableSelectionClobbering()
+        observeProcessOutput()
     }
 
     private func disableSelectionClobbering() {
         allowMouseReporting = false
+    }
+
+    private func observeProcessOutput() {
+        setProcessOutputHandler { [weak self] in
+            self?.processOutputApplied()
+        }
+    }
+
+    nonisolated func processOutputApplied() {
+        pendingOutputBatches.withLock { $0 += 1 }
+        Task { @MainActor [weak self] in self?.outputApplied() }
+    }
+
+    func outputApplied() {
+        pendingOutputBatches.withLock { $0 = max(0, $0 - 1) }
+        let position = scrollPosition
+        if isScrolledUp, position < lastObservedPosition {
+            setOutputBelowViewport(true)
+        }
+        lastObservedPosition = position
     }
 
     var useMetalProvider: (@MainActor () -> Bool)?
@@ -28,18 +53,14 @@ final class SessionTerminalView: LocalProcessTerminalView {
         Task { @MainActor in onUserSent() }
     }
 
-    override func dataReceived(slice: ArraySlice<UInt8>) {
-        let before = scrollPosition
-        super.dataReceived(slice: slice)
-        if isScrolledUp, scrollPosition < before {
-            setOutputBelowViewport(true)
-        }
-    }
-
     override func scrolled(source: TerminalView, position: Double) {
         super.scrolled(source: source, position: position)
         if !isScrolledUp {
             setOutputBelowViewport(false)
+        }
+        // Output-driven scrolls can land before outputApplied; moving the baseline then would hide the drop.
+        if pendingOutputBatches.withLock({ $0 }) == 0 {
+            lastObservedPosition = scrollPosition
         }
     }
 

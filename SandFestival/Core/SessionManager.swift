@@ -271,7 +271,7 @@ final class SessionManager {
     private func makeSession(for project: Project) -> Session {
         let session = Session(project: project)
         session.terminalView.font = currentTerminalFont()
-        session.terminalView.getTerminal().changeScrollback(terminalScrollback)
+        session.terminalView.changeScrollback(terminalScrollback)
         session.terminalView.useMetalProvider = { [weak self] in
             self?.useMetalRenderer ?? false
         }
@@ -419,7 +419,7 @@ final class SessionManager {
         terminalScrollback = clamped
         UserDefaults.standard.set(clamped, forKey: SessionManager.scrollbackKey)
         for session in sessions.values {
-            session.terminalView.getTerminal().changeScrollback(clamped)
+            session.terminalView.changeScrollback(clamped)
         }
     }
 
