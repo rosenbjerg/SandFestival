@@ -1,6 +1,6 @@
 import Foundation
 
-struct GitStatus: Equatable {
+nonisolated struct GitStatus: Equatable {
     var branch: String?
     var ahead: Int = 0
     var behind: Int = 0
@@ -15,7 +15,7 @@ enum GitStatusResult: Equatable {
     case status(GitStatus)
 }
 
-extension GitStatus {
+nonisolated extension GitStatus {
     static func parse(porcelainV2 output: String) -> GitStatus {
         var status = GitStatus()
         for line in output.split(whereSeparator: \.isNewline) {
@@ -39,7 +39,7 @@ extension GitStatus {
     }
 }
 
-private extension Substring {
+private nonisolated extension Substring {
     func dropPrefix(_ prefix: String) -> Substring? {
         hasPrefix(prefix) ? dropFirst(prefix.count) : nil
     }

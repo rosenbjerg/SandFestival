@@ -3,7 +3,7 @@ import Foundation
 enum HookEntryFactory {
     static let sourceSentinel = "?source=sand-festival"
 
-    static let projectHeaderName = "X-Sand-Festival-Project"
+    nonisolated static let projectHeaderName = "X-Sand-Festival-Project"
 
     static func hookURL(port: UInt16) -> String {
         "http://127.0.0.1:\(port)/event\(sourceSentinel)"

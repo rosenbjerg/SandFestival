@@ -15,11 +15,11 @@ final class MockAdapter: AgentAdapter {
     init(
         command: String = "/bin/sh",
         args: [String] = ["-c", "echo mock; while true; do sleep 1; done"],
-        script: [ScriptStep] = MockAdapter.defaultScript
+        script: [ScriptStep]? = nil
     ) {
         self.defaultCommand = command
         self.defaultArgs = args
-        self.script = script
+        self.script = script ?? Self.defaultScript
     }
 
     func start(eventSink: AgentEventSink) async throws {

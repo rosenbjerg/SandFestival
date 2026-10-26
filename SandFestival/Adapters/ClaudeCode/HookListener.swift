@@ -7,7 +7,7 @@ enum HookListenerError: Error, Equatable {
     case invalidPort
 }
 
-final class HookListener: @unchecked Sendable {
+nonisolated final class HookListener: @unchecked Sendable {
     static let defaultPort: UInt16 = 51789
 
     let port: UInt16
@@ -194,7 +194,7 @@ final class HookListener: @unchecked Sendable {
     }
 }
 
-private final class ResumeFlag: @unchecked Sendable {
+private nonisolated final class ResumeFlag: @unchecked Sendable {
     private var fired = false
     private let lock = NSLock()
 

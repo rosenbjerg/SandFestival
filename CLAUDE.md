@@ -184,4 +184,5 @@ Agents never read the clipboard themselves. SandFestival reads it on the user's 
 ## Concurrency
 
 - Default actor isolation is `MainActor` (pbxproj `SWIFT_DEFAULT_ACTOR_ISOLATION`). Default args calling MainActor initializers warn — accept `nil` and resolve inside the init body
+- Types whose code runs off the main actor (subprocess helpers called from detached tasks or `nonisolated` statics, `HookListener` and everything its queue calls) are declared `nonisolated` at the type level, not member by member. The compiler reports only the first isolation hop, so after marking a type check the build again for the next layer down
 - `HookListener` is `@unchecked Sendable`; NWListener callbacks run on its serial queue and hop to MainActor via `Task { @MainActor in … }`

@@ -1,6 +1,6 @@
 import Foundation
 
-enum HookRequestParser {
+nonisolated enum HookRequestParser {
     struct Headers: Equatable {
         var requestLine: String
         var fields: [String: String]

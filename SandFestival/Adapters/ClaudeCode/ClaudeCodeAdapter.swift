@@ -30,12 +30,12 @@ final class ClaudeCodeAdapter: AgentAdapter {
 
     init(
         port: UInt16 = HookListener.defaultPort,
-        tokenStore: any TokenStore = KeychainTokenStore(),
-        settingsManager: SettingsJSONManager = SettingsJSONManager()
+        tokenStore: (any TokenStore)? = nil,
+        settingsManager: SettingsJSONManager? = nil
     ) {
         self.port = port
-        self.tokenStore = tokenStore
-        self.settingsManager = settingsManager
+        self.tokenStore = tokenStore ?? KeychainTokenStore()
+        self.settingsManager = settingsManager ?? SettingsJSONManager()
     }
 
     // MARK: - AgentAdapter

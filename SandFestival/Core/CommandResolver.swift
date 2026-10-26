@@ -1,6 +1,6 @@
 import Foundation
 
-enum CommandResolver {
+nonisolated enum CommandResolver {
     static let defaultSearchPath: [String] = [
         NSHomeDirectory() + "/.local/bin",
         "/opt/homebrew/bin",

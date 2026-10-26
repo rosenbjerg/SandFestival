@@ -1,6 +1,6 @@
 import Foundation
 
-enum NonoProfileDiscovery {
+nonisolated enum NonoProfileDiscovery {
     static let builtInDefault = "claude-code"
 
     static func availableProfiles() -> [String] {
