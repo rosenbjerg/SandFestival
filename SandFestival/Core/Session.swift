@@ -21,7 +21,7 @@ final class Session: Identifiable {
     @ObservationIgnored var spawnEnvProvider: ((Project) -> [String: String])?
     @ObservationIgnored var continuationArgsProvider: (() -> [String])?
 
-    @ObservationIgnored var sandboxArgsProvider: ((Project) throws -> [String])?
+    @ObservationIgnored var sandboxedArgsProvider: ((Project) throws -> [String])?
 
     @ObservationIgnored private var extraAgentArgs: [String] = []
 
@@ -85,9 +85,9 @@ final class Session: Identifiable {
             lastError = reason
             return
         }
-        let sandboxArgs: [String]
+        let baseArgs: [String]
         do {
-            sandboxArgs = try sandboxArgsProvider?(project) ?? []
+            baseArgs = try sandboxedArgsProvider?(project) ?? project.args
         } catch {
             let reason = String(
                 format: String(localized: "session.error.sandbox_profile"),
@@ -107,8 +107,7 @@ final class Session: Identifiable {
         terminalView.startProcess(
             executable: executable,
             args: Session.composeArgs(
-                base: project.args,
-                extraWrapperArgs: sandboxArgs,
+                base: baseArgs,
                 extraAgentArgs: extraAgentArgs
             ),
             environment: composedEnvironment(extra: extraEnvironment),
@@ -121,26 +120,13 @@ final class Session: Identifiable {
         onDidSpawn?(project)
     }
 
-    static func composeArgs(
-        base: [String],
-        extraWrapperArgs: [String] = [],
-        extraAgentArgs: [String]
-    ) -> [String] {
-        let wrapped = insertingAfterRun(extraWrapperArgs, into: base)
-        guard !extraAgentArgs.isEmpty else { return wrapped }
-        if wrapped.contains("--") {
-            let split = ArgsSplitter.split(wrapped)
+    static func composeArgs(base: [String], extraAgentArgs: [String]) -> [String] {
+        guard !extraAgentArgs.isEmpty else { return base }
+        if base.contains("--") {
+            let split = ArgsSplitter.split(base)
             return ArgsSplitter.join(wrapper: split.wrapper, agent: split.agent + extraAgentArgs)
         }
-        return wrapped + extraAgentArgs
-    }
-
-    private static func insertingAfterRun(_ extra: [String], into args: [String]) -> [String] {
-        let wrapper = ArgsSplitter.split(args).wrapper
-        guard !extra.isEmpty, let runIndex = wrapper.firstIndex(of: "run") else { return args }
-        var result = args
-        result.insert(contentsOf: extra, at: runIndex + 1)
-        return result
+        return base + extraAgentArgs
     }
 
     // SIGINT, not SwiftTerm's terminate(): terminate() closes the PTY, which kills

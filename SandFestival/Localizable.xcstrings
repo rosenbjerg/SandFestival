@@ -2142,7 +2142,18 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Couldn't write the sandbox profile: %@"
+            "value" : "Couldn't prepare the sandbox profile: %@"
+          }
+        }
+      }
+    },
+    "session.error.sandbox_profile.path" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nono can only extend a profile by name, and “%@” is a file path. Save it to ~/.config/nono/profiles and select it by name instead."
           }
         }
       }

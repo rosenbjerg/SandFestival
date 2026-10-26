@@ -285,10 +285,9 @@ final class SessionManager {
         session.continuationArgsProvider = { [weak self] in
             self?.adapter?.continuationArgs ?? []
         }
-        session.sandboxArgsProvider = { [weak self] project in
-            guard let self, NonoCommand.matches(project.command) else { return [] }
-            let profile = try AgentSandboxProfile.install(blockingClipboard: self.blocksAgentClipboard)
-            return AgentSandboxProfile.wrapperArgs(profileURL: profile)
+        session.sandboxedArgsProvider = { [weak self] project in
+            guard let self, NonoCommand.matches(project.command) else { return project.args }
+            return try AgentSandboxProfile.sandboxing(project.args, blockingClipboard: self.blocksAgentClipboard)
         }
         session.terminalView.acceptsPastedImagePaths = { [weak self] in
             self?.adapter?.acceptsPastedImagePaths ?? false

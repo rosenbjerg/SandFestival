@@ -33,24 +33,4 @@ struct SessionComposeArgsTests {
         #expect(result[separator...].contains("claude"))
         #expect(result.last == "--continue")
     }
-
-    @Test("wrapper args land right after nono's run subcommand")
-    func wrapperArgsFollowRun() {
-        let result = Session.composeArgs(
-            base: Project.defaultArgs,
-            extraWrapperArgs: ["--extends", "/p.json"],
-            extraAgentArgs: ["--continue"]
-        )
-        #expect(result == [
-            "run", "--extends", "/p.json", "--profile", "claude-code", "--allow-cwd",
-            "--", "claude", "--enable-auto-mode", "--continue",
-        ])
-    }
-
-    @Test("wrapper args are dropped when the wrapper has no run subcommand")
-    func wrapperArgsNeedRun() {
-        let base = ["--", "claude", "run"]
-        let result = Session.composeArgs(base: base, extraWrapperArgs: ["--extends", "/p.json"], extraAgentArgs: [])
-        #expect(result == base)
-    }
 }
