@@ -265,8 +265,7 @@ struct ProjectDraft {
     }
 
     var isNonoCommand: Bool {
-        let trimmed = command.trimmingCharacters(in: .whitespaces)
-        return trimmed == "nono" || trimmed.hasSuffix("/nono")
+        NonoCommand.matches(command)
     }
 
     var profileChoices: [String] {

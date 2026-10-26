@@ -270,10 +270,6 @@ struct ProjectDuplicateView: View {
         }
     }
 
-    private func isNono(_ command: String) -> Bool {
-        (command as NSString).lastPathComponent == "nono"
-    }
-
     private func submit() {
         let snapshot = draft
         let trimmedName = snapshot.name.trimmingCharacters(in: .whitespaces)
@@ -351,7 +347,7 @@ struct ProjectDuplicateView: View {
                     if mode == .newBranch {
                         baseBranchStore.remember(base, for: snapshot.resolvedParentProjectID)
                     }
-                    let args = isNono(source.command)
+                    let args = NonoCommand.matches(source.command)
                         ? NonoWorktreeArgs.grantingRepoAccess(
                             repoPath: sourceRepoPath.path,
                             in: source.args

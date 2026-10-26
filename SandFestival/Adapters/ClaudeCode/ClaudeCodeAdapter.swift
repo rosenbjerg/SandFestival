@@ -10,6 +10,7 @@ final class ClaudeCodeAdapter: AgentAdapter {
     let defaultCommand = Project.defaultCommand
     let defaultArgs = Project.defaultArgs
     let continuationArgs = ["--continue"]
+    let acceptsPastedImagePaths = true
 
     private(set) var needsInstallation = false
     private(set) var lastInstallError: String?

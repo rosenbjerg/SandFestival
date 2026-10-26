@@ -7,6 +7,7 @@ struct TerminalPreferencesView: View {
     @State private var useMetalDraft: Bool = false
     @State private var familyDraft: String = ""
     @State private var sizeDraft: Double = Double(SessionManager.defaultFontSize)
+    @State private var blocksClipboardDraft: Bool = true
 
     var body: some View {
         Form {
@@ -62,6 +63,15 @@ struct TerminalPreferencesView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            Section(String(localized: "preferences.terminal.clipboard.section")) {
+                Toggle(String(localized: "preferences.terminal.clipboard.label"), isOn: $blocksClipboardDraft)
+
+                Text(String(localized: "preferences.terminal.clipboard.description"))
+                    .interfaceFont(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .formStyle(.grouped)
         .frame(width: 480)
@@ -72,6 +82,7 @@ struct TerminalPreferencesView: View {
                 ? manager.terminalFontFamily
                 : ""
             sizeDraft = Double(manager.terminalFontSize)
+            blocksClipboardDraft = manager.blocksAgentClipboard
         }
         .onChange(of: draft) { _, newValue in
             manager.applyTerminalScrollback(newValue)
@@ -84,6 +95,9 @@ struct TerminalPreferencesView: View {
         }
         .onChange(of: sizeDraft) { _, newValue in
             manager.applyTerminalFontSize(CGFloat(newValue))
+        }
+        .onChange(of: blocksClipboardDraft) { _, newValue in
+            manager.applyAgentClipboardBlocking(newValue)
         }
     }
 

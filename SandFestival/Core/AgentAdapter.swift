@@ -8,6 +8,7 @@ protocol AgentAdapter: AnyObject {
     var defaultCommand: String { get }
     var defaultArgs: [String] { get }
     var continuationArgs: [String] { get }
+    var acceptsPastedImagePaths: Bool { get }
 
     func start(eventSink: AgentEventSink) async throws
     func stop() async
@@ -18,4 +19,5 @@ protocol AgentAdapter: AnyObject {
 
 extension AgentAdapter {
     var continuationArgs: [String] { [] }
+    var acceptsPastedImagePaths: Bool { false }
 }

@@ -14,6 +14,7 @@ final class SessionManager {
     private(set) var terminalFontFamily: String = ""
     private(set) var terminalScrollback: Int = SessionManager.defaultScrollback
     private(set) var useMetalRenderer: Bool = false
+    private(set) var blocksAgentClipboard: Bool = true
 
     static let defaultFontSize: CGFloat = 13
     static let minFontSize: CGFloat = 9
@@ -26,6 +27,7 @@ final class SessionManager {
     static let maxScrollback: Int = 50_000
     private static let scrollbackKey = "terminal.scrollback"
     private static let useMetalKey = "terminal.useMetal"
+    private static let blocksAgentClipboardKey = "agents.blockClipboard"
 
     @ObservationIgnored private let store: ProjectStore
     @ObservationIgnored private(set) var adapter: (any AgentAdapter)?
@@ -50,6 +52,7 @@ final class SessionManager {
             SessionManager.fontFamilyKey: "",
             SessionManager.scrollbackKey: SessionManager.defaultScrollback,
             SessionManager.useMetalKey: false,
+            SessionManager.blocksAgentClipboardKey: true,
         ])
         let storedFontSize = CGFloat(UserDefaults.standard.double(forKey: SessionManager.fontSizeKey))
         terminalFontSize = SessionManager.clampFontSize(storedFontSize)
@@ -57,6 +60,7 @@ final class SessionManager {
         let storedScrollback = UserDefaults.standard.integer(forKey: SessionManager.scrollbackKey)
         terminalScrollback = SessionManager.clampScrollback(storedScrollback)
         useMetalRenderer = UserDefaults.standard.bool(forKey: SessionManager.useMetalKey)
+        blocksAgentClipboard = UserDefaults.standard.bool(forKey: SessionManager.blocksAgentClipboardKey)
 
         do {
             projects = try resolvedStore.load()
@@ -281,6 +285,14 @@ final class SessionManager {
         session.continuationArgsProvider = { [weak self] in
             self?.adapter?.continuationArgs ?? []
         }
+        session.sandboxArgsProvider = { [weak self] project in
+            guard let self, NonoCommand.matches(project.command) else { return [] }
+            let profile = try AgentSandboxProfile.install(blockingClipboard: self.blocksAgentClipboard)
+            return AgentSandboxProfile.wrapperArgs(profileURL: profile)
+        }
+        session.terminalView.acceptsPastedImagePaths = { [weak self] in
+            self?.adapter?.acceptsPastedImagePaths ?? false
+        }
         session.onDidSpawn = { [weak self] project in
             guard let self else { return }
             self.adapter?.didSpawnSession(self.handle(for: project))
@@ -434,6 +446,12 @@ final class SessionManager {
         for session in sessions.values {
             try? session.terminalView.setUseMetal(enabled)
         }
+    }
+
+    func applyAgentClipboardBlocking(_ enabled: Bool) {
+        guard enabled != blocksAgentClipboard else { return }
+        blocksAgentClipboard = enabled
+        UserDefaults.standard.set(enabled, forKey: SessionManager.blocksAgentClipboardKey)
     }
 
     private func handle(for project: Project) -> SessionHandle {

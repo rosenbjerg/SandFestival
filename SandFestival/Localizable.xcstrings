@@ -1843,6 +1843,36 @@
         }
       }
     },
+    "preferences.terminal.clipboard.description" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sandboxed agents can't read or write the system clipboard. Pasting still works: Sand Festival hands the agent only what you paste, and pasted images arrive as a file path. Applies to sessions started after the change."
+          }
+        }
+      }
+    },
+    "preferences.terminal.clipboard.label" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Block agents from reading the clipboard"
+          }
+        }
+      }
+    },
+    "preferences.terminal.clipboard.section" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clipboard"
+          }
+        }
+      }
+    },
     "preferences.terminal.font.family.label" : {
       "localizations" : {
         "en" : {
@@ -2102,6 +2132,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Process exited with status %d."
+          }
+        }
+      }
+    },
+    "session.error.sandbox_profile" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't write the sandbox profile: %@"
           }
         }
       }
