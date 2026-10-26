@@ -57,15 +57,16 @@ struct SessionManagerSurfaceTests {
         manager.session(for: projects[1].id)?.apply(event: .working)
         manager.session(for: projects[2].id)?.apply(event: .working)
 
-        #expect(manager.projects.map(\.id) == [projects[2].id, projects[1].id, projects[0].id])
+        let surfaced = [projects[2].id, projects[1].id, projects[0].id]
+        #expect(manager.projects.map(\.id) == surfaced)
 
         let beforeFlush = try ProjectStore(fileURL: url).load()
         #expect(beforeFlush.map(\.id) == projects.map(\.id))
 
-        try await Task.sleep(for: .milliseconds(200))
+        await manager.persistDebounceTask?.value
 
         let afterFlush = try ProjectStore(fileURL: url).load()
-        #expect(afterFlush.map(\.id) == [projects[2].id, projects[1].id, projects[0].id])
+        #expect(afterFlush.map(\.id) == surfaced)
     }
 
     @Test("surfacing a child project lifts its whole parent block to the front")

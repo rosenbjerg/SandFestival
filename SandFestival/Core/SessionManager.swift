@@ -40,7 +40,7 @@ final class SessionManager {
     @ObservationIgnored var shouldSurfaceOnActivity: () -> Bool = { false }
     @ObservationIgnored var isAppActive: () -> Bool = { NSApp.isActive }
 
-    @ObservationIgnored private var persistDebounceTask: Task<Void, Never>?
+    @ObservationIgnored private(set) var persistDebounceTask: Task<Void, Never>?
     @ObservationIgnored var persistDebounceDelay: Duration = .seconds(1)
 
     init(store: ProjectStore? = nil) {
