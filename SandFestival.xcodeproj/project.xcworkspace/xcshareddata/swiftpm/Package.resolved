@@ -1,13 +1,13 @@
 {
-  "originHash" : "328e27bb99caf5dd35d0457d8f42f2c49e28ca702eee1405baaf376ad0b77cb4",
+  "originHash" : "107d1c21d59c25e3710ffaa94da8d019298f8abcb73704bd34b0f83da629535d",
   "pins" : [
     {
       "identity" : "swift-argument-parser",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-argument-parser",
       "state" : {
-        "revision" : "626b5b7b2f45e1b0b1c6f4a309296d1d21d7311b",
-        "version" : "1.7.1"
+        "revision" : "6a52f3251125d74daf04fcbd5e6f08a75d074382",
+        "version" : "1.8.2"
       }
     },
     {
