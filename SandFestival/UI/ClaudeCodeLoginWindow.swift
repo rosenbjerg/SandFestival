@@ -32,6 +32,10 @@ final class ClaudeCodeLoginController {
                 self?.phase = .finished(exitCode: exitCode)
             }
         }
+        bridge.onLaunchFailed = { [weak self] error in
+            self?.startupError = String(format: String(localized: "session.error.launch_failed"), String(describing: error))
+            self?.phase = .finished(exitCode: nil)
+        }
     }
 
     func start() {
@@ -77,12 +81,16 @@ final class ClaudeCodeLoginController {
 
 private final class LoginProcessBridge: NSObject, LocalProcessTerminalViewDelegate {
     var onProcessTerminated: ((Int32?) -> Void)?
+    var onLaunchFailed: ((LocalProcessError) -> Void)?
 
     func sizeChanged(source: LocalProcessTerminalView, newCols: Int, newRows: Int) {}
     func setTerminalTitle(source: LocalProcessTerminalView, title: String) {}
     func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {}
     func processTerminated(source: TerminalView, exitCode: Int32?) {
         onProcessTerminated?(exitCode)
+    }
+    func processFailedToStart(source: TerminalView, error: LocalProcessError) {
+        onLaunchFailed?(error)
     }
 }
 

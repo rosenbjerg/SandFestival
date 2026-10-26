@@ -2106,6 +2106,17 @@
         }
       }
     },
+    "session.error.launch_failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The process could not be launched (%@)."
+          }
+        }
+      }
+    },
     "sidebar.add_project" : {
       "extractionState" : "manual",
       "localizations" : {

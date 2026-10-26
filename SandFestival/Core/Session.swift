@@ -44,6 +44,9 @@ final class Session: Identifiable {
                 self?.handleProcessTerminated(exitCode: exitCode)
             }
         }
+        bridge.onLaunchFailed = { [weak self] error in
+            self?.handleLaunchFailed(error)
+        }
         bridge.onTerminalTitleChanged = { [weak self] title in
             Task { @MainActor in
                 self?.updateTerminalTitle(title)
@@ -270,6 +273,16 @@ final class Session: Identifiable {
 
     private static let startupFailureWindow: TimeInterval = 3
 
+    private func handleLaunchFailed(_ error: LocalProcessError) {
+        wantsStop = false
+        wantsRestart = false
+        softStopRequested = false
+        processStartedAt = nil
+        lastError = String(format: String(localized: "session.error.launch_failed"), String(describing: error))
+        onDidTerminate?(project)
+        transition(to: .stopped)
+    }
+
     private func formatExitFailure(exitCode: Int32?) -> String {
         let header: String
         if let code = exitCode {
@@ -368,6 +381,7 @@ final class Session: Identifiable {
 
 private final class ProcessBridge: NSObject, LocalProcessTerminalViewDelegate {
     var onProcessTerminated: ((Int32?) -> Void)?
+    var onLaunchFailed: ((LocalProcessError) -> Void)?
     var onTerminalTitleChanged: ((String) -> Void)?
 
     func sizeChanged(source: LocalProcessTerminalView, newCols: Int, newRows: Int) {}
@@ -378,5 +392,9 @@ private final class ProcessBridge: NSObject, LocalProcessTerminalViewDelegate {
 
     func processTerminated(source: TerminalView, exitCode: Int32?) {
         onProcessTerminated?(exitCode)
+    }
+
+    func processFailedToStart(source: TerminalView, error: LocalProcessError) {
+        onLaunchFailed?(error)
     }
 }
