@@ -6,7 +6,8 @@ protocol DictationTarget: AnyObject {
     var id: Project.ID { get }
     var isReadyForDictation: Bool { get }
     var canReceiveText: Bool { get }
-    func insertDictatedText(_ text: String)
+    var canSubmitDictation: Bool { get }
+    func insertDictatedText(_ text: String, submit: Bool)
     func dictationVocabulary() async -> [String]
 }
 
@@ -42,6 +43,7 @@ final class DictationController {
     @ObservationIgnored private let makeEngine: () -> any SpeechEngine
     @ObservationIgnored var refinerProvider: (() -> (any TranscriptRefiner)?)?
     @ObservationIgnored var endpointConfigurationProvider: (() -> DictationEndpointer.Configuration)?
+    @ObservationIgnored var submitsAfterPasteProvider: (() -> Bool)?
     @ObservationIgnored private var refiner: (any TranscriptRefiner)?
     @ObservationIgnored private var vocabularyTask: Task<[String], Never>?
     @ObservationIgnored private var refineTask: Task<String?, Never>?
@@ -113,7 +115,7 @@ final class DictationController {
 
     func pasteHeldText() {
         guard case .held(let text) = phase, let target, target.canReceiveText else { return }
-        target.insertDictatedText(Self.insertion(for: text))
+        target.insertDictatedText(text + " ", submit: false)
         reset()
     }
 
@@ -257,7 +259,11 @@ final class DictationController {
             phase = .held(text)
             return
         }
-        target.insertDictatedText(Self.insertion(for: text))
+        if submitsAfterPasteProvider?() == true, target.canSubmitDictation {
+            target.insertDictatedText(text, submit: true)
+        } else {
+            target.insertDictatedText(text + " ", submit: false)
+        }
         reset()
     }
 
@@ -283,9 +289,5 @@ final class DictationController {
         endpointer = DictationEndpointer()
         inputLevel = 0
         phase = .idle
-    }
-
-    private static func insertion(for text: String) -> String {
-        text + " "
     }
 }

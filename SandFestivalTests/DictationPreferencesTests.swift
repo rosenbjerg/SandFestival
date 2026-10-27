@@ -49,6 +49,16 @@ struct DictationPreferencesTests {
         #expect(DictationPreferences(defaults: defaults).silenceTimeout == 5)
     }
 
+    @Test("sending after paste is off by default and persists")
+    func submitsAfterPastePersists() {
+        let defaults = makeDefaults()
+        #expect(DictationPreferences(defaults: defaults).submitsAfterPaste == false)
+
+        DictationPreferences(defaults: defaults).submitsAfterPaste = true
+
+        #expect(DictationPreferences(defaults: defaults).submitsAfterPaste == true)
+    }
+
     private func makeDefaults() -> UserDefaults {
         let suite = "DictationPreferencesTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!

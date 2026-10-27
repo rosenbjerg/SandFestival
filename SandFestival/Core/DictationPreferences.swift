@@ -57,6 +57,13 @@ final class DictationPreferences {
         }
     }
 
+    var submitsAfterPaste: Bool {
+        didSet {
+            guard submitsAfterPaste != oldValue else { return }
+            defaults.set(submitsAfterPaste, forKey: Keys.submitsAfterPaste)
+        }
+    }
+
     var endpointConfiguration: DictationEndpointer.Configuration {
         DictationEndpointer.Configuration(silenceTimeout: silenceTimeout)
     }
@@ -73,10 +80,12 @@ final class DictationPreferences {
         self.cleanup = TranscriptCleanup(rawValue: stored) ?? .automatic
         let range = DictationEndpointer.Configuration.silenceTimeoutRange
         self.silenceTimeout = min(max(defaults.double(forKey: Keys.silenceTimeout), range.lowerBound), range.upperBound)
+        self.submitsAfterPaste = defaults.bool(forKey: Keys.submitsAfterPaste)
     }
 
     private enum Keys {
         static let cleanup = "dictation.cleanup"
         static let silenceTimeout = "dictation.silenceTimeout"
+        static let submitsAfterPaste = "dictation.submitsAfterPaste"
     }
 }

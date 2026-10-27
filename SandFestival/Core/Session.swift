@@ -229,6 +229,7 @@ final class Session: Identifiable {
     }
 
     private static let terminationPollInterval: Duration = .milliseconds(25)
+    private static let dictationSubmitDelay: Duration = .milliseconds(150)
     private static let terminationDrainPolls = 40
 
     @ObservationIgnored private var wantsRestart = false
@@ -404,8 +405,19 @@ extension Session: DictationTarget {
         state.isRunning
     }
 
-    func insertDictatedText(_ text: String) {
+    var canSubmitDictation: Bool {
+        state == .idle
+    }
+
+    func insertDictatedText(_ text: String, submit: Bool) {
         terminalView.pasteText(text)
+        guard submit else { return }
+        Task { [weak self] in
+            // Don't send Return in the same write as the paste — the TUI can take it as part of the pasted text.
+            try? await Task.sleep(for: Session.dictationSubmitDelay)
+            guard let self, self.canSubmitDictation else { return }
+            self.terminalView.send(txt: "\r")
+        }
     }
 
     func dictationVocabulary() async -> [String] {

@@ -24,6 +24,18 @@ struct DictationPreferencesView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            Section(String(localized: "preferences.dictation.paste.section")) {
+                Toggle(
+                    String(localized: "preferences.dictation.submit_after_paste.label"),
+                    isOn: $preferences.submitsAfterPaste
+                )
+
+                Text(String(localized: "preferences.dictation.submit_after_paste.description"))
+                    .interfaceFont(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             Section(String(localized: "preferences.dictation.cleanup.section")) {
                 Picker(
                     String(localized: "preferences.dictation.cleanup.label"),

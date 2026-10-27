@@ -21,6 +21,7 @@ struct DictationControllerTests {
         await controller.runTask?.value
 
         #expect(target.inserted == ["Refactor the session. "])
+        #expect(target.submitted == [false])
         #expect(controller.phase == .idle)
         #expect(controller.targetID == nil)
     }
@@ -54,6 +55,57 @@ struct DictationControllerTests {
         #expect(target.inserted.isEmpty)
         #expect(controller.phase == .held("yes do it"))
         #expect(controller.targetID == target.id)
+    }
+
+    @Test("submits without the trailing space when sending after paste is on")
+    func submitsAfterPaste() async {
+        let engine = StubSpeechEngine(
+            script: [.result(text: "Run the tests.", isFinal: true, rangeEnd: 1)],
+            endsAfterScript: true
+        )
+        let (controller, target) = makeController(engine: engine)
+        controller.submitsAfterPasteProvider = { true }
+
+        controller.toggle(for: target)
+        await controller.runTask?.value
+
+        #expect(target.inserted == ["Run the tests."])
+        #expect(target.submitted == [true])
+    }
+
+    @Test("pastes without submitting when the target can't take a submit")
+    func pastesWithoutSubmitWhenBusy() async {
+        let engine = StubSpeechEngine(
+            script: [.result(text: "Run the tests.", isFinal: true, rangeEnd: 1)],
+            endsAfterScript: true
+        )
+        let (controller, target) = makeController(engine: engine)
+        controller.submitsAfterPasteProvider = { true }
+        target.canSubmitDictation = false
+
+        controller.toggle(for: target)
+        await controller.runTask?.value
+
+        #expect(target.inserted == ["Run the tests. "])
+        #expect(target.submitted == [false])
+    }
+
+    @Test("pasting held text never submits")
+    func pasteHeldNeverSubmits() async {
+        let engine = StubSpeechEngine(
+            script: [.result(text: "yes do it", isFinal: true, rangeEnd: 1)],
+            endsAfterScript: true
+        )
+        let (controller, target) = makeController(engine: engine)
+        controller.submitsAfterPasteProvider = { true }
+        target.isReadyForDictation = false
+        controller.toggle(for: target)
+        await controller.runTask?.value
+
+        controller.pasteHeldText()
+
+        #expect(target.inserted == ["yes do it "])
+        #expect(target.submitted == [false])
     }
 
     @Test("pasting held text inserts it and resets")
@@ -479,11 +531,14 @@ private final class StubDictationTarget: DictationTarget {
     let id = UUID()
     var isReadyForDictation = true
     var canReceiveText = true
+    var canSubmitDictation = true
     var vocabulary: [String] = []
     private(set) var inserted: [String] = []
+    private(set) var submitted: [Bool] = []
 
-    func insertDictatedText(_ text: String) {
+    func insertDictatedText(_ text: String, submit: Bool) {
         inserted.append(text)
+        submitted.append(submit)
     }
 
     func dictationVocabulary() async -> [String] {

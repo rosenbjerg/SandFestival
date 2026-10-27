@@ -1872,6 +1872,17 @@
         }
       }
     },
+    "preferences.dictation.paste.section" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pasting"
+          }
+        }
+      }
+    },
     "preferences.dictation.silence_timeout.description" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1894,13 +1905,24 @@
         }
       }
     },
-    "preferences.dock.bounce_style" : {
+    "preferences.dictation.submit_after_paste.description" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dock bounce"
+            "value" : "Presses Return for you once the dictated text is pasted, but only while the session is idle. If the agent is still working, the text is pasted and left for you to send."
+          }
+        }
+      }
+    },
+    "preferences.dictation.submit_after_paste.label" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send the prompt after pasting"
           }
         }
       }
@@ -1923,6 +1945,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Informational (one bounce)"
+          }
+        }
+      }
+    },
+    "preferences.dock.bounce_style" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock bounce"
           }
         }
       }
@@ -2620,6 +2653,17 @@
         }
       }
     },
+    "session.error.launch_failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The process could not be launched (%@)."
+          }
+        }
+      }
+    },
     "session.error.sandbox_profile" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2638,17 +2682,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "nono can only extend a profile by name, and “%@” is a file path. Save it to ~/.config/nono/profiles and select it by name instead."
-          }
-        }
-      }
-    },
-    "session.error.launch_failed" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The process could not be launched (%@)."
           }
         }
       }
