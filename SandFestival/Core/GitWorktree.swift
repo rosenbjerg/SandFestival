@@ -108,6 +108,15 @@ enum GitWorktree {
         var lastFetch: Date?
     }
 
+    static func trackedFiles(at path: URL) async -> [String] {
+        await Task.detached(priority: .utility) {
+            guard let result = runGit(["ls-files"], at: path, timeout: 2),
+                  !result.timedOut, result.exitCode == 0
+            else { return [] }
+            return result.stdout.split(separator: "\n").map(String.init)
+        }.value
+    }
+
     static func loadBranchSnapshot(at path: URL) async -> BranchSnapshot {
         // Detached: the waitUntilExit() calls inside would otherwise block the
         // main actor while the sheet is presenting.

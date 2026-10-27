@@ -395,6 +395,25 @@ final class Session: Identifiable {
     }
 }
 
+extension Session: DictationTarget {
+    var isReadyForDictation: Bool {
+        state == .idle || state == .working
+    }
+
+    var canReceiveText: Bool {
+        state.isRunning
+    }
+
+    func insertDictatedText(_ text: String) {
+        terminalView.pasteText(text)
+    }
+
+    func dictationVocabulary() async -> [String] {
+        let files = await GitWorktree.trackedFiles(at: project.path)
+        return TranscriptRefinement.vocabulary(projectName: project.name, trackedFiles: files)
+    }
+}
+
 // MARK: - Process delegate bridge
 
 private final class ProcessBridge: NSObject, LocalProcessTerminalViewDelegate {

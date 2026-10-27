@@ -47,8 +47,8 @@ struct WorktreeInfo: Codable, Hashable {
 
 extension Project {
     static let defaultAgentID = "claude-code"
-    static let defaultCommand = "nono"
-    static let defaultArgs: [String] = [
+    nonisolated static let defaultCommand = "nono"
+    nonisolated static let defaultArgs: [String] = [
         "run",
         "--profile", "claude-code",
         "--allow-cwd",

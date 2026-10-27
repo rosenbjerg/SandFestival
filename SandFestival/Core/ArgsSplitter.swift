@@ -1,6 +1,6 @@
 import Foundation
 
-enum ArgsSplitter {
+nonisolated enum ArgsSplitter {
     static func split(_ args: [String]) -> (wrapper: [String], agent: [String]) {
         guard let index = args.firstIndex(of: "--") else {
             return (args, [])

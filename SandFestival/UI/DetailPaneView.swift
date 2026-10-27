@@ -3,6 +3,7 @@ import SwiftUI
 
 struct DetailPaneView: View {
     @Bindable var manager: SessionManager
+    let dictation: DictationController
     @Binding var editorTarget: ProjectEditorTarget?
     @Binding var duplicateTarget: Project?
 
@@ -71,7 +72,8 @@ struct DetailPaneView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.leading, 4)
             .overlay(alignment: .bottom) {
-                if isVisible, session.state.isRunning, session.hasOutputBelowViewport {
+                if isVisible, session.state.isRunning, session.hasOutputBelowViewport,
+                   dictation.targetID != session.id {
                     newOutputPill(session: session)
                 }
             }
@@ -81,6 +83,14 @@ struct DetailPaneView: View {
                     notRunningOverlay(session: session)
                 }
             }
+            .overlay(alignment: .bottom) {
+                if isVisible, dictation.targetID == session.id {
+                    DictationOverlay(controller: dictation) {
+                        manager.focusSelectedTerminal()
+                    }
+                }
+            }
+            .animation(.easeOut(duration: 0.15), value: dictation.targetID == session.id)
             .opacity(isVisible ? 1 : 0)
             .allowsHitTesting(isVisible)
     }
@@ -185,6 +195,8 @@ struct DetailPaneView: View {
         ToolbarSpacer(.fixed)
 
         ToolbarItemGroup {
+            dictationButton(for: session)
+
             Button {
                 NSWorkspace.shared.open(session.project.path)
             } label: {
@@ -218,6 +230,19 @@ struct DetailPaneView: View {
             }
             .help(String(localized: "detail.toolbar.edit"))
         }
+    }
+
+    private func dictationButton(for session: Session) -> some View {
+        let isActive = dictation.isActive(for: session.id)
+        let title = String(localized: isActive ? "detail.toolbar.dictate.stop" : "detail.toolbar.dictate")
+        return Button {
+            dictation.toggle(for: session)
+        } label: {
+            Label(title, systemImage: isActive ? "mic.fill" : "mic")
+        }
+        .tint(isActive ? .red : nil)
+        .disabled(!session.state.isRunning || !dictation.canStart(for: session.id))
+        .help(title)
     }
 
     @ViewBuilder

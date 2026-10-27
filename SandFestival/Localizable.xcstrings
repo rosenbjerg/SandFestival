@@ -237,6 +237,28 @@
         }
       }
     },
+    "detail.toolbar.dictate" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dictate"
+          }
+        }
+      }
+    },
+    "detail.toolbar.dictate.stop" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop Dictating"
+          }
+        }
+      }
+    },
     "detail.toolbar.duplicate" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -320,6 +342,193 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Stop"
+          }
+        }
+      }
+    },
+    "dictation.action.copy" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy"
+          }
+        }
+      }
+    },
+    "dictation.action.discard" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discard"
+          }
+        }
+      }
+    },
+    "dictation.action.dismiss" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dismiss"
+          }
+        }
+      }
+    },
+    "dictation.action.done" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        }
+      }
+    },
+    "dictation.action.open_privacy_settings" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Privacy Settings"
+          }
+        }
+      }
+    },
+    "dictation.action.paste_anyway" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste Anyway"
+          }
+        }
+      }
+    },
+    "dictation.action.skip_cleanup" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skip Clean-up"
+          }
+        }
+      }
+    },
+    "dictation.error.audio_format" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The microphone’s audio format isn’t supported for dictation."
+          }
+        }
+      }
+    },
+    "dictation.error.microphone_denied" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sand Festival doesn’t have access to the microphone. Allow it in System Settings › Privacy & Security › Microphone."
+          }
+        }
+      }
+    },
+    "dictation.error.no_microphone" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No microphone is available."
+          }
+        }
+      }
+    },
+    "dictation.error.unsupported_language" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dictation isn’t available for %@."
+          }
+        }
+      }
+    },
+    "dictation.status.downloading" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Downloading speech model… %lld%%"
+          }
+        }
+      }
+    },
+    "dictation.status.finishing" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finishing…"
+          }
+        }
+      }
+    },
+    "dictation.status.held" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not pasted: the session isn’t ready for a prompt."
+          }
+        }
+      }
+    },
+    "dictation.status.listening" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Listening…"
+          }
+        }
+      }
+    },
+    "dictation.status.refining" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cleaning up…"
+          }
+        }
+      }
+    },
+    "dictation.status.starting" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starting…"
           }
         }
       }
@@ -1421,6 +1630,138 @@
         }
       }
     },
+    "preferences.dictation.cleanup.claude_haiku" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clean up with Claude Haiku"
+          }
+        }
+      }
+    },
+    "preferences.dictation.cleanup.claude_haiku.description" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude Haiku fixes misheard words, filler words and punctuation, using your project’s file names as vocabulary. It knows programming terms better, but the transcript and file names are sent to Anthropic through your Claude Code login, and each clean-up adds about four seconds."
+          }
+        }
+      }
+    },
+    "preferences.dictation.cleanup.label" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Before pasting"
+          }
+        }
+      }
+    },
+    "preferences.dictation.cleanup.off" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste as recognized"
+          }
+        }
+      }
+    },
+    "preferences.dictation.cleanup.off.description" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The transcript is pasted exactly as speech recognition heard it."
+          }
+        }
+      }
+    },
+    "preferences.dictation.cleanup.on_device" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clean up on this Mac"
+          }
+        }
+      }
+    },
+    "preferences.dictation.cleanup.on_device.description" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple’s on-device model fixes misheard words, filler words and punctuation, using your project’s file names as vocabulary. Nothing leaves this Mac. If the model is unavailable, the transcript is pasted as recognized."
+          }
+        }
+      }
+    },
+    "preferences.dictation.cleanup.section" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcript Clean-up"
+          }
+        }
+      }
+    },
+    "preferences.dictation.on_device.unavailable.device" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This Mac doesn’t support Apple Intelligence, so transcripts are pasted as recognized."
+          }
+        }
+      }
+    },
+    "preferences.dictation.on_device.unavailable.disabled" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence is turned off in System Settings, so transcripts are pasted as recognized."
+          }
+        }
+      }
+    },
+    "preferences.dictation.on_device.unavailable.not_ready" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple’s on-device model is still downloading. Until it’s ready, transcripts are pasted as recognized."
+          }
+        }
+      }
+    },
+    "preferences.dictation.on_device.unavailable.other" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple’s on-device model is unavailable, so transcripts are pasted as recognized."
+          }
+        }
+      }
+    },
     "preferences.dock.bounce_style" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1809,6 +2150,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Attention"
+          }
+        }
+      }
+    },
+    "preferences.tab.dictation" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dictation"
           }
         }
       }

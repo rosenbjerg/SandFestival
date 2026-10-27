@@ -5,6 +5,7 @@ struct ContentView: View {
     @Bindable var manager: SessionManager
     @Bindable var claudeCodeAdapter: ClaudeCodeAdapter
     let statusStore: WorktreeStatusStore
+    let dictation: DictationController
     @Binding var manualHookSheet: Bool
     @Binding var updateSheet: Bool
     @Binding var editorTarget: ProjectEditorTarget?
@@ -27,6 +28,7 @@ struct ContentView: View {
             } detail: {
                 DetailPaneView(
                     manager: manager,
+                    dictation: dictation,
                     editorTarget: $editorTarget,
                     duplicateTarget: $duplicateTarget
                 )
@@ -169,6 +171,7 @@ struct ContentView: View {
         manager: SessionManager(),
         claudeCodeAdapter: ClaudeCodeAdapter(),
         statusStore: WorktreeStatusStore(),
+        dictation: DictationController(),
         manualHookSheet: .constant(false),
         updateSheet: .constant(false),
         editorTarget: .constant(nil)

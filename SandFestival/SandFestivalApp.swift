@@ -12,6 +12,8 @@ struct SandFestivalApp: App {
     @State private var keepAwakePreferences = KeepAwakePreferences()
     @State private var interfacePreferences = InterfacePreferences()
     @State private var keepAwake: KeepAwake?
+    @State private var dictation = DictationController()
+    @State private var dictationPreferences = DictationPreferences()
     @State private var manualHookSheet = false
     @State private var updateSheet = false
     @State private var editorTarget: ProjectEditorTarget?
@@ -22,6 +24,7 @@ struct SandFestivalApp: App {
                 manager: manager,
                 claudeCodeAdapter: claudeCodeAdapter,
                 statusStore: statusStore,
+                dictation: dictation,
                 manualHookSheet: $manualHookSheet,
                 updateSheet: $updateSheet,
                 editorTarget: $editorTarget
@@ -46,6 +49,13 @@ struct SandFestivalApp: App {
                     }
                     manager.anyWorkingDidChange = { [keepAwake] anyWorking in
                         keepAwake?.anyWorking = anyWorking
+                    }
+                    dictation.refinerProvider = { [dictationPreferences] in
+                        switch dictationPreferences.cleanup {
+                        case .off: nil
+                        case .onDevice: OnDeviceTranscriptRefiner()
+                        case .claudeHaiku: ClaudeTranscriptRefiner()
+                        }
                     }
                     statusStore.refreshAll(projects: manager.projects)
                     await attachAdapterIfNeeded()
@@ -145,6 +155,14 @@ struct SandFestivalApp: App {
                         Label(
                             String(localized: "preferences.tab.power"),
                             systemImage: "powerplug"
+                        )
+                    }
+
+                DictationPreferencesView(preferences: dictationPreferences)
+                    .tabItem {
+                        Label(
+                            String(localized: "preferences.tab.dictation"),
+                            systemImage: "mic"
                         )
                     }
             }
