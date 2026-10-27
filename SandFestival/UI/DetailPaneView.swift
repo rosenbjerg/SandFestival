@@ -235,6 +235,7 @@ struct DetailPaneView: View {
     private func dictationButton(for session: Session) -> some View {
         let isActive = dictation.isActive(for: session.id)
         let title = String(localized: isActive ? "detail.toolbar.dictate.stop" : "detail.toolbar.dictate")
+        let help = String(localized: isActive ? "detail.toolbar.dictate.stop.help" : "detail.toolbar.dictate.help")
         return Button {
             dictation.toggle(for: session)
         } label: {
@@ -242,7 +243,7 @@ struct DetailPaneView: View {
         }
         .tint(isActive ? .red : nil)
         .disabled(!session.state.isRunning || !dictation.canToggle(for: session.id))
-        .help(dictation.isHoldingText ? String(localized: "detail.toolbar.dictate.held") : title)
+        .help(dictation.isHoldingText ? String(localized: "detail.toolbar.dictate.held") : help)
     }
 
     @ViewBuilder
