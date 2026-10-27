@@ -51,6 +51,15 @@ struct ClaudeTranscriptRefinerTests {
         #expect(environment["PATH"] == "/usr/bin")
     }
 
+    @MainActor
+    @Test("the Claude Code adapter offers Haiku as the agent's clean-up model")
+    func adapterOffersRefiner() {
+        let refinement = ClaudeCodeAdapter().transcriptRefinement
+
+        #expect(refinement?.name.isEmpty == false)
+        #expect(refinement?.refiner is ClaudeTranscriptRefiner)
+    }
+
     private func value(after flag: String, in args: [String]) -> String? {
         guard let index = args.firstIndex(of: flag), args.indices.contains(index + 1) else { return nil }
         return args[index + 1]

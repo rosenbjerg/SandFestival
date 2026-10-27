@@ -19,6 +19,10 @@ nonisolated struct OnDeviceTranscriptRefiner: TranscriptRefiner {
         return response.content.text
     }
 
+    static var isAvailable: Bool {
+        SystemLanguageModel.default.isAvailable
+    }
+
     static var unavailableReason: String? {
         switch SystemLanguageModel.default.availability {
         case .available:

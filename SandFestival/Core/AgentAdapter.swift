@@ -9,6 +9,7 @@ protocol AgentAdapter: AnyObject {
     var defaultArgs: [String] { get }
     var continuationArgs: [String] { get }
     var acceptsPastedImagePaths: Bool { get }
+    var transcriptRefinement: AgentTranscriptRefinement? { get }
 
     func start(eventSink: AgentEventSink) async throws
     func stop() async
@@ -20,4 +21,11 @@ protocol AgentAdapter: AnyObject {
 extension AgentAdapter {
     var continuationArgs: [String] { [] }
     var acceptsPastedImagePaths: Bool { false }
+    var transcriptRefinement: AgentTranscriptRefinement? { nil }
+}
+
+struct AgentTranscriptRefinement {
+    let name: String
+    let description: String
+    let refiner: any TranscriptRefiner
 }

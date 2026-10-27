@@ -2,17 +2,37 @@ import Foundation
 import Observation
 
 enum TranscriptCleanup: String, CaseIterable, Identifiable {
-    case off
+    case automatic
     case onDevice
-    case claudeHaiku
+    case agentModel
+    case off
+
+    enum Source: Equatable {
+        case onDevice
+        case agentModel
+    }
 
     var id: String { rawValue }
 
-    var displayLabel: String {
+    func source(onDeviceAvailable: Bool, agentModelAvailable: Bool) -> Source? {
         switch self {
-        case .off: String(localized: "preferences.dictation.cleanup.off")
-        case .onDevice: String(localized: "preferences.dictation.cleanup.on_device")
-        case .claudeHaiku: String(localized: "preferences.dictation.cleanup.claude_haiku")
+        case .automatic:
+            if onDeviceAvailable { return .onDevice }
+            return agentModelAvailable ? .agentModel : nil
+        case .onDevice:
+            return onDeviceAvailable ? .onDevice : nil
+        case .agentModel:
+            return agentModelAvailable ? .agentModel : nil
+        case .off:
+            return nil
+        }
+    }
+
+    func makeRefiner(agent: AgentTranscriptRefinement?) -> (any TranscriptRefiner)? {
+        switch source(onDeviceAvailable: OnDeviceTranscriptRefiner.isAvailable, agentModelAvailable: agent != nil) {
+        case .onDevice: OnDeviceTranscriptRefiner()
+        case .agentModel: agent?.refiner
+        case nil: nil
         }
     }
 }
@@ -43,11 +63,11 @@ final class DictationPreferences {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         defaults.register(defaults: [
-            Keys.cleanup: TranscriptCleanup.onDevice.rawValue,
+            Keys.cleanup: TranscriptCleanup.automatic.rawValue,
             Keys.silenceTimeout: DictationEndpointer.Configuration.defaultSilenceTimeout,
         ])
         let stored = defaults.string(forKey: Keys.cleanup) ?? ""
-        self.cleanup = TranscriptCleanup(rawValue: stored) ?? .onDevice
+        self.cleanup = TranscriptCleanup(rawValue: stored) ?? .automatic
         let range = DictationEndpointer.Configuration.silenceTimeoutRange
         self.silenceTimeout = min(max(defaults.double(forKey: Keys.silenceTimeout), range.lowerBound), range.upperBound)
     }

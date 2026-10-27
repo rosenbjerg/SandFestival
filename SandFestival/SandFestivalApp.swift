@@ -50,12 +50,8 @@ struct SandFestivalApp: App {
                     manager.anyWorkingDidChange = { [keepAwake] anyWorking in
                         keepAwake?.anyWorking = anyWorking
                     }
-                    dictation.refinerProvider = { [dictationPreferences] in
-                        switch dictationPreferences.cleanup {
-                        case .off: nil
-                        case .onDevice: OnDeviceTranscriptRefiner()
-                        case .claudeHaiku: ClaudeTranscriptRefiner()
-                        }
+                    dictation.refinerProvider = { [dictationPreferences, claudeCodeAdapter] in
+                        dictationPreferences.cleanup.makeRefiner(agent: claudeCodeAdapter.transcriptRefinement)
                     }
                     dictation.endpointConfigurationProvider = { [dictationPreferences] in
                         dictationPreferences.endpointConfiguration
@@ -175,7 +171,10 @@ struct SandFestivalApp: App {
                         )
                     }
 
-                DictationPreferencesView(preferences: dictationPreferences)
+                DictationPreferencesView(
+                    preferences: dictationPreferences,
+                    agentRefinement: claudeCodeAdapter.transcriptRefinement
+                )
                     .tabItem {
                         Label(
                             String(localized: "preferences.tab.dictation"),

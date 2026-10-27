@@ -12,6 +12,14 @@ final class ClaudeCodeAdapter: AgentAdapter {
     let continuationArgs = ["--continue"]
     let acceptsPastedImagePaths = true
 
+    var transcriptRefinement: AgentTranscriptRefinement? {
+        AgentTranscriptRefinement(
+            name: String(localized: "adapter.claude_code.transcript_refiner.name"),
+            description: String(localized: "adapter.claude_code.transcript_refiner.description"),
+            refiner: ClaudeTranscriptRefiner()
+        )
+    }
+
     private(set) var needsInstallation = false
     private(set) var lastInstallError: String?
     private(set) var startupError: String?

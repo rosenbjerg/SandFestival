@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DictationPreferencesView: View {
     @Bindable var preferences: DictationPreferences
+    let agentRefinement: AgentTranscriptRefinement?
 
     var body: some View {
         Form {
@@ -28,8 +29,8 @@ struct DictationPreferencesView: View {
                     String(localized: "preferences.dictation.cleanup.label"),
                     selection: $preferences.cleanup
                 ) {
-                    ForEach(TranscriptCleanup.allCases) { cleanup in
-                        Text(cleanup.displayLabel)
+                    ForEach(choices) { cleanup in
+                        Text(label(for: cleanup))
                             .tag(cleanup)
                     }
                 }
@@ -40,10 +41,10 @@ struct DictationPreferencesView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                if preferences.cleanup == .onDevice, let reason = OnDeviceTranscriptRefiner.unavailableReason {
-                    Label(reason, systemImage: "exclamationmark.triangle.fill")
+                if let status {
+                    Label(status, systemImage: "info.circle")
                         .interfaceFont(.caption)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -52,18 +53,59 @@ struct DictationPreferencesView: View {
         .frame(width: 480)
     }
 
+    private var choices: [TranscriptCleanup] {
+        TranscriptCleanup.allCases.filter { $0 != .agentModel || agentRefinement != nil }
+    }
+
+    private func label(for cleanup: TranscriptCleanup) -> String {
+        switch cleanup {
+        case .automatic:
+            String(localized: "preferences.dictation.cleanup.automatic")
+        case .onDevice:
+            String(localized: "preferences.dictation.cleanup.on_device")
+        case .agentModel:
+            agentRefinement?.name ?? ""
+        case .off:
+            String(localized: "preferences.dictation.cleanup.off")
+        }
+    }
+
     private var description: String {
         switch preferences.cleanup {
-        case .off:
-            String(localized: "preferences.dictation.cleanup.off.description")
+        case .automatic:
+            if let agentRefinement {
+                String(
+                    format: String(localized: "preferences.dictation.cleanup.automatic.description.agent"),
+                    agentRefinement.name
+                )
+            } else {
+                String(localized: "preferences.dictation.cleanup.automatic.description")
+            }
         case .onDevice:
             String(localized: "preferences.dictation.cleanup.on_device.description")
-        case .claudeHaiku:
-            String(localized: "preferences.dictation.cleanup.claude_haiku.description")
+        case .agentModel:
+            agentRefinement?.description ?? ""
+        case .off:
+            String(localized: "preferences.dictation.cleanup.off.description")
+        }
+    }
+
+    private var status: String? {
+        guard let reason = OnDeviceTranscriptRefiner.unavailableReason else { return nil }
+        switch preferences.cleanup.source(onDeviceAvailable: false, agentModelAvailable: agentRefinement != nil) {
+        case .agentModel where preferences.cleanup == .automatic:
+            return reason + " " + String(
+                format: String(localized: "preferences.dictation.cleanup.fallback.agent"),
+                agentRefinement?.name ?? ""
+            )
+        case nil where preferences.cleanup != .off:
+            return reason + " " + String(localized: "preferences.dictation.cleanup.fallback.raw")
+        default:
+            return nil
         }
     }
 }
 
 #Preview {
-    DictationPreferencesView(preferences: DictationPreferences())
+    DictationPreferencesView(preferences: DictationPreferences(), agentRefinement: nil)
 }

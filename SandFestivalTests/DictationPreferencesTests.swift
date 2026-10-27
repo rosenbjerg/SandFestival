@@ -6,25 +6,25 @@ import Testing
 @Suite("DictationPreferences")
 struct DictationPreferencesTests {
 
-    @Test("defaults to on-device clean-up")
-    func defaultsToOnDevice() {
-        #expect(DictationPreferences(defaults: makeDefaults()).cleanup == .onDevice)
+    @Test("defaults to automatic clean-up")
+    func defaultsToAutomatic() {
+        #expect(DictationPreferences(defaults: makeDefaults()).cleanup == .automatic)
     }
 
     @Test("persists the chosen clean-up")
     func persists() {
         let defaults = makeDefaults()
-        DictationPreferences(defaults: defaults).cleanup = .claudeHaiku
+        DictationPreferences(defaults: defaults).cleanup = .agentModel
 
-        #expect(DictationPreferences(defaults: defaults).cleanup == .claudeHaiku)
+        #expect(DictationPreferences(defaults: defaults).cleanup == .agentModel)
     }
 
-    @Test("an unknown stored value falls back to on-device")
+    @Test("an unknown stored value falls back to automatic")
     func unknownFallsBack() {
         let defaults = makeDefaults()
         defaults.set("gpt", forKey: "dictation.cleanup")
 
-        #expect(DictationPreferences(defaults: defaults).cleanup == .onDevice)
+        #expect(DictationPreferences(defaults: defaults).cleanup == .automatic)
     }
 
     @Test("the silence timeout defaults to 2.5 s and persists")

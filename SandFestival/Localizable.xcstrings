@@ -1,6 +1,28 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "adapter.claude_code.transcript_refiner.description" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude Haiku fixes misheard words, filler words and punctuation, using your project’s file names as vocabulary. It knows programming terms better, but the transcript and file names are sent to Anthropic through your Claude Code login, and each clean-up adds about four seconds."
+          }
+        }
+      }
+    },
+    "adapter.claude_code.transcript_refiner.name" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude Haiku"
+          }
+        }
+      }
+    },
     "app.name" : {
       "localizations" : {
         "en" : {
@@ -1652,24 +1674,57 @@
         }
       }
     },
-    "preferences.dictation.cleanup.claude_haiku" : {
+    "preferences.dictation.cleanup.automatic" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Clean up with Claude Haiku"
+            "value" : "Automatic"
           }
         }
       }
     },
-    "preferences.dictation.cleanup.claude_haiku.description" : {
+    "preferences.dictation.cleanup.automatic.description" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Claude Haiku fixes misheard words, filler words and punctuation, using your project’s file names as vocabulary. It knows programming terms better, but the transcript and file names are sent to Anthropic through your Claude Code login, and each clean-up adds about four seconds."
+            "value" : "Uses Apple’s on-device model when it’s available, and pastes the transcript as recognized when it isn’t."
+          }
+        }
+      }
+    },
+    "preferences.dictation.cleanup.automatic.description.agent" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uses Apple’s on-device model when it’s available, and %@ when it isn’t."
+          }
+        }
+      }
+    },
+    "preferences.dictation.cleanup.fallback.agent" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ is used instead."
+          }
+        }
+      }
+    },
+    "preferences.dictation.cleanup.fallback.raw" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcripts are pasted as recognized."
           }
         }
       }
@@ -1680,7 +1735,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Before pasting"
+            "value" : "Clean up with"
           }
         }
       }
@@ -1691,7 +1746,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Paste as recognized"
+            "value" : "Don’t clean up"
           }
         }
       }
@@ -1713,7 +1768,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Clean up on this Mac"
+            "value" : "On this Mac"
           }
         }
       }
@@ -1757,7 +1812,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This Mac doesn’t support Apple Intelligence, so transcripts are pasted as recognized."
+            "value" : "This Mac doesn’t support Apple Intelligence."
           }
         }
       }
@@ -1768,7 +1823,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple Intelligence is turned off in System Settings, so transcripts are pasted as recognized."
+            "value" : "Apple Intelligence is turned off in System Settings."
           }
         }
       }
@@ -1779,7 +1834,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple’s on-device model is still downloading. Until it’s ready, transcripts are pasted as recognized."
+            "value" : "Apple’s on-device model is still downloading."
           }
         }
       }
@@ -1790,7 +1845,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple’s on-device model is unavailable, so transcripts are pasted as recognized."
+            "value" : "Apple’s on-device model is unavailable."
           }
         }
       }
