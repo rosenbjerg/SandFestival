@@ -73,6 +73,22 @@ struct DictationControllerTests {
         #expect(target.submitted == [.whenIdle])
     }
 
+    @Test("submits a dictated slash command without the trailing period")
+    func submitsSlashCommand() async {
+        let engine = StubSpeechEngine(
+            script: [.result(text: "/clear.", isFinal: true, rangeEnd: 1)],
+            endsAfterScript: true
+        )
+        let (controller, target) = makeController(engine: engine)
+        controller.submitProvider = { .whenIdle }
+
+        controller.toggle(for: target)
+        await controller.runTask?.value
+
+        #expect(target.inserted == ["/clear "])
+        #expect(target.submitted == [.whenIdle])
+    }
+
     @Test("pastes without submitting while working unless that's allowed")
     func pastesWithoutSubmitWhenWorking() async {
         let engine = StubSpeechEngine(

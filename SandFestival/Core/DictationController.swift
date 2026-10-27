@@ -289,6 +289,6 @@ final class DictationController {
     }
 
     private static func insertion(for text: String) -> String {
-        text + " "
+        DictationTranscript.prompt(from: text) + " "
     }
 }

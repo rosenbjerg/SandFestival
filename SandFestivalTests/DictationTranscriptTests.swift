@@ -78,4 +78,17 @@ struct DictationTranscriptTests {
 
         #expect(transcript.isEmpty)
     }
+
+    @Test("a slash command loses the punctuation dictation adds")
+    func slashCommandPunctuation() {
+        #expect(DictationTranscript.prompt(from: "/clear.") == "/clear")
+        #expect(DictationTranscript.prompt(from: "/model haiku!") == "/model haiku")
+        #expect(DictationTranscript.prompt(from: "/compact focus on the tests…") == "/compact focus on the tests")
+    }
+
+    @Test("a prose prompt keeps its punctuation")
+    func prosePunctuation() {
+        #expect(DictationTranscript.prompt(from: "Run the tests.") == "Run the tests.")
+        #expect(DictationTranscript.prompt(from: "Why does /clear fail?") == "Why does /clear fail?")
+    }
 }
