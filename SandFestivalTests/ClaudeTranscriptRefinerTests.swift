@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import SandFestival
 
@@ -32,36 +33,64 @@ struct ClaudeTranscriptRefinerTests {
         #expect(!args.contains("--bare"))
     }
 
-    @Test("keeps the inherited environment, swaps in the shell PATH and disables CLAUDE.md")
-    func environment() {
-        let environment = ClaudeTranscriptRefiner.environment(
-            inherited: ["HOME": "/Users/me", "PATH": "/usr/bin"],
-            shellPath: "/opt/homebrew/bin:/usr/bin"
-        )
+    @MainActor
+    @Test("asks the launcher for a sandboxed one-shot and returns its output")
+    func launchesThroughLauncher() async throws {
+        let recorder = LaunchRecorder()
+        let refiner = ClaudeTranscriptRefiner { command, arguments, environment in
+            recorder.record(command: command, arguments: arguments, environment: environment)
+            return AgentLaunch(executable: "/bin/echo", arguments: ["Fix the SwiftTerm view."], environment: [])
+        }
 
-        #expect(environment["HOME"] == "/Users/me")
-        #expect(environment["PATH"] == "/opt/homebrew/bin:/usr/bin")
-        #expect(environment["CLAUDE_CODE_DISABLE_CLAUDE_MDS"] == "1")
+        let output = try await refiner.refine("fix the swift term view", vocabulary: ["SwiftTerm"])
+
+        #expect(output.trimmingCharacters(in: .whitespacesAndNewlines) == "Fix the SwiftTerm view.")
+        let call = try #require(recorder.call)
+        #expect(call.command == ClaudeTranscriptRefiner.command)
+        #expect(call.arguments.last == "<vocabulary>SwiftTerm</vocabulary>\n<transcript>fix the swift term view</transcript>")
+        #expect(call.environment == ["CLAUDE_CODE_DISABLE_CLAUDE_MDS": "1"])
     }
 
-    @Test("leaves PATH alone when the shell PATH is unknown")
-    func environmentWithoutShellPath() {
-        let environment = ClaudeTranscriptRefiner.environment(inherited: ["PATH": "/usr/bin"], shellPath: nil)
+    @Test("a failing launch surfaces as an error")
+    func launchFailurePropagates() async {
+        let refiner = ClaudeTranscriptRefiner { command, _, _ in
+            throw AgentLaunch.Failure.commandNotFound(command)
+        }
 
-        #expect(environment["PATH"] == "/usr/bin")
+        await #expect(throws: AgentLaunch.Failure.self) {
+            try await refiner.refine("hello", vocabulary: [])
+        }
     }
 
     @MainActor
     @Test("the Claude Code adapter offers Haiku as the agent's clean-up model")
     func adapterOffersRefiner() {
         let refinement = ClaudeCodeAdapter().transcriptRefinement
+        let refiner = refinement?.makeRefiner { _, _, _ in
+            AgentLaunch(executable: "/bin/echo", arguments: [], environment: [])
+        }
 
         #expect(refinement?.name.isEmpty == false)
-        #expect(refinement?.refiner is ClaudeTranscriptRefiner)
+        #expect(refiner is ClaudeTranscriptRefiner)
     }
 
     private func value(after flag: String, in args: [String]) -> String? {
         guard let index = args.firstIndex(of: flag), args.indices.contains(index + 1) else { return nil }
         return args[index + 1]
+    }
+}
+
+@MainActor
+private final class LaunchRecorder: Sendable {
+    struct Call {
+        let command: String
+        let arguments: [String]
+        let environment: [String: String]
+    }
+
+    private(set) var call: Call?
+
+    func record(command: String, arguments: [String], environment: [String: String]) {
+        call = Call(command: command, arguments: arguments, environment: environment)
     }
 }

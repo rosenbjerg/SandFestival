@@ -174,6 +174,30 @@ final class SessionManager {
         return await session.forceStopAndWait(timeout: timeout)
     }
 
+    func sandboxedArgs(command: String, args: [String]) throws -> [String] {
+        guard NonoCommand.matches(command) else { return args }
+        return try AgentSandboxProfile.sandboxing(args, blockingClipboard: blocksAgentClipboard)
+    }
+
+    func oneShotAgentLaunch(
+        command: String,
+        arguments: [String],
+        environment: [String: String]
+    ) throws -> AgentLaunch {
+        guard let executable = CommandResolver.resolve(command) else {
+            throw AgentLaunch.Failure.commandNotFound(command)
+        }
+        return AgentLaunch(
+            executable: executable,
+            arguments: try sandboxedArgs(command: command, args: arguments),
+            environment: Session.composeEnvironment(
+                inherited: Session.inheritedEnvironment(),
+                projectEnv: [:],
+                extra: environment
+            )
+        )
+    }
+
     func session(for id: Project.ID) -> Session? {
         sessions[id]
     }
@@ -286,8 +310,7 @@ final class SessionManager {
             self?.adapter?.continuationArgs ?? []
         }
         session.sandboxedArgsProvider = { [weak self] project in
-            guard let self, NonoCommand.matches(project.command) else { return project.args }
-            return try AgentSandboxProfile.sandboxing(project.args, blockingClipboard: self.blocksAgentClipboard)
+            try self?.sandboxedArgs(command: project.command, args: project.args) ?? project.args
         }
         session.terminalView.acceptsPastedImagePaths = { [weak self] in
             self?.adapter?.acceptsPastedImagePaths ?? false

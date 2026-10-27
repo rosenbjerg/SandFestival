@@ -1,6 +1,8 @@
 import Foundation
 
 nonisolated struct ClaudeTranscriptRefiner: TranscriptRefiner {
+    let launcher: AgentLauncher
+
     var timeout: Duration { .seconds(10) }
 
     static let command = Project.defaultCommand
@@ -19,20 +21,19 @@ nonisolated struct ClaudeTranscriptRefiner: TranscriptRefiner {
         ]
     }
 
-    static func environment(inherited: [String: String], shellPath: String?) -> [String: String] {
-        var environment = inherited
-        if let shellPath {
-            environment["PATH"] = shellPath
-        }
-        // Otherwise the user's CLAUDE.md rides along and steers the rewrite.
-        environment["CLAUDE_CODE_DISABLE_CLAUDE_MDS"] = "1"
-        return environment
-    }
+    // Otherwise the user's CLAUDE.md rides along and steers the rewrite.
+    static let environment = ["CLAUDE_CODE_DISABLE_CLAUDE_MDS": "1"]
 
     func refine(_ transcript: String, vocabulary: [String]) async throws -> String {
-        let run = OneShotClaudeRun(
-            prompt: TranscriptRefinement.prompt(transcript: transcript, vocabulary: vocabulary)
+        let launch = try await launcher(
+            Self.command,
+            Self.arguments(
+                systemPrompt: TranscriptRefinement.instructions,
+                prompt: TranscriptRefinement.prompt(transcript: transcript, vocabulary: vocabulary)
+            ),
+            Self.environment
         )
+        let run = OneShotClaudeRun(launch: launch)
         return try await withTaskCancellationHandler {
             try await Task.detached(priority: .userInitiated) { try run.execute() }.value
         } onCancel: {
@@ -49,36 +50,24 @@ private nonisolated final class OneShotClaudeRun: @unchecked Sendable {
         case cancelled
     }
 
-    private let prompt: String
+    private let launch: AgentLaunch
     private let lock = NSLock()
     private var state = State.idle
 
-    init(prompt: String) {
-        self.prompt = prompt
+    init(launch: AgentLaunch) {
+        self.launch = launch
     }
 
     func execute() throws -> String {
-        let shellPath = UserShellPath.current(blockingUpTo: 1.0)
-        guard let nono = CommandResolver.resolve(
-            ClaudeTranscriptRefiner.command,
-            searchPath: ClaudeCodeUpdater.searchPath(shellPath: shellPath)
-        ) else { throw TranscriptRefinerError.unavailable }
-
         let workingDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("sandfestival-refine-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: workingDirectory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: workingDirectory) }
 
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: nono)
-        process.arguments = ClaudeTranscriptRefiner.arguments(
-            systemPrompt: TranscriptRefinement.instructions,
-            prompt: prompt
-        )
-        process.environment = ClaudeTranscriptRefiner.environment(
-            inherited: ProcessInfo.processInfo.environment,
-            shellPath: shellPath
-        )
+        process.executableURL = URL(fileURLWithPath: launch.executable)
+        process.arguments = launch.arguments
+        process.environment = launch.environmentDictionary
         process.currentDirectoryURL = workingDirectory
         let stdout = Pipe()
         process.standardInput = FileHandle.nullDevice

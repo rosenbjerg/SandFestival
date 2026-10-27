@@ -50,8 +50,11 @@ struct SandFestivalApp: App {
                     manager.anyWorkingDidChange = { [keepAwake] anyWorking in
                         keepAwake?.anyWorking = anyWorking
                     }
-                    dictation.refinerProvider = { [dictationPreferences, claudeCodeAdapter] in
-                        dictationPreferences.cleanup.makeRefiner(agent: claudeCodeAdapter.transcriptRefinement)
+                    dictation.refinerProvider = { [dictationPreferences, claudeCodeAdapter, manager] in
+                        dictationPreferences.cleanup.makeRefiner(
+                            agent: claudeCodeAdapter.transcriptRefinement,
+                            launcher: { try manager.oneShotAgentLaunch(command: $0, arguments: $1, environment: $2) }
+                        )
                     }
                     dictation.endpointConfigurationProvider = { [dictationPreferences] in
                         dictationPreferences.endpointConfiguration

@@ -27,5 +27,5 @@ extension AgentAdapter {
 struct AgentTranscriptRefinement {
     let name: String
     let description: String
-    let refiner: any TranscriptRefiner
+    let makeRefiner: (@escaping AgentLauncher) -> any TranscriptRefiner
 }

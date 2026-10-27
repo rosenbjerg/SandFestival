@@ -28,10 +28,13 @@ enum TranscriptCleanup: String, CaseIterable, Identifiable {
         }
     }
 
-    func makeRefiner(agent: AgentTranscriptRefinement?) -> (any TranscriptRefiner)? {
+    func makeRefiner(
+        agent: AgentTranscriptRefinement?,
+        launcher: @escaping AgentLauncher
+    ) -> (any TranscriptRefiner)? {
         switch source(onDeviceAvailable: OnDeviceTranscriptRefiner.isAvailable, agentModelAvailable: agent != nil) {
         case .onDevice: OnDeviceTranscriptRefiner()
-        case .agentModel: agent?.refiner
+        case .agentModel: agent?.makeRefiner(launcher)
         case nil: nil
         }
     }

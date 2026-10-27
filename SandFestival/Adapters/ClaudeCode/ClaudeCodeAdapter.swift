@@ -16,7 +16,7 @@ final class ClaudeCodeAdapter: AgentAdapter {
         AgentTranscriptRefinement(
             name: String(localized: "adapter.claude_code.transcript_refiner.name"),
             description: String(localized: "adapter.claude_code.transcript_refiner.description"),
-            refiner: ClaudeTranscriptRefiner()
+            makeRefiner: { ClaudeTranscriptRefiner(launcher: $0) }
         )
     }
 

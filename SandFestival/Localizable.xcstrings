@@ -23,6 +23,17 @@
         }
       }
     },
+    "agent_launch.error.command_not_found" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t find “%@”."
+          }
+        }
+      }
+    },
     "app.name" : {
       "localizations" : {
         "en" : {
