@@ -33,6 +33,7 @@ final class DictationController {
     private(set) var phase: Phase = .idle
     private(set) var transcript = DictationTranscript()
     @ObservationIgnored private(set) var endpointer = DictationEndpointer()
+    private(set) var inputLevel: Double = 0
     private(set) var targetID: Project.ID?
 
     @ObservationIgnored private weak var target: (any DictationTarget)?
@@ -160,6 +161,8 @@ final class DictationController {
         switch event {
         case .audioAdvanced(let time):
             endpointer.audioAdvanced(to: time)
+        case .inputLevel(let rms):
+            inputLevel = MicrophoneLevel.smoothed(previous: inputLevel, next: MicrophoneLevel.normalized(rms: rms))
         case .result(let text, let isFinal, let rangeEnd):
             let wordsBefore = transcript.words
             transcript.apply(text: text, isFinal: isFinal)
@@ -242,6 +245,7 @@ final class DictationController {
         targetID = nil
         transcript = DictationTranscript()
         endpointer = DictationEndpointer()
+        inputLevel = 0
         phase = .idle
     }
 

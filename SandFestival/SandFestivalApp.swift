@@ -86,6 +86,20 @@ struct SandFestivalApp: App {
                 }
             }
 
+            CommandGroup(after: .pasteboard) {
+                Divider()
+
+                let session = manager.selectedSession()
+                let isDictating = session.map { dictation.isActive(for: $0.id) } ?? false
+                Button(String(localized: isDictating ? "menu.dictate.stop" : "menu.dictate")) {
+                    if let session {
+                        dictation.toggle(for: session)
+                    }
+                }
+                .keyboardShortcut("d", modifiers: [.command, .shift])
+                .disabled(session.map { !$0.state.isRunning || !dictation.canStart(for: $0.id) } ?? true)
+            }
+
             CommandMenu(String(localized: "menu.go")) {
                 Button(String(localized: "menu.go.next_attention")) {
                     manager.focusNextAttention()

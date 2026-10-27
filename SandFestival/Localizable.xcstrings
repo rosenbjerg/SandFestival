@@ -1491,6 +1491,28 @@
         }
       }
     },
+    "menu.dictate" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dictate Prompt"
+          }
+        }
+      }
+    },
+    "menu.dictate.stop" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop Dictating"
+          }
+        }
+      }
+    },
     "menu.go" : {
       "extractionState" : "manual",
       "localizations" : {

@@ -219,6 +219,19 @@ struct DictationControllerTests {
         controller.discard()
     }
 
+    @Test("tracks the microphone level while listening and resets afterwards")
+    func tracksMicrophoneLevel() async {
+        let engine = StubSpeechEngine(script: [.inputLevel(rms: 1)])
+        let (controller, target) = makeController(engine: engine)
+
+        controller.toggle(for: target)
+        await waitUntil { controller.inputLevel == 1 }
+        #expect(controller.inputLevel == 1)
+
+        controller.discard()
+        #expect(controller.inputLevel == 0)
+    }
+
     @Test("cleans up the transcript with the project vocabulary before pasting")
     func refinesBeforePasting() async {
         let engine = StubSpeechEngine(

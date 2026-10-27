@@ -1,9 +1,11 @@
+import Accelerate
 import AVFoundation
 import Foundation
 import Speech
 
 nonisolated enum SpeechEngineEvent: Equatable, Sendable {
     case audioAdvanced(to: TimeInterval)
+    case inputLevel(rms: Float)
     case result(text: String, isFinal: Bool, rangeEnd: TimeInterval)
 }
 
@@ -180,6 +182,9 @@ actor SpeechAnalyzerEngine: SpeechEngine {
         events: AsyncThrowingStream<SpeechEngineEvent, any Error>.Continuation
     ) {
         node.installTap(onBus: 0, bufferSize: 4096, format: format) { buffer, _ in
+            if let rms = AnalyzerInputConverter.rms(of: buffer) {
+                events.yield(.inputLevel(rms: rms))
+            }
             guard let (analyzerInput, audioTime) = converter.convert(buffer) else { return }
             input.yield(analyzerInput)
             events.yield(.audioAdvanced(to: audioTime))
@@ -261,5 +266,12 @@ private nonisolated final class AnalyzerInputConverter: @unchecked Sendable {
         guard status != .error, output.frameLength > 0 else { return nil }
         framesEmitted += AVAudioFramePosition(output.frameLength)
         return (AnalyzerInput(buffer: output), Double(framesEmitted) / outputFormat.sampleRate)
+    }
+
+    static func rms(of buffer: AVAudioPCMBuffer) -> Float? {
+        guard let samples = buffer.floatChannelData?[0], buffer.frameLength > 0 else { return nil }
+        var rms: Float = 0
+        vDSP_rmsqv(samples, 1, &rms, vDSP_Length(buffer.frameLength))
+        return rms
     }
 }

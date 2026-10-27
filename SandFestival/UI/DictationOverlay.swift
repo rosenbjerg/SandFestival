@@ -37,9 +37,11 @@ struct DictationOverlay: View {
     private var statusIcon: some View {
         switch controller.phase {
         case .listening:
-            Image(systemName: "mic.fill")
-                .foregroundStyle(.red)
-                .symbolEffect(.pulse)
+            HStack(spacing: 4) {
+                Image(systemName: "mic.fill")
+                    .foregroundStyle(.red)
+                DictationLevelMeter(controller: controller)
+            }
         case .preparing, .finishing, .refining:
             ProgressView()
                 .controlSize(.small)
@@ -134,4 +136,26 @@ struct DictationOverlay: View {
     private static let microphonePrivacySettings = URL(
         string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
     )!
+}
+
+private struct DictationLevelMeter: View {
+    let controller: DictationController
+
+    private static let barCount = 5
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 2) {
+            ForEach(0..<Self.barCount, id: \.self) { index in
+                Capsule()
+                    .fill(isLit(index) ? AnyShapeStyle(.red) : AnyShapeStyle(.quaternary))
+                    .frame(width: 3, height: 5 + CGFloat(index) * 2)
+            }
+        }
+        .animation(.linear(duration: 0.08), value: controller.inputLevel)
+        .accessibilityHidden(true)
+    }
+
+    private func isLit(_ index: Int) -> Bool {
+        controller.inputLevel > Double(index + 1) / Double(Self.barCount + 1)
+    }
 }
