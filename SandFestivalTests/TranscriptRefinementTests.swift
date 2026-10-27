@@ -30,6 +30,18 @@ struct TranscriptRefinementTests {
         #expect(TranscriptRefinement.accept("<transcript>Hello there.</transcript>", original: "hello there") == "Hello there.")
     }
 
+    @Test("a copied Output: label is stripped")
+    func stripsOutputLabel() {
+        #expect(TranscriptRefinement.accept("Output: Delete the UserService tests.", original: "delete the user service tests") == "Delete the UserService tests.")
+    }
+
+    @Test("the reply budget scales with the transcript and has a floor")
+    func responseBudget() {
+        #expect(TranscriptRefinement.maximumResponseTokens(for: "yes") == 64)
+        let long = Array(repeating: "word", count: 100).joined(separator: " ")
+        #expect(TranscriptRefinement.maximumResponseTokens(for: long) == 300)
+    }
+
     @Test("an answer instead of a clean-up is rejected")
     func rejectsAnswers() {
         let original = "What's the best way to handle errors here?"

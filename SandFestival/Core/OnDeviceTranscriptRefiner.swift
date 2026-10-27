@@ -11,7 +11,10 @@ nonisolated struct OnDeviceTranscriptRefiner: TranscriptRefiner {
         let response = try await session.respond(
             to: TranscriptRefinement.prompt(transcript: transcript, vocabulary: vocabulary),
             generating: CleanedTranscript.self,
-            options: GenerationOptions(sampling: .greedy)
+            options: GenerationOptions(
+                sampling: .greedy,
+                maximumResponseTokens: TranscriptRefinement.maximumResponseTokens(for: transcript)
+            )
         )
         return response.content.text
     }
