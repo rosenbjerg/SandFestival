@@ -34,6 +34,17 @@ struct DictationPreferencesView: View {
                     .interfaceFont(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+
+                Toggle(
+                    String(localized: "preferences.dictation.submit_while_working.label"),
+                    isOn: $preferences.submitsWhileWorking
+                )
+                .disabled(!preferences.submitsAfterPaste)
+
+                Text(String(localized: "preferences.dictation.submit_while_working.description"))
+                    .interfaceFont(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Section(String(localized: "preferences.dictation.cleanup.section")) {

@@ -1911,7 +1911,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Presses Return for you once the dictated text is pasted, but only while the session is idle. If the agent is still working, the text is pasted and left for you to send."
+            "value" : "Presses Return for you once the dictated text is pasted. By default this happens only while the session is idle; if the agent is still working, the text is pasted and left for you to send."
           }
         }
       }
@@ -1923,6 +1923,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Send the prompt after pasting"
+          }
+        }
+      }
+    },
+    "preferences.dictation.submit_while_working.description" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The agent queues the prompt until its current turn ends. If a permission prompt appears at the same moment, the Return can answer it with its default choice."
+          }
+        }
+      }
+    },
+    "preferences.dictation.submit_while_working.label" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Also send while the agent is working"
           }
         }
       }

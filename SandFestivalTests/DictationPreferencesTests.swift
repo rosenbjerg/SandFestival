@@ -59,6 +59,39 @@ struct DictationPreferencesTests {
         #expect(DictationPreferences(defaults: defaults).submitsAfterPaste == true)
     }
 
+    @Test("sending while working is off by default, persists, and needs sending after paste")
+    func submitsWhileWorking() {
+        let defaults = makeDefaults()
+        let preferences = DictationPreferences(defaults: defaults)
+        #expect(preferences.submitsWhileWorking == false)
+        #expect(preferences.submit == .off)
+
+        preferences.submitsWhileWorking = true
+        #expect(DictationPreferences(defaults: defaults).submitsWhileWorking == true)
+        #expect(preferences.submit == .off)
+
+        preferences.submitsAfterPaste = true
+        #expect(preferences.submit == .whenIdleOrWorking)
+
+        preferences.submitsWhileWorking = false
+        #expect(preferences.submit == .whenIdle)
+    }
+
+    @Test("each submit policy allows only its states", arguments: [
+        (DictationSubmit.off, [SessionState]()),
+        (.whenIdle, [.idle]),
+        (.whenIdleOrWorking, [.idle, .working]),
+    ])
+    func submitAllows(submit: DictationSubmit, allowed: [SessionState]) {
+        let all: [SessionState] = [
+            .starting, .idle, .working, .waitingForPermission, .waitingForIdle,
+            .blockedByAutoMode, .errored(reason: "x"), .stopped,
+        ]
+        for state in all {
+            #expect(submit.allows(state) == allowed.contains(state))
+        }
+    }
+
     private func makeDefaults() -> UserDefaults {
         let suite = "DictationPreferencesTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!

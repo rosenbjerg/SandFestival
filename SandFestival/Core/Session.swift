@@ -405,17 +405,17 @@ extension Session: DictationTarget {
         state.isRunning
     }
 
-    var canSubmitDictation: Bool {
-        state == .idle
+    func canSubmitDictation(_ submit: DictationSubmit) -> Bool {
+        submit.allows(state)
     }
 
-    func insertDictatedText(_ text: String, submit: Bool) {
+    func insertDictatedText(_ text: String, submit: DictationSubmit) {
         terminalView.pasteText(text)
-        guard submit else { return }
+        guard submit != .off else { return }
         Task { [weak self] in
             // Don't send Return in the same write as the paste — the TUI can take it as part of the pasted text.
             try? await Task.sleep(for: Session.dictationSubmitDelay)
-            guard let self, self.canSubmitDictation else { return }
+            guard let self, self.canSubmitDictation(submit) else { return }
             self.terminalView.send(txt: "\r")
         }
     }

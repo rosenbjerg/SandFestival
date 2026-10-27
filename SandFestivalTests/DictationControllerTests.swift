@@ -21,7 +21,7 @@ struct DictationControllerTests {
         await controller.runTask?.value
 
         #expect(target.inserted == ["Refactor the session. "])
-        #expect(target.submitted == [false])
+        #expect(target.submitted == [.off])
         #expect(controller.phase == .idle)
         #expect(controller.targetID == nil)
     }
@@ -64,30 +64,47 @@ struct DictationControllerTests {
             endsAfterScript: true
         )
         let (controller, target) = makeController(engine: engine)
-        controller.submitsAfterPasteProvider = { true }
+        controller.submitProvider = { .whenIdle }
 
         controller.toggle(for: target)
         await controller.runTask?.value
 
         #expect(target.inserted == ["Run the tests."])
-        #expect(target.submitted == [true])
+        #expect(target.submitted == [.whenIdle])
     }
 
-    @Test("pastes without submitting when the target can't take a submit")
-    func pastesWithoutSubmitWhenBusy() async {
+    @Test("pastes without submitting while working unless that's allowed")
+    func pastesWithoutSubmitWhenWorking() async {
         let engine = StubSpeechEngine(
             script: [.result(text: "Run the tests.", isFinal: true, rangeEnd: 1)],
             endsAfterScript: true
         )
         let (controller, target) = makeController(engine: engine)
-        controller.submitsAfterPasteProvider = { true }
-        target.canSubmitDictation = false
+        controller.submitProvider = { .whenIdle }
+        target.state = .working
 
         controller.toggle(for: target)
         await controller.runTask?.value
 
         #expect(target.inserted == ["Run the tests. "])
-        #expect(target.submitted == [false])
+        #expect(target.submitted == [.off])
+    }
+
+    @Test("submits while working when that's allowed")
+    func submitsWhileWorking() async {
+        let engine = StubSpeechEngine(
+            script: [.result(text: "Run the tests.", isFinal: true, rangeEnd: 1)],
+            endsAfterScript: true
+        )
+        let (controller, target) = makeController(engine: engine)
+        controller.submitProvider = { .whenIdleOrWorking }
+        target.state = .working
+
+        controller.toggle(for: target)
+        await controller.runTask?.value
+
+        #expect(target.inserted == ["Run the tests."])
+        #expect(target.submitted == [.whenIdleOrWorking])
     }
 
     @Test("pasting held text never submits")
@@ -97,7 +114,7 @@ struct DictationControllerTests {
             endsAfterScript: true
         )
         let (controller, target) = makeController(engine: engine)
-        controller.submitsAfterPasteProvider = { true }
+        controller.submitProvider = { .whenIdleOrWorking }
         target.isReadyForDictation = false
         controller.toggle(for: target)
         await controller.runTask?.value
@@ -105,7 +122,7 @@ struct DictationControllerTests {
         controller.pasteHeldText()
 
         #expect(target.inserted == ["yes do it "])
-        #expect(target.submitted == [false])
+        #expect(target.submitted == [.off])
     }
 
     @Test("pasting held text inserts it and resets")
@@ -531,12 +548,16 @@ private final class StubDictationTarget: DictationTarget {
     let id = UUID()
     var isReadyForDictation = true
     var canReceiveText = true
-    var canSubmitDictation = true
+    var state: SessionState = .idle
     var vocabulary: [String] = []
     private(set) var inserted: [String] = []
-    private(set) var submitted: [Bool] = []
+    private(set) var submitted: [DictationSubmit] = []
 
-    func insertDictatedText(_ text: String, submit: Bool) {
+    func canSubmitDictation(_ submit: DictationSubmit) -> Bool {
+        submit.allows(state)
+    }
+
+    func insertDictatedText(_ text: String, submit: DictationSubmit) {
         inserted.append(text)
         submitted.append(submit)
     }

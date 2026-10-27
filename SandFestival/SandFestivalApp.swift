@@ -59,8 +59,8 @@ struct SandFestivalApp: App {
                     dictation.endpointConfigurationProvider = { [dictationPreferences] in
                         dictationPreferences.endpointConfiguration
                     }
-                    dictation.submitsAfterPasteProvider = { [dictationPreferences] in
-                        dictationPreferences.submitsAfterPaste
+                    dictation.submitProvider = { [dictationPreferences] in
+                        dictationPreferences.submit
                     }
                     statusStore.refreshAll(projects: manager.projects)
                     await attachAdapterIfNeeded()

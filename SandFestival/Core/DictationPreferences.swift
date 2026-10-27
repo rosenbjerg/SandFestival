@@ -40,6 +40,19 @@ enum TranscriptCleanup: String, CaseIterable, Identifiable {
     }
 }
 
+enum DictationSubmit: Equatable {
+    case off
+    case whenIdle
+    case whenIdleOrWorking
+
+    func allows(_ state: SessionState) -> Bool {
+        switch (self, state) {
+        case (.whenIdle, .idle), (.whenIdleOrWorking, .idle), (.whenIdleOrWorking, .working): true
+        default: false
+        }
+    }
+}
+
 @MainActor
 @Observable
 final class DictationPreferences {
@@ -64,6 +77,18 @@ final class DictationPreferences {
         }
     }
 
+    var submitsWhileWorking: Bool {
+        didSet {
+            guard submitsWhileWorking != oldValue else { return }
+            defaults.set(submitsWhileWorking, forKey: Keys.submitsWhileWorking)
+        }
+    }
+
+    var submit: DictationSubmit {
+        guard submitsAfterPaste else { return .off }
+        return submitsWhileWorking ? .whenIdleOrWorking : .whenIdle
+    }
+
     var endpointConfiguration: DictationEndpointer.Configuration {
         DictationEndpointer.Configuration(silenceTimeout: silenceTimeout)
     }
@@ -81,11 +106,13 @@ final class DictationPreferences {
         let range = DictationEndpointer.Configuration.silenceTimeoutRange
         self.silenceTimeout = min(max(defaults.double(forKey: Keys.silenceTimeout), range.lowerBound), range.upperBound)
         self.submitsAfterPaste = defaults.bool(forKey: Keys.submitsAfterPaste)
+        self.submitsWhileWorking = defaults.bool(forKey: Keys.submitsWhileWorking)
     }
 
     private enum Keys {
         static let cleanup = "dictation.cleanup"
         static let silenceTimeout = "dictation.silenceTimeout"
         static let submitsAfterPaste = "dictation.submitsAfterPaste"
+        static let submitsWhileWorking = "dictation.submitsWhileWorking"
     }
 }
