@@ -32,12 +32,13 @@ nonisolated struct DictationTranscript: Equatable, Sendable {
     }
 
     static func prompt(from text: String) -> String {
-        guard text.hasPrefix("/") else { return text }
-        var command = Substring(text)
+        let leadingSlash = #/^(?i:slash\b|/)[\s,.:;-]*(?=\p{L})/#
+        guard let match = text.prefixMatch(of: leadingSlash) else { return text }
+        var command = "/" + text[match.range.upperBound...]
         while let last = command.last, last.isWhitespace || ".,;:!?…".contains(last) {
-            command = command.dropLast()
+            command.removeLast()
         }
-        return String(command)
+        return command
     }
 
     private static func join(_ head: String, _ tail: String) -> String {

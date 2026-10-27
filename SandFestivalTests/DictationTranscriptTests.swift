@@ -86,6 +86,19 @@ struct DictationTranscriptTests {
         #expect(DictationTranscript.prompt(from: "/compact focus on the tests…") == "/compact focus on the tests")
     }
 
+    @Test("a spoken slash at the start becomes a slash command")
+    func spokenSlash() {
+        #expect(DictationTranscript.prompt(from: "Slash clear.") == "/clear")
+        #expect(DictationTranscript.prompt(from: "slash, compact focus on the tests.") == "/compact focus on the tests")
+        #expect(DictationTranscript.prompt(from: "/ clear.") == "/clear")
+    }
+
+    @Test("slash only counts as a command at the start, as its own word")
+    func slashInProse() {
+        #expect(DictationTranscript.prompt(from: "Slashing the timeout broke it.") == "Slashing the timeout broke it.")
+        #expect(DictationTranscript.prompt(from: "Add a slash route.") == "Add a slash route.")
+    }
+
     @Test("a prose prompt keeps its punctuation")
     func prosePunctuation() {
         #expect(DictationTranscript.prompt(from: "Run the tests.") == "Run the tests.")
