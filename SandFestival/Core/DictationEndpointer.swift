@@ -8,6 +8,7 @@ nonisolated struct DictationEndpointer: Equatable {
         var silenceTimeout: TimeInterval = defaultSilenceTimeout
         var noSpeechTimeout: TimeInterval = 8
         var maximumDuration: TimeInterval = 180
+        var audioStallTimeout: TimeInterval = 2
     }
 
     enum Decision: Equatable {

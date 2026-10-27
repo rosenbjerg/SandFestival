@@ -270,6 +270,17 @@
         }
       }
     },
+    "detail.toolbar.dictate.held" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A dictated prompt is waiting to be pasted. Paste, copy or discard it first."
+          }
+        }
+      }
+    },
     "detail.toolbar.dictate.stop" : {
       "extractionState" : "manual",
       "localizations" : {

@@ -45,6 +45,8 @@ final class DictationController {
     @ObservationIgnored private var refiner: (any TranscriptRefiner)?
     @ObservationIgnored private var vocabularyTask: Task<[String], Never>?
     @ObservationIgnored private var refineTask: Task<String?, Never>?
+    @ObservationIgnored private var lastAudioAt = ContinuousClock.now
+    @ObservationIgnored private var stallWatch: Task<Void, Never>?
 
     init(makeEngine: (() -> any SpeechEngine)? = nil) {
         self.makeEngine = makeEngine ?? { SpeechAnalyzerEngine() }
@@ -54,8 +56,18 @@ final class DictationController {
         targetID == id && phase.isBusy
     }
 
-    func canStart(for id: Project.ID) -> Bool {
-        !phase.isBusy || targetID == id
+    func canToggle(for id: Project.ID) -> Bool {
+        switch phase {
+        case .idle, .failed: true
+        case .held: target == nil
+        case .preparing, .listening, .refining: targetID == id
+        case .finishing: false
+        }
+    }
+
+    var isHoldingText: Bool {
+        guard case .held = phase else { return false }
+        return target != nil
     }
 
     var targetCanReceiveText: Bool {
@@ -63,23 +75,19 @@ final class DictationController {
     }
 
     func toggle(for target: any DictationTarget) {
-        if targetID == target.id {
-            switch phase {
-            case .listening:
-                finish()
-                return
-            case .preparing:
-                discard()
-                return
-            case .finishing, .refining:
-                return
-            case .idle, .held, .failed:
-                break
-            }
-        } else if phase.isBusy {
-            return
+        guard canToggle(for: target.id) else { return }
+        switch phase {
+        case .listening:
+            finish()
+        case .preparing:
+            discard()
+        case .refining:
+            skipRefinement()
+        case .finishing:
+            break
+        case .idle, .held, .failed:
+            start(target)
         }
-        start(target)
     }
 
     func finish() {
@@ -137,6 +145,8 @@ final class DictationController {
                 return
             }
             phase = .listening
+            lastAudioAt = .now
+            stallWatch = watchForStalledAudio()
             for try await event in events {
                 apply(event)
             }
@@ -158,8 +168,13 @@ final class DictationController {
 
     private func apply(_ event: SpeechEngineEvent) {
         guard phase == .listening || phase == .finishing else { return }
+        guard target != nil else {
+            discard()
+            return
+        }
         switch event {
         case .audioAdvanced(let time):
+            lastAudioAt = .now
             endpointer.audioAdvanced(to: time)
         case .inputLevel(let rms):
             inputLevel = MicrophoneLevel.smoothed(previous: inputLevel, next: MicrophoneLevel.normalized(rms: rms))
@@ -195,31 +210,50 @@ final class DictationController {
         return refined.flatMap { TranscriptRefinement.accept($0, original: text) } ?? text
     }
 
+    private func watchForStalledAudio() -> Task<Void, Never> {
+        let timeout = Duration.seconds(endpointer.configuration.audioStallTimeout)
+        return Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: timeout / 4)
+                guard let self, self.phase == .listening else { return }
+                if self.lastAudioAt.duration(to: .now) >= timeout {
+                    self.finish()
+                    return
+                }
+            }
+        }
+    }
+
     private nonisolated static func refine(
         _ text: String,
         with refiner: any TranscriptRefiner,
         vocabulary: [String]
     ) async -> String? {
-        await withTaskGroup(of: String?.self) { group in
-            group.addTask { try? await refiner.refine(text, vocabulary: vocabulary) }
-            group.addTask {
-                try? await Task.sleep(for: refiner.timeout)
-                return nil
-            }
-            let first = await group.next() ?? nil
-            group.cancelAll()
-            return first
+        // Not a task group: it would wait out a refiner that ignores cancellation, defeating Skip and the timeout.
+        let (outcomes, continuation) = AsyncStream<String?>.makeStream(bufferingPolicy: .bufferingOldest(1))
+        let work = Task { continuation.yield(try? await refiner.refine(text, vocabulary: vocabulary)) }
+        let deadline = Task {
+            try? await Task.sleep(for: refiner.timeout)
+            continuation.yield(nil)
         }
+        defer {
+            work.cancel()
+            deadline.cancel()
+        }
+        for await outcome in outcomes {
+            return outcome
+        }
+        return nil
     }
 
     private func deliver(_ text: String) {
         engine = nil
         runTask = nil
-        guard !text.isEmpty else {
+        guard !text.isEmpty, let target else {
             reset()
             return
         }
-        guard let target, target.isReadyForDictation else {
+        guard target.isReadyForDictation else {
             phase = .held(text)
             return
         }
@@ -237,6 +271,8 @@ final class DictationController {
     }
 
     private func reset() {
+        stallWatch?.cancel()
+        stallWatch = nil
         engine = nil
         refiner = nil
         vocabularyTask = nil

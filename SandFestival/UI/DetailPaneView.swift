@@ -241,8 +241,8 @@ struct DetailPaneView: View {
             Label(title, systemImage: isActive ? "mic.fill" : "mic")
         }
         .tint(isActive ? .red : nil)
-        .disabled(!session.state.isRunning || !dictation.canStart(for: session.id))
-        .help(title)
+        .disabled(!session.state.isRunning || !dictation.canToggle(for: session.id))
+        .help(dictation.isHoldingText ? String(localized: "detail.toolbar.dictate.held") : title)
     }
 
     @ViewBuilder

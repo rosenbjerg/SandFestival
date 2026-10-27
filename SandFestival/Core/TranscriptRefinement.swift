@@ -64,9 +64,9 @@ nonisolated enum TranscriptRefinement {
 
     static func vocabulary(projectName: String, trackedFiles: [String], limit: Int = 150) -> [String] {
         let stems = trackedFiles
-            .map { $0.split(separator: "/") }
-            .sorted { ($0.count, $0.joined(separator: "/")) < ($1.count, $1.joined(separator: "/")) }
-            .flatMap { components in
+            .map { (components: $0.split(separator: "/"), path: $0) }
+            .sorted { ($0.components.count, $0.path) < ($1.components.count, $1.path) }
+            .flatMap { components, _ in
                 components.map { component in
                     String(component.split(separator: ".", maxSplits: 1).first ?? component)
                 }

@@ -93,7 +93,7 @@ struct SandFestivalApp: App {
                     }
                 }
                 .keyboardShortcut("d", modifiers: [.command, .shift])
-                .disabled(session.map { !$0.state.isRunning || !dictation.canStart(for: $0.id) } ?? true)
+                .disabled(session.map { !$0.state.isRunning || !dictation.canToggle(for: $0.id) } ?? true)
             }
 
             CommandMenu(String(localized: "menu.go")) {

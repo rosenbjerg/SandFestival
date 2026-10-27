@@ -409,8 +409,11 @@ extension Session: DictationTarget {
     }
 
     func dictationVocabulary() async -> [String] {
+        let name = project.name
         let files = await GitWorktree.trackedFiles(at: project.path)
-        return TranscriptRefinement.vocabulary(projectName: project.name, trackedFiles: files)
+        return await Task.detached(priority: .utility) {
+            TranscriptRefinement.vocabulary(projectName: name, trackedFiles: files)
+        }.value
     }
 }
 

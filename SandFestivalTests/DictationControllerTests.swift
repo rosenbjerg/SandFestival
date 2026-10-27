@@ -130,8 +130,8 @@ struct DictationControllerTests {
         controller.toggle(for: other)
 
         #expect(controller.targetID == target.id)
-        #expect(!controller.canStart(for: other.id))
-        #expect(controller.canStart(for: target.id))
+        #expect(!controller.canToggle(for: other.id))
+        #expect(controller.canToggle(for: target.id))
         controller.discard()
     }
 
@@ -230,6 +230,131 @@ struct DictationControllerTests {
 
         controller.discard()
         #expect(controller.inputLevel == 0)
+    }
+
+    @Test("held text blocks every session's mic until it's pasted, copied or discarded")
+    func heldTextBlocksNewDictation() async {
+        let engine = StubSpeechEngine(
+            script: [.result(text: "yes do it", isFinal: true, rangeEnd: 1)],
+            endsAfterScript: true
+        )
+        let (controller, target) = makeController(engine: engine)
+        let other = StubDictationTarget()
+        target.isReadyForDictation = false
+        controller.toggle(for: target)
+        await controller.runTask?.value
+
+        controller.toggle(for: other)
+        controller.toggle(for: target)
+
+        #expect(controller.phase == .held("yes do it"))
+        #expect(controller.isHoldingText)
+        #expect(!controller.canToggle(for: other.id))
+        #expect(!controller.canToggle(for: target.id))
+        controller.pasteHeldText()
+        #expect(controller.canToggle(for: other.id))
+    }
+
+    @Test("held text for a session that no longer exists doesn't block")
+    func heldTextForRemovedSessionDoesNotBlock() async {
+        let engine = StubSpeechEngine(
+            script: [.result(text: "yes do it", isFinal: true, rangeEnd: 1)],
+            endsAfterScript: true
+        )
+        let controller = DictationController(makeEngine: { engine })
+        var target: StubDictationTarget? = StubDictationTarget()
+        target?.isReadyForDictation = false
+        controller.toggle(for: target!)
+        await controller.runTask?.value
+
+        target = nil
+
+        #expect(!controller.isHoldingText)
+        #expect(controller.canToggle(for: StubDictationTarget().id))
+    }
+
+    @Test("dictation for a session that was removed is discarded on the next audio")
+    func removedSessionDiscards() async {
+        let engine = StubSpeechEngine(script: [.result(text: "hello", isFinal: false, rangeEnd: 1)])
+        let controller = DictationController(makeEngine: { engine })
+        var target: StubDictationTarget? = StubDictationTarget()
+        controller.toggle(for: target!)
+        await waitUntil { controller.transcript.text == "hello" }
+
+        target = nil
+        await engine.emit(.audioAdvanced(to: 1.1))
+        await waitUntil { await engine.cancelCalls > 0 }
+
+        #expect(controller.phase == .idle)
+        #expect(controller.targetID == nil)
+        #expect(await engine.cancelCalls >= 1)
+    }
+
+    @Test("the mic during clean-up skips it and pastes the raw transcript")
+    func toggleDuringCleanupSkips() async {
+        let engine = StubSpeechEngine(
+            script: [.result(text: "fix the swift term view", isFinal: true, rangeEnd: 1)],
+            endsAfterScript: true
+        )
+        let (controller, target) = makeController(engine: engine, refiner: StubRefiner(output: nil))
+        controller.toggle(for: target)
+        await waitUntil { controller.phase == .refining }
+
+        #expect(controller.canToggle(for: target.id))
+        controller.toggle(for: target)
+        await controller.runTask?.value
+
+        #expect(target.inserted == ["fix the swift term view "])
+    }
+
+    @Test("Skip doesn't wait for a clean-up that ignores cancellation")
+    func skipDoesNotWaitForStuckRefiner() async {
+        let engine = StubSpeechEngine(
+            script: [.result(text: "fix the swift term view", isFinal: true, rangeEnd: 1)],
+            endsAfterScript: true
+        )
+        let refiner = StubRefiner(output: nil, ignoresCancellation: true)
+        let (controller, target) = makeController(engine: engine, refiner: refiner)
+        controller.toggle(for: target)
+        await waitUntil { controller.phase == .refining }
+
+        controller.skipRefinement()
+        await controller.runTask?.value
+
+        #expect(target.inserted == ["fix the swift term view "])
+        refiner.release()
+    }
+
+    @Test("the timeout doesn't wait for a clean-up that ignores cancellation")
+    func timeoutDoesNotWaitForStuckRefiner() async {
+        let engine = StubSpeechEngine(
+            script: [.result(text: "fix the swift term view", isFinal: true, rangeEnd: 1)],
+            endsAfterScript: true
+        )
+        let refiner = StubRefiner(output: nil, timeout: .milliseconds(50), ignoresCancellation: true)
+        let (controller, target) = makeController(engine: engine, refiner: refiner)
+
+        controller.toggle(for: target)
+        await controller.runTask?.value
+
+        #expect(target.inserted == ["fix the swift term view "])
+        refiner.release()
+    }
+
+    @Test("finishes with what it has when audio stops arriving")
+    func finishesWhenAudioStalls() async {
+        let engine = StubSpeechEngine(script: [
+            .audioAdvanced(to: 0.5),
+            .result(text: "hello", isFinal: true, rangeEnd: 0.5),
+        ])
+        let (controller, target) = makeController(engine: engine)
+        controller.endpointConfigurationProvider = { .init(audioStallTimeout: 0.2) }
+
+        controller.toggle(for: target)
+        await waitUntil { await engine.finishCalls > 0 }
+        await controller.runTask?.value
+
+        #expect(target.inserted == ["hello "])
     }
 
     @Test("cleans up the transcript with the project vocabulary before pasting")
@@ -374,25 +499,53 @@ private final class StubRefiner: TranscriptRefiner, @unchecked Sendable {
 
     private let output: Result<String, TranscriptRefinerError>?
     let timeout: Duration
+    private let ignoresCancellation: Bool
     private let lock = NSLock()
     private var recorded: [Call] = []
+    private var stuck: [CheckedContinuation<Void, Never>] = []
+    private var released = false
 
     var calls: [Call] {
         lock.withLock { recorded }
     }
 
-    init(output: Result<String, TranscriptRefinerError>?, timeout: Duration = .seconds(30)) {
+    init(
+        output: Result<String, TranscriptRefinerError>?,
+        timeout: Duration = .seconds(30),
+        ignoresCancellation: Bool = false
+    ) {
         self.output = output
         self.timeout = timeout
+        self.ignoresCancellation = ignoresCancellation
     }
 
     func refine(_ transcript: String, vocabulary: [String]) async throws -> String {
         lock.withLock { recorded.append(Call(transcript: transcript, vocabulary: vocabulary)) }
         guard let output else {
+            if ignoresCancellation {
+                await withCheckedContinuation { continuation in
+                    let resumeNow = lock.withLock {
+                        if released { return true }
+                        stuck.append(continuation)
+                        return false
+                    }
+                    if resumeNow { continuation.resume() }
+                }
+                return "too late"
+            }
             try await Task.sleep(for: .seconds(60))
             throw CancellationError()
         }
         return try output.get()
+    }
+
+    func release() {
+        let continuations = lock.withLock {
+            released = true
+            defer { stuck = [] }
+            return stuck
+        }
+        continuations.forEach { $0.resume() }
     }
 }
 
@@ -425,6 +578,10 @@ private actor StubSpeechEngine: SpeechEngine {
             self.continuation = continuation
         }
         return stream
+    }
+
+    func emit(_ event: SpeechEngineEvent) {
+        continuation?.yield(event)
     }
 
     func finish() async {
