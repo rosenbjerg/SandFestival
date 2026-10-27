@@ -23,6 +23,14 @@ nonisolated struct DictationTranscript: Equatable, Sendable {
 
     var isEmpty: Bool { text.isEmpty }
 
+    var words: [String] {
+        Self.words(in: text)
+    }
+
+    static func words(in text: String) -> [String] {
+        text.split { !($0.isLetter || $0.isNumber) }.map { $0.lowercased() }
+    }
+
     private static func join(_ head: String, _ tail: String) -> String {
         guard let last = head.last, let first = tail.first,
               !last.isWhitespace, !first.isWhitespace

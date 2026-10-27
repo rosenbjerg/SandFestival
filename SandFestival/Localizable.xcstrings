@@ -1718,6 +1718,17 @@
         }
       }
     },
+    "preferences.dictation.listening.section" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Listening"
+          }
+        }
+      }
+    },
     "preferences.dictation.on_device.unavailable.device" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1758,6 +1769,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Apple’s on-device model is unavailable, so transcripts are pasted as recognized."
+          }
+        }
+      }
+    },
+    "preferences.dictation.silence_timeout.description" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dictation finishes on its own once you stop talking for this long. Click the microphone or Done to finish sooner. If nothing is said within 8 seconds, it stops without pasting."
+          }
+        }
+      }
+    },
+    "preferences.dictation.silence_timeout.label" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop after %.1f s of silence"
           }
         }
       }

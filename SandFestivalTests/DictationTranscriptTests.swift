@@ -58,6 +58,18 @@ struct DictationTranscriptTests {
         #expect(transcript.finalizedText + transcript.volatileSuffix == "Done. Next")
     }
 
+    @Test("words ignore punctuation and case")
+    func wordsIgnorePunctuation() {
+        var transcript = DictationTranscript()
+        transcript.apply(text: "it keeps the hook listener alive after a restart", isFinal: false)
+        let before = transcript.words
+
+        transcript.apply(text: "It keeps the hook listener alive after a restart.", isFinal: false)
+
+        #expect(transcript.words == before)
+        #expect(before.first == "it")
+    }
+
     @Test("whitespace-only results leave the transcript empty")
     func whitespaceIsEmpty() {
         var transcript = DictationTranscript()

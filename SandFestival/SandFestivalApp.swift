@@ -57,6 +57,9 @@ struct SandFestivalApp: App {
                         case .claudeHaiku: ClaudeTranscriptRefiner()
                         }
                     }
+                    dictation.endpointConfigurationProvider = { [dictationPreferences] in
+                        dictationPreferences.endpointConfiguration
+                    }
                     statusStore.refreshAll(projects: manager.projects)
                     await attachAdapterIfNeeded()
                 }

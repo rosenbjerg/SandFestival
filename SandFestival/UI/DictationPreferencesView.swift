@@ -5,6 +5,24 @@ struct DictationPreferencesView: View {
 
     var body: some View {
         Form {
+            Section(String(localized: "preferences.dictation.listening.section")) {
+                Slider(
+                    value: $preferences.silenceTimeout,
+                    in: DictationEndpointer.Configuration.silenceTimeoutRange,
+                    step: 0.5
+                ) {
+                    Text(String(
+                        format: String(localized: "preferences.dictation.silence_timeout.label"),
+                        preferences.silenceTimeout
+                    ))
+                }
+
+                Text(String(localized: "preferences.dictation.silence_timeout.description"))
+                    .interfaceFont(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             Section(String(localized: "preferences.dictation.cleanup.section")) {
                 Picker(
                     String(localized: "preferences.dictation.cleanup.label"),

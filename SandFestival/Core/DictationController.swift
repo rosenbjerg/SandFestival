@@ -32,6 +32,7 @@ final class DictationController {
 
     private(set) var phase: Phase = .idle
     private(set) var transcript = DictationTranscript()
+    @ObservationIgnored private(set) var endpointer = DictationEndpointer()
     private(set) var targetID: Project.ID?
 
     @ObservationIgnored private weak var target: (any DictationTarget)?
@@ -39,6 +40,7 @@ final class DictationController {
     @ObservationIgnored private(set) var runTask: Task<Void, Never>?
     @ObservationIgnored private let makeEngine: () -> any SpeechEngine
     @ObservationIgnored var refinerProvider: (() -> (any TranscriptRefiner)?)?
+    @ObservationIgnored var endpointConfigurationProvider: (() -> DictationEndpointer.Configuration)?
     @ObservationIgnored private var refiner: (any TranscriptRefiner)?
     @ObservationIgnored private var vocabularyTask: Task<[String], Never>?
     @ObservationIgnored private var refineTask: Task<String?, Never>?
@@ -111,6 +113,7 @@ final class DictationController {
         self.target = target
         targetID = target.id
         phase = .preparing(progress: nil)
+        endpointer = DictationEndpointer(configuration: endpointConfigurationProvider?() ?? .init())
         refiner = refinerProvider?()
         if refiner != nil {
             vocabularyTask = Task { await target.dictationVocabulary() }
@@ -153,11 +156,26 @@ final class DictationController {
     }
 
     private func apply(_ event: SpeechEngineEvent) {
+        guard phase == .listening || phase == .finishing else { return }
         switch event {
-        case .audioAdvanced:
-            break
-        case .result(let text, let isFinal, _):
+        case .audioAdvanced(let time):
+            endpointer.audioAdvanced(to: time)
+        case .result(let text, let isFinal, let rangeEnd):
+            let wordsBefore = transcript.words
             transcript.apply(text: text, isFinal: isFinal)
+            let finalHasWords = isFinal && !DictationTranscript.words(in: text).isEmpty
+            if transcript.words != wordsBefore || finalHasWords {
+                endpointer.speechObserved(through: rangeEnd)
+            }
+        }
+        guard phase == .listening else { return }
+        switch endpointer.decision {
+        case .listening:
+            break
+        case .finish:
+            finish()
+        case .discardNoSpeech:
+            discard()
         }
     }
 
@@ -223,6 +241,7 @@ final class DictationController {
         target = nil
         targetID = nil
         transcript = DictationTranscript()
+        endpointer = DictationEndpointer()
         phase = .idle
     }
 

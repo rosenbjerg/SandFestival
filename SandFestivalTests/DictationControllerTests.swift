@@ -135,6 +135,90 @@ struct DictationControllerTests {
         controller.discard()
     }
 
+    @Test("finishes on its own after the silence timeout and pastes")
+    func autoFinishesAfterSilence() async {
+        let engine = StubSpeechEngine(script: [
+            .audioAdvanced(to: 1),
+            .result(text: "hello there", isFinal: true, rangeEnd: 1),
+            .audioAdvanced(to: 2),
+            .audioAdvanced(to: 3.6),
+        ])
+        let (controller, target) = makeController(engine: engine)
+
+        controller.toggle(for: target)
+        await waitUntil { await engine.finishCalls > 0 }
+        await controller.runTask?.value
+
+        #expect(await engine.finishCalls == 1)
+        #expect(target.inserted == ["hello there "])
+    }
+
+    @Test("punctuation arriving after speech doesn't extend listening")
+    func punctuationDoesNotExtend() async {
+        let engine = StubSpeechEngine(script: [
+            .result(text: "hello there", isFinal: false, rangeEnd: 1),
+            .audioAdvanced(to: 2),
+            .result(text: "Hello there.", isFinal: false, rangeEnd: 2),
+            .audioAdvanced(to: 3.6),
+        ])
+        let (controller, target) = makeController(engine: engine)
+
+        controller.toggle(for: target)
+        await waitUntil { await engine.finishCalls > 0 }
+
+        #expect(await engine.finishCalls == 1)
+        controller.discard()
+    }
+
+    @Test("keeps listening while words keep arriving")
+    func keepsListeningDuringSpeech() async {
+        let engine = StubSpeechEngine(script: [
+            .result(text: "one", isFinal: false, rangeEnd: 1),
+            .audioAdvanced(to: 3),
+            .result(text: "one two", isFinal: false, rangeEnd: 3),
+            .audioAdvanced(to: 5),
+            .result(text: "one two three", isFinal: false, rangeEnd: 5),
+            .audioAdvanced(to: 7),
+        ])
+        let (controller, target) = makeController(engine: engine)
+
+        controller.toggle(for: target)
+        await waitUntil { controller.transcript.text == "one two three" }
+
+        #expect(controller.phase == .listening)
+        #expect(await engine.finishCalls == 0)
+        controller.discard()
+    }
+
+    @Test("stops without pasting when nothing is said")
+    func discardsWhenSilent() async {
+        let engine = StubSpeechEngine(script: [.audioAdvanced(to: 4), .audioAdvanced(to: 8)])
+        let (controller, target) = makeController(engine: engine)
+
+        controller.toggle(for: target)
+        await waitUntil { await engine.cancelCalls > 0 }
+
+        #expect(controller.phase == .idle)
+        #expect(target.inserted.isEmpty)
+    }
+
+    @Test("uses the configured silence timeout")
+    func configuredTimeout() async {
+        let engine = StubSpeechEngine(script: [
+            .result(text: "hello", isFinal: true, rangeEnd: 1),
+            .audioAdvanced(to: 3.6),
+        ])
+        let (controller, target) = makeController(engine: engine)
+        controller.endpointConfigurationProvider = { .init(silenceTimeout: 4) }
+
+        controller.toggle(for: target)
+        await waitUntil { controller.endpointer.audioTime == 3.6 }
+
+        #expect(controller.phase == .listening)
+        #expect(await engine.finishCalls == 0)
+        controller.discard()
+    }
+
     @Test("cleans up the transcript with the project vocabulary before pasting")
     func refinesBeforePasting() async {
         let engine = StubSpeechEngine(

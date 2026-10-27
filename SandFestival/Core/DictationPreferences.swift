@@ -27,16 +27,33 @@ final class DictationPreferences {
         }
     }
 
+    var silenceTimeout: TimeInterval {
+        didSet {
+            guard silenceTimeout != oldValue else { return }
+            defaults.set(silenceTimeout, forKey: Keys.silenceTimeout)
+        }
+    }
+
+    var endpointConfiguration: DictationEndpointer.Configuration {
+        DictationEndpointer.Configuration(silenceTimeout: silenceTimeout)
+    }
+
     @ObservationIgnored private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        defaults.register(defaults: [Keys.cleanup: TranscriptCleanup.onDevice.rawValue])
+        defaults.register(defaults: [
+            Keys.cleanup: TranscriptCleanup.onDevice.rawValue,
+            Keys.silenceTimeout: DictationEndpointer.Configuration.defaultSilenceTimeout,
+        ])
         let stored = defaults.string(forKey: Keys.cleanup) ?? ""
         self.cleanup = TranscriptCleanup(rawValue: stored) ?? .onDevice
+        let range = DictationEndpointer.Configuration.silenceTimeoutRange
+        self.silenceTimeout = min(max(defaults.double(forKey: Keys.silenceTimeout), range.lowerBound), range.upperBound)
     }
 
     private enum Keys {
         static let cleanup = "dictation.cleanup"
+        static let silenceTimeout = "dictation.silenceTimeout"
     }
 }
