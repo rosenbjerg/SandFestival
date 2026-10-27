@@ -115,7 +115,7 @@ final class DictationController {
 
     func pasteHeldText() {
         guard case .held(let text) = phase, let target, target.canReceiveText else { return }
-        target.insertDictatedText(text + " ", submit: .off)
+        target.insertDictatedText(Self.insertion(for: text), submit: .off)
         reset()
     }
 
@@ -260,11 +260,7 @@ final class DictationController {
             return
         }
         let submit = submitProvider?() ?? .off
-        if target.canSubmitDictation(submit) {
-            target.insertDictatedText(text, submit: submit)
-        } else {
-            target.insertDictatedText(text + " ", submit: .off)
-        }
+        target.insertDictatedText(Self.insertion(for: text), submit: target.canSubmitDictation(submit) ? submit : .off)
         reset()
     }
 
@@ -290,5 +286,9 @@ final class DictationController {
         endpointer = DictationEndpointer()
         inputLevel = 0
         phase = .idle
+    }
+
+    private static func insertion(for text: String) -> String {
+        text + " "
     }
 }

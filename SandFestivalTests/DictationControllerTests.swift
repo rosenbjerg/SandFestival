@@ -57,7 +57,7 @@ struct DictationControllerTests {
         #expect(controller.targetID == target.id)
     }
 
-    @Test("submits without the trailing space when sending after paste is on")
+    @Test("submits after pasting when sending after paste is on")
     func submitsAfterPaste() async {
         let engine = StubSpeechEngine(
             script: [.result(text: "Run the tests.", isFinal: true, rangeEnd: 1)],
@@ -69,7 +69,7 @@ struct DictationControllerTests {
         controller.toggle(for: target)
         await controller.runTask?.value
 
-        #expect(target.inserted == ["Run the tests."])
+        #expect(target.inserted == ["Run the tests. "])
         #expect(target.submitted == [.whenIdle])
     }
 
@@ -103,7 +103,7 @@ struct DictationControllerTests {
         controller.toggle(for: target)
         await controller.runTask?.value
 
-        #expect(target.inserted == ["Run the tests."])
+        #expect(target.inserted == ["Run the tests. "])
         #expect(target.submitted == [.whenIdleOrWorking])
     }
 
