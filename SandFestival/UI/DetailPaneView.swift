@@ -202,14 +202,14 @@ struct DetailPaneView: View {
             } label: {
                 Label(String(localized: "detail.toolbar.open_in_finder"), systemImage: "folder")
             }
-            .help(String(localized: "detail.toolbar.open_in_finder"))
+            .help(KeyboardShortcut.openInFinder.tooltip(String(localized: "detail.toolbar.open_in_finder")))
 
             Button {
                 OpenInTerminal.open(session.project.path)
             } label: {
                 Label(String(localized: "detail.toolbar.open_in_terminal"), systemImage: "terminal")
             }
-            .help(String(localized: "detail.toolbar.open_in_terminal"))
+            .help(KeyboardShortcut.openInTerminal.tooltip(String(localized: "detail.toolbar.open_in_terminal")))
 
             if session.project.parentProjectID == nil {
                 Button {
@@ -220,7 +220,7 @@ struct DetailPaneView: View {
                         systemImage: "plus.square.on.square"
                     )
                 }
-                .help(String(localized: "detail.toolbar.duplicate"))
+                .help(KeyboardShortcut.duplicateProject.tooltip(String(localized: "detail.toolbar.duplicate")))
             }
 
             Button {
@@ -228,14 +228,13 @@ struct DetailPaneView: View {
             } label: {
                 Label(String(localized: "detail.toolbar.edit"), systemImage: "pencil")
             }
-            .help(String(localized: "detail.toolbar.edit"))
+            .help(KeyboardShortcut.editProject.tooltip(String(localized: "detail.toolbar.edit")))
         }
     }
 
     private func dictationButton(for session: Session) -> some View {
         let isActive = dictation.isActive(for: session.id)
         let title = String(localized: isActive ? "detail.toolbar.dictate.stop" : "detail.toolbar.dictate")
-        let help = String(localized: isActive ? "detail.toolbar.dictate.stop.help" : "detail.toolbar.dictate.help")
         return Button {
             dictation.toggle(for: session)
         } label: {
@@ -243,7 +242,7 @@ struct DetailPaneView: View {
         }
         .tint(isActive ? .red : nil)
         .disabled(!session.state.isRunning || !dictation.canToggle(for: session.id))
-        .help(dictation.isHoldingText ? String(localized: "detail.toolbar.dictate.held") : help)
+        .help(dictation.isHoldingText ? String(localized: "detail.toolbar.dictate.held") : KeyboardShortcut.dictate.tooltip(title))
     }
 
     @ViewBuilder

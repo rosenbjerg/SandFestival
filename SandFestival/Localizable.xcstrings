@@ -314,17 +314,6 @@
         }
       }
     },
-    "detail.toolbar.dictate.help" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dictate (⇧⌘D)"
-          }
-        }
-      }
-    },
     "detail.toolbar.dictate.stop" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -332,17 +321,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Stop Dictating"
-          }
-        }
-      }
-    },
-    "detail.toolbar.dictate.stop.help" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Stop Dictating (⇧⌘D)"
           }
         }
       }
@@ -1601,6 +1579,28 @@
         }
       }
     },
+    "menu.duplicate_project" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplicate Project…"
+          }
+        }
+      }
+    },
+    "menu.edit_project" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit Project…"
+          }
+        }
+      }
+    },
     "menu.go" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1660,6 +1660,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "New Project"
+          }
+        }
+      }
+    },
+    "menu.open_in_finder" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open in Finder"
+          }
+        }
+      }
+    },
+    "menu.open_in_terminal" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open in Terminal"
           }
         }
       }
@@ -2836,6 +2858,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "nono can only extend a profile by name, and “%@” is a file path. Save it to ~/.config/nono/profiles and select it by name instead."
+          }
+        }
+      }
+    },
+    "shortcut.tooltip" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ (%2$@)"
           }
         }
       }

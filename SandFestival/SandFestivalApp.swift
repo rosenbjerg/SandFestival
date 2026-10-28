@@ -17,6 +17,7 @@ struct SandFestivalApp: App {
     @State private var manualHookSheet = false
     @State private var updateSheet = false
     @State private var editorTarget: ProjectEditorTarget?
+    @State private var duplicateTarget: Project?
 
     var body: some Scene {
         WindowGroup {
@@ -27,7 +28,8 @@ struct SandFestivalApp: App {
                 dictation: dictation,
                 manualHookSheet: $manualHookSheet,
                 updateSheet: $updateSheet,
-                editorTarget: $editorTarget
+                editorTarget: $editorTarget,
+                duplicateTarget: $duplicateTarget
             )
                 .frame(minWidth: 900, minHeight: 600)
                 .interfaceTextScale(interfacePreferences.textSize.scale)
@@ -86,6 +88,37 @@ struct SandFestivalApp: App {
                     editorTarget = .add(seedFolder: nil)
                 }
                 .keyboardShortcut("n", modifiers: .command)
+
+                Divider()
+
+                let project = manager.selectedSession()?.project
+                Button(String(localized: "menu.duplicate_project")) {
+                    duplicateTarget = project
+                }
+                .keyboardShortcut(.duplicateProject)
+                .disabled(project == nil || project?.parentProjectID != nil)
+
+                Button(String(localized: "menu.edit_project")) {
+                    editorTarget = project.map { .edit($0) }
+                }
+                .keyboardShortcut(.editProject)
+                .disabled(project == nil)
+
+                Button(String(localized: "menu.open_in_finder")) {
+                    if let project {
+                        NSWorkspace.shared.open(project.path)
+                    }
+                }
+                .keyboardShortcut(.openInFinder)
+                .disabled(project == nil)
+
+                Button(String(localized: "menu.open_in_terminal")) {
+                    if let project {
+                        OpenInTerminal.open(project.path)
+                    }
+                }
+                .keyboardShortcut(.openInTerminal)
+                .disabled(project == nil)
             }
 
             CommandGroup(after: .appSettings) {
@@ -112,7 +145,7 @@ struct SandFestivalApp: App {
                         dictation.toggle(for: session)
                     }
                 }
-                .keyboardShortcut("d", modifiers: [.command, .shift])
+                .keyboardShortcut(.dictate)
                 .disabled(session.map { !$0.state.isRunning || !dictation.canToggle(for: $0.id) } ?? true)
             }
 

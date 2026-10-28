@@ -9,7 +9,7 @@ struct ContentView: View {
     @Binding var manualHookSheet: Bool
     @Binding var updateSheet: Bool
     @Binding var editorTarget: ProjectEditorTarget?
-    @State private var duplicateTarget: Project?
+    @Binding var duplicateTarget: Project?
     @State private var removalTarget: Project?
     @State private var hookSheetSkipped = false
 
@@ -174,6 +174,7 @@ struct ContentView: View {
         dictation: DictationController(),
         manualHookSheet: .constant(false),
         updateSheet: .constant(false),
-        editorTarget: .constant(nil)
+        editorTarget: .constant(nil),
+        duplicateTarget: .constant(nil)
     )
 }
