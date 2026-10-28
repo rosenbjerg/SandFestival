@@ -6,7 +6,7 @@ import Testing
 @Suite("AttentionPreferences")
 struct AttentionPreferencesTests {
 
-    @Test("Defaults: informational bounce, notifications off, unfocused-only trigger, auto-surface off")
+    @Test("Defaults: informational bounce, notifications off, unfocused-only trigger, auto-surface off, turn summaries off")
     func freshInstanceMatchesRegisteredDefaults() {
         let defaults = makeDefaults()
         let prefs = AttentionPreferences(defaults: defaults)
@@ -15,7 +15,7 @@ struct AttentionPreferencesTests {
         #expect(prefs.notificationTrigger == .unfocusedOnly)
         #expect(prefs.autoSurfaceActiveProject == false)
         #expect(prefs.enabledEvents == AttentionPreferences.defaultEnabledEvents)
-        #expect(prefs.turnSummaries == .automatic)
+        #expect(prefs.turnSummaries == .off)
     }
 
     @Test("Default enabled-events covers every attention state and finishedOutputting")
@@ -37,7 +37,7 @@ struct AttentionPreferencesTests {
         first.notificationTrigger = .always
         first.autoSurfaceActiveProject = true
         first.enabledEvents = [.permissionRequested, .errored]
-        first.turnSummaries = .off
+        first.turnSummaries = .automatic
 
         let second = AttentionPreferences(defaults: defaults)
         #expect(second.dockBounceStyle == .critical)
@@ -45,7 +45,7 @@ struct AttentionPreferencesTests {
         #expect(second.notificationTrigger == .always)
         #expect(second.autoSurfaceActiveProject == true)
         #expect(second.enabledEvents == [.permissionRequested, .errored])
-        #expect(second.turnSummaries == .off)
+        #expect(second.turnSummaries == .automatic)
     }
 
     @Test("Enabled-events insertion through the property fires didSet")

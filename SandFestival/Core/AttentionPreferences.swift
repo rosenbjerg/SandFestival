@@ -56,7 +56,7 @@ final class AttentionPreferences {
             Keys.notificationTrigger: NotificationTrigger.unfocusedOnly.rawValue,
             Keys.autoSurfaceActiveProject: false,
             Keys.enabledEvents: AttentionPreferences.defaultEnabledEvents.map(\.rawValue),
-            Keys.turnSummaries: ModelChoice.automatic.rawValue,
+            Keys.turnSummaries: ModelChoice.off.rawValue,
         ])
         self.dockBounceStyle =
             DockBounceStyle(rawValue: defaults.string(forKey: Keys.dockBounceStyle) ?? "")
@@ -66,7 +66,7 @@ final class AttentionPreferences {
             NotificationTrigger(rawValue: defaults.string(forKey: Keys.notificationTrigger) ?? "")
             ?? .unfocusedOnly
         self.autoSurfaceActiveProject = defaults.bool(forKey: Keys.autoSurfaceActiveProject)
-        self.turnSummaries = ModelChoice(rawValue: defaults.string(forKey: Keys.turnSummaries) ?? "") ?? .automatic
+        self.turnSummaries = ModelChoice(rawValue: defaults.string(forKey: Keys.turnSummaries) ?? "") ?? .off
         let storedEvents = (defaults.array(forKey: Keys.enabledEvents) as? [String]) ?? []
         self.enabledEvents = Set(storedEvents.compactMap(AttentionEvent.init(rawValue:)))
     }
