@@ -2,15 +2,15 @@ import Foundation
 import Testing
 @testable import SandFestival
 
-@Suite("ClaudeTranscriptRefiner")
+@Suite("Claude one-shot models")
 struct ClaudeTranscriptRefinerTests {
 
     @Test("runs claude inside the sessions' nono wrapper, silenced")
     func sandboxedLikeSessions() {
-        let args = ClaudeTranscriptRefiner.arguments(systemPrompt: "SYSTEM", prompt: "PROMPT")
+        let args = ClaudeOneShot.arguments(systemPrompt: "SYSTEM", prompt: "PROMPT")
         let (wrapper, agent) = ArgsSplitter.split(args)
 
-        #expect(ClaudeTranscriptRefiner.command == Project.defaultCommand)
+        #expect(ClaudeOneShot.command == Project.defaultCommand)
         #expect(wrapper == ArgsSplitter.split(Project.defaultArgs).wrapper + ["--silent"])
         #expect(agent.first == "claude")
     }
@@ -18,7 +18,7 @@ struct ClaudeTranscriptRefinerTests {
     @Test("runs Haiku one-shot with no tools, MCP servers, hooks or session history, prompt last")
     func lockedDownArguments() {
         let args = ArgsSplitter.split(
-            ClaudeTranscriptRefiner.arguments(systemPrompt: "SYSTEM", prompt: "PROMPT")
+            ClaudeOneShot.arguments(systemPrompt: "SYSTEM", prompt: "PROMPT")
         ).agent
 
         #expect(args.dropFirst().first == "-p")
@@ -46,7 +46,7 @@ struct ClaudeTranscriptRefinerTests {
 
         #expect(output.trimmingCharacters(in: .whitespacesAndNewlines) == "Fix the SwiftTerm view.")
         let call = try #require(recorder.call)
-        #expect(call.command == ClaudeTranscriptRefiner.command)
+        #expect(call.command == ClaudeOneShot.command)
         #expect(call.arguments.last == "<vocabulary>SwiftTerm</vocabulary>\n<transcript>fix the swift term view</transcript>")
         #expect(call.environment == ["CLAUDE_CODE_DISABLE_CLAUDE_MDS": "1"])
     }
@@ -72,6 +72,47 @@ struct ClaudeTranscriptRefinerTests {
 
         #expect(refinement?.name.isEmpty == false)
         #expect(refiner is ClaudeTranscriptRefiner)
+    }
+
+    @MainActor
+    @Test("the turn summarizer sends the reply as the prompt and the summary rules as the system prompt")
+    func summarizerLaunchesThroughLauncher() async throws {
+        let recorder = LaunchRecorder()
+        let summarizer = ClaudeTurnSummarizer { command, arguments, environment in
+            recorder.record(command: command, arguments: arguments, environment: environment)
+            return AgentLaunch(executable: "/bin/echo", arguments: ["Fixed the race"], environment: [])
+        }
+
+        let output = try await summarizer.summarize("I fixed the race.")
+
+        #expect(output.trimmingCharacters(in: .whitespacesAndNewlines) == "Fixed the race")
+        let call = try #require(recorder.call)
+        #expect(call.arguments.last == TurnSummary.prompt(message: "I fixed the race."))
+        #expect(value(after: "--system-prompt", in: call.arguments) == TurnSummary.instructions)
+        #expect(call.environment == ClaudeOneShot.environment)
+    }
+
+    @Test("a one-shot that exits non-zero surfaces as an error")
+    func nonZeroExitFails() async {
+        let summarizer = ClaudeTurnSummarizer { _, _, _ in
+            AgentLaunch(executable: "/usr/bin/false", arguments: [], environment: [])
+        }
+
+        await #expect(throws: ClaudeOneShot.Failure.exited(1)) {
+            try await summarizer.summarize("hello")
+        }
+    }
+
+    @MainActor
+    @Test("the Claude Code adapter offers Haiku as the agent's summary model")
+    func adapterOffersSummarizer() {
+        let summarization = ClaudeCodeAdapter().turnSummarization
+        let summarizer = summarization?.makeSummarizer { _, _, _ in
+            AgentLaunch(executable: "/bin/echo", arguments: [], environment: [])
+        }
+
+        #expect(summarization?.name.isEmpty == false)
+        #expect(summarizer is ClaudeTurnSummarizer)
     }
 
     private func value(after flag: String, in args: [String]) -> String? {

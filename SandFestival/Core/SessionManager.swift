@@ -39,6 +39,8 @@ final class SessionManager {
     @ObservationIgnored private var anyWorking = false
     @ObservationIgnored var shouldSurfaceOnActivity: () -> Bool = { false }
     @ObservationIgnored var isAppActive: () -> Bool = { NSApp.isActive }
+    @ObservationIgnored var summarizesTurns: () -> Bool = { true }
+    @ObservationIgnored var turnSummarizer: () -> (any TurnSummarizer)? = { OnDeviceTurnSummarizer() }
 
     @ObservationIgnored private(set) var persistDebounceTask: Task<Void, Never>?
     @ObservationIgnored var persistDebounceDelay: Duration = .seconds(1)
@@ -200,6 +202,12 @@ final class SessionManager {
 
     func session(for id: Project.ID) -> Session? {
         sessions[id]
+    }
+
+    func clearTurnSummaries() {
+        for session in sessions.values {
+            session.clearTurnSummary()
+        }
     }
 
     func selectedSession() -> Session? {

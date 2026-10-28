@@ -197,12 +197,13 @@ struct SidebarView: View {
                 Text(project.name)
                     .lineLimit(1)
                 secondaryLine(for: project)
-                if let title = session?.terminalTitle {
-                    Text(title)
+                if let caption = session?.turnSummary ?? session?.terminalTitle {
+                    Text(caption)
                         .interfaceFont(.caption2)
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
                         .truncationMode(.tail)
+                        .help(caption)
                 }
             }
 

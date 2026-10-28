@@ -5,6 +5,7 @@ import UserNotifications
 struct AttentionPreferencesView: View {
     @Bindable var preferences: AttentionPreferences
     let notifier: AttentionNotifier?
+    let agentSummarization: AgentTurnSummarization?
 
     @State private var focusAuthorization: INFocusStatusAuthorizationStatus = .notDetermined
     @State private var notificationAuthorization: UNAuthorizationStatus = .notDetermined
@@ -89,6 +90,16 @@ struct AttentionPreferencesView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            ModelChoiceSection(
+                title: String(localized: "preferences.turn_summary.section"),
+                pickerLabel: String(localized: "preferences.turn_summary.label"),
+                choice: $preferences.turnSummaries,
+                agentModelName: agentSummarization?.name,
+                offLabel: String(localized: "preferences.turn_summary.off"),
+                description: turnSummaryDescription,
+                withoutModel: String(localized: "preferences.turn_summary.fallback.first_line")
+            )
         }
         .formStyle(.grouped)
         .frame(width: 480)
@@ -153,6 +164,26 @@ struct AttentionPreferencesView: View {
         }
     }
 
+    private var turnSummaryDescription: String {
+        switch preferences.turnSummaries {
+        case .automatic:
+            if let agentSummarization {
+                String(
+                    format: String(localized: "preferences.turn_summary.automatic.description.agent"),
+                    agentSummarization.name
+                )
+            } else {
+                String(localized: "preferences.turn_summary.automatic.description")
+            }
+        case .onDevice:
+            String(localized: "preferences.turn_summary.on_device.description")
+        case .agentModel:
+            agentSummarization?.description ?? ""
+        case .off:
+            String(localized: "preferences.turn_summary.off.description")
+        }
+    }
+
     private var bounceDescription: String {
         switch preferences.dockBounceStyle {
         case .informational:
@@ -166,6 +197,7 @@ struct AttentionPreferencesView: View {
 #Preview {
     AttentionPreferencesView(
         preferences: AttentionPreferences(defaults: UserDefaults(suiteName: "preview")!),
-        notifier: nil
+        notifier: nil,
+        agentSummarization: nil
     )
 }

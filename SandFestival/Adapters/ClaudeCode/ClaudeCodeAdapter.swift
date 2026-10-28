@@ -20,6 +20,14 @@ final class ClaudeCodeAdapter: AgentAdapter {
         )
     }
 
+    var turnSummarization: AgentTurnSummarization? {
+        AgentTurnSummarization(
+            name: String(localized: "adapter.claude_code.turn_summarizer.name"),
+            description: String(localized: "adapter.claude_code.turn_summarizer.description"),
+            makeSummarizer: { ClaudeTurnSummarizer(launcher: $0) }
+        )
+    }
+
     private(set) var needsInstallation = false
     private(set) var lastInstallError: String?
     private(set) var startupError: String?
@@ -142,6 +150,13 @@ final class ClaudeCodeAdapter: AgentAdapter {
         }
 
         guard let projectID else { return }
+
+        // Before the event: the notifier reads the summary task when Stop's .idle lands.
+        if payload.hookEventName == HookEvent.stop.rawValue,
+           let message = payload.lastAssistantMessage,
+           !message.isEmpty {
+            eventSink?.report(projectID: projectID, finishedTurnMessage: message)
+        }
 
         if var event = HookPayloadTranslator.translate(payload) {
             if isRebind, case .started = event {

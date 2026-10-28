@@ -32,6 +32,13 @@ final class AttentionPreferences {
         }
     }
 
+    var turnSummaries: ModelChoice {
+        didSet {
+            guard turnSummaries != oldValue else { return }
+            defaults.set(turnSummaries.rawValue, forKey: Keys.turnSummaries)
+        }
+    }
+
     var enabledEvents: Set<AttentionEvent> {
         didSet {
             guard enabledEvents != oldValue else { return }
@@ -49,6 +56,7 @@ final class AttentionPreferences {
             Keys.notificationTrigger: NotificationTrigger.unfocusedOnly.rawValue,
             Keys.autoSurfaceActiveProject: false,
             Keys.enabledEvents: AttentionPreferences.defaultEnabledEvents.map(\.rawValue),
+            Keys.turnSummaries: ModelChoice.automatic.rawValue,
         ])
         self.dockBounceStyle =
             DockBounceStyle(rawValue: defaults.string(forKey: Keys.dockBounceStyle) ?? "")
@@ -58,6 +66,7 @@ final class AttentionPreferences {
             NotificationTrigger(rawValue: defaults.string(forKey: Keys.notificationTrigger) ?? "")
             ?? .unfocusedOnly
         self.autoSurfaceActiveProject = defaults.bool(forKey: Keys.autoSurfaceActiveProject)
+        self.turnSummaries = ModelChoice(rawValue: defaults.string(forKey: Keys.turnSummaries) ?? "") ?? .automatic
         let storedEvents = (defaults.array(forKey: Keys.enabledEvents) as? [String]) ?? []
         self.enabledEvents = Set(storedEvents.compactMap(AttentionEvent.init(rawValue:)))
     }
@@ -76,6 +85,20 @@ final class AttentionPreferences {
         static let notificationTrigger = "attention.notificationTrigger"
         static let autoSurfaceActiveProject = "attention.autoSurfaceActiveProject"
         static let enabledEvents = "attention.enabledEvents"
+        static let turnSummaries = "attention.turnSummaries"
+    }
+}
+
+extension ModelChoice {
+    func makeSummarizer(
+        agent: AgentTurnSummarization?,
+        launcher: @escaping AgentLauncher
+    ) -> (any TurnSummarizer)? {
+        switch source(onDeviceAvailable: OnDeviceModel.isAvailable, agentModelAvailable: agent != nil) {
+        case .onDevice: OnDeviceTurnSummarizer()
+        case .agentModel: agent?.makeSummarizer(launcher)
+        case nil: nil
+        }
     }
 }
 

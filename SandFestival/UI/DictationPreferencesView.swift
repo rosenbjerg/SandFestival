@@ -47,53 +47,21 @@ struct DictationPreferencesView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            Section(String(localized: "preferences.dictation.cleanup.section")) {
-                Picker(
-                    String(localized: "preferences.dictation.cleanup.label"),
-                    selection: $preferences.cleanup
-                ) {
-                    ForEach(choices) { cleanup in
-                        Text(label(for: cleanup))
-                            .tag(cleanup)
-                    }
-                }
-                .pickerStyle(.radioGroup)
-
-                Text(description)
-                    .interfaceFont(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                if let status {
-                    Label(status, systemImage: "info.circle")
-                        .interfaceFont(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
+            ModelChoiceSection(
+                title: String(localized: "preferences.dictation.cleanup.section"),
+                pickerLabel: String(localized: "preferences.dictation.cleanup.label"),
+                choice: $preferences.cleanup,
+                agentModelName: agentRefinement?.name,
+                offLabel: String(localized: "preferences.dictation.cleanup.off"),
+                description: cleanupDescription,
+                withoutModel: String(localized: "preferences.dictation.cleanup.fallback.raw")
+            )
         }
         .formStyle(.grouped)
         .frame(width: 480)
     }
 
-    private var choices: [TranscriptCleanup] {
-        TranscriptCleanup.allCases.filter { $0 != .agentModel || agentRefinement != nil }
-    }
-
-    private func label(for cleanup: TranscriptCleanup) -> String {
-        switch cleanup {
-        case .automatic:
-            String(localized: "preferences.dictation.cleanup.automatic")
-        case .onDevice:
-            String(localized: "preferences.dictation.cleanup.on_device")
-        case .agentModel:
-            agentRefinement?.name ?? ""
-        case .off:
-            String(localized: "preferences.dictation.cleanup.off")
-        }
-    }
-
-    private var description: String {
+    private var cleanupDescription: String {
         switch preferences.cleanup {
         case .automatic:
             if let agentRefinement {
@@ -110,21 +78,6 @@ struct DictationPreferencesView: View {
             agentRefinement?.description ?? ""
         case .off:
             String(localized: "preferences.dictation.cleanup.off.description")
-        }
-    }
-
-    private var status: String? {
-        guard let reason = OnDeviceTranscriptRefiner.unavailableReason else { return nil }
-        switch preferences.cleanup.source(onDeviceAvailable: false, agentModelAvailable: agentRefinement != nil) {
-        case .agentModel where preferences.cleanup == .automatic:
-            return reason + " " + String(
-                format: String(localized: "preferences.dictation.cleanup.fallback.agent"),
-                agentRefinement?.name ?? ""
-            )
-        case nil where preferences.cleanup != .off:
-            return reason + " " + String(localized: "preferences.dictation.cleanup.fallback.raw")
-        default:
-            return nil
         }
     }
 }

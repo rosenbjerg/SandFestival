@@ -15,6 +15,7 @@ struct AttentionPreferencesTests {
         #expect(prefs.notificationTrigger == .unfocusedOnly)
         #expect(prefs.autoSurfaceActiveProject == false)
         #expect(prefs.enabledEvents == AttentionPreferences.defaultEnabledEvents)
+        #expect(prefs.turnSummaries == .automatic)
     }
 
     @Test("Default enabled-events covers every attention state and finishedOutputting")
@@ -36,6 +37,7 @@ struct AttentionPreferencesTests {
         first.notificationTrigger = .always
         first.autoSurfaceActiveProject = true
         first.enabledEvents = [.permissionRequested, .errored]
+        first.turnSummaries = .off
 
         let second = AttentionPreferences(defaults: defaults)
         #expect(second.dockBounceStyle == .critical)
@@ -43,6 +45,7 @@ struct AttentionPreferencesTests {
         #expect(second.notificationTrigger == .always)
         #expect(second.autoSurfaceActiveProject == true)
         #expect(second.enabledEvents == [.permissionRequested, .errored])
+        #expect(second.turnSummaries == .off)
     }
 
     @Test("Enabled-events insertion through the property fires didSet")

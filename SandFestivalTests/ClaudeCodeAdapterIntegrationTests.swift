@@ -126,6 +126,35 @@ struct ClaudeCodeAdapterIntegrationTests {
         #expect(events.contains { $0.projectID == child.id && $0.event == .started })
     }
 
+    @Test("Stop forwards the final assistant message alongside its .idle")
+    func stopForwardsFinalMessage() async throws {
+        let env = try await IntegrationEnvironment.start(port: 51796)
+        defer { env.teardown() }
+
+        let project = env.makeProject(cwdName: "sf-int-\(UUID().uuidString)")
+        _ = env.adapter.prepareSpawn(project: project)
+
+        try await env.postHook([
+            "session_id": "sess-stop",
+            "hook_event_name": "SessionStart",
+            "cwd": project.path.path,
+        ], projectID: project.id)
+        try await env.sink.waitForEvents(1)
+        env.sink.drainEvents()
+
+        try await env.postHook([
+            "session_id": "sess-stop",
+            "hook_event_name": "Stop",
+            "stop_hook_active": false,
+            "last_assistant_message": "Fixed the race; all tests pass.",
+        ])
+        try await env.sink.waitForEvents(1)
+        #expect(env.sink.events.first?.event == .idle)
+        let message = try #require(env.sink.turnMessages.first)
+        #expect(message.projectID == project.id)
+        #expect(message.message == "Fixed the race; all tests pass.")
+    }
+
     @Test("POST without the bearer token is rejected and never reaches the sink")
     func unauthorizedPostIsDropped() async throws {
         let env = try await IntegrationEnvironment.start(port: 51793)
@@ -231,8 +260,14 @@ private struct InMemoryTokenStore: TokenStore {
 private final class RecordingSink: AgentEventSink {
     private(set) var events: [(projectID: Project.ID, event: AgentEvent)] = []
 
+    private(set) var turnMessages: [(projectID: Project.ID, message: String)] = []
+
     func report(projectID: Project.ID, event: AgentEvent) {
         events.append((projectID, event))
+    }
+
+    func report(projectID: Project.ID, finishedTurnMessage message: String) {
+        turnMessages.append((projectID, message))
     }
 
     func drainEvents() { events.removeAll() }

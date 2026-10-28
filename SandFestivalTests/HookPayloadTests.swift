@@ -21,6 +21,20 @@ struct HookPayloadDecoderTests {
         #expect(payload.cwd?.path == "/tmp/project")
     }
 
+    @Test("decodes the final assistant message from a Stop payload")
+    func decodesLastAssistantMessage() throws {
+        let json = """
+        {
+          "session_id": "sess-1",
+          "hook_event_name": "Stop",
+          "stop_hook_active": false,
+          "last_assistant_message": "Fixed the race; all tests pass."
+        }
+        """
+        let payload = try #require(HookPayloadDecoder.decode(Data(json.utf8)))
+        #expect(payload.lastAssistantMessage == "Fixed the race; all tests pass.")
+    }
+
     @Test("returns nil for malformed JSON")
     func returnsNilForMalformedJSON() {
         #expect(HookPayloadDecoder.decode(Data("{garbage".utf8)) == nil)
@@ -199,7 +213,8 @@ struct HookPayloadTranslatorTests {
             cwd: URL(fileURLWithPath: "/tmp"),
             notificationMessage: message,
             notificationType: notificationType,
-            toolName: toolName
+            toolName: toolName,
+            lastAssistantMessage: nil
         )
     }
 }

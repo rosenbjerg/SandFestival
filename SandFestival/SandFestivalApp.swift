@@ -31,6 +31,11 @@ struct SandFestivalApp: App {
             )
                 .frame(minWidth: 900, minHeight: 600)
                 .interfaceTextScale(interfacePreferences.textSize.scale)
+                .onChange(of: attentionPreferences.turnSummaries) { _, choice in
+                    if choice == .off {
+                        manager.clearTurnSummaries()
+                    }
+                }
                 .task {
                     if attentionNotifier == nil {
                         attentionNotifier = AttentionNotifier(
@@ -53,6 +58,15 @@ struct SandFestivalApp: App {
                     dictation.refinerProvider = { [dictationPreferences, claudeCodeAdapter, manager] in
                         dictationPreferences.cleanup.makeRefiner(
                             agent: claudeCodeAdapter.transcriptRefinement,
+                            launcher: { try manager.oneShotAgentLaunch(command: $0, arguments: $1, environment: $2) }
+                        )
+                    }
+                    manager.summarizesTurns = { [attentionPreferences] in
+                        attentionPreferences.turnSummaries != .off
+                    }
+                    manager.turnSummarizer = { [attentionPreferences, claudeCodeAdapter, manager] in
+                        attentionPreferences.turnSummaries.makeSummarizer(
+                            agent: claudeCodeAdapter.turnSummarization,
                             launcher: { try manager.oneShotAgentLaunch(command: $0, arguments: $1, environment: $2) }
                         )
                     }
@@ -152,7 +166,8 @@ struct SandFestivalApp: App {
 
                 AttentionPreferencesView(
                     preferences: attentionPreferences,
-                    notifier: attentionNotifier
+                    notifier: attentionNotifier,
+                    agentSummarization: claudeCodeAdapter.turnSummarization
                 )
                 .tabItem {
                     Label(

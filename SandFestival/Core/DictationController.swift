@@ -231,21 +231,9 @@ final class DictationController {
         with refiner: any TranscriptRefiner,
         vocabulary: [String]
     ) async -> String? {
-        // Not a task group: it would wait out a refiner that ignores cancellation, defeating Skip and the timeout.
-        let (outcomes, continuation) = AsyncStream<String?>.makeStream(bufferingPolicy: .bufferingOldest(1))
-        let work = Task { continuation.yield(try? await refiner.refine(text, vocabulary: vocabulary)) }
-        let deadline = Task {
-            try? await Task.sleep(for: refiner.timeout)
-            continuation.yield(nil)
+        await Deadline.value(within: refiner.timeout) {
+            try await refiner.refine(text, vocabulary: vocabulary)
         }
-        defer {
-            work.cancel()
-            deadline.cancel()
-        }
-        for await outcome in outcomes {
-            return outcome
-        }
-        return nil
     }
 
     private func deliver(_ text: String) {

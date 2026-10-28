@@ -7,6 +7,7 @@ struct HookPayload: Equatable {
     let notificationMessage: String?
     let notificationType: String?
     let toolName: String?
+    let lastAssistantMessage: String?
 }
 
 enum HookPayloadDecoder {
@@ -29,7 +30,8 @@ enum HookPayloadDecoder {
             cwd: (json["cwd"] as? String).map { URL(fileURLWithPath: $0) },
             notificationMessage: json["message"] as? String,
             notificationType: json["notification_type"] as? String,
-            toolName: json["tool_name"] as? String
+            toolName: json["tool_name"] as? String,
+            lastAssistantMessage: json["last_assistant_message"] as? String
         )
     }
 }

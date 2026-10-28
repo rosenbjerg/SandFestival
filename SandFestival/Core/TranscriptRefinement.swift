@@ -7,7 +7,6 @@ nonisolated protocol TranscriptRefiner: Sendable {
 
 nonisolated enum TranscriptRefinerError: Error, Equatable {
     case unavailable
-    case failed
 }
 
 nonisolated enum TranscriptRefinement {

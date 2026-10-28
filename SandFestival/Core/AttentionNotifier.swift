@@ -132,9 +132,22 @@ final class AttentionNotifier: NSObject {
     // MARK: - Notifications
 
     private func postNotification(for session: Session, event: AttentionEvent, state: SessionState) {
+        let fallbackBody = Self.notificationBody(for: event, state: state)
+        guard event == .finishedOutputting, let summaryTask = session.turnSummaryTask else {
+            postNotification(for: session, body: fallbackBody)
+            return
+        }
+        Task { [weak self, weak session] in
+            let summary = await summaryTask.value
+            guard let self, let session, session.turnSummaryTask == summaryTask else { return }
+            self.postNotification(for: session, body: summary ?? fallbackBody)
+        }
+    }
+
+    private func postNotification(for session: Session, body: String) {
         let content = UNMutableNotificationContent()
         content.title = session.project.name
-        content.body = Self.notificationBody(for: event, state: state)
+        content.body = body
         content.sound = .default
         content.userInfo = [Self.projectIDKey: session.project.id.uuidString]
         let request = UNNotificationRequest(

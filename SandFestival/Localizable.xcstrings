@@ -23,6 +23,28 @@
         }
       }
     },
+    "adapter.claude_code.turn_summarizer.description" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude Haiku condenses each finished turn’s reply into a one-line status for the sidebar and the notification. The reply is sent to Anthropic through your Claude Code login, every finished turn counts toward your usage, and notifications arrive a few seconds later."
+          }
+        }
+      }
+    },
+    "adapter.claude_code.turn_summarizer.name" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude Haiku"
+          }
+        }
+      }
+    },
     "agent_launch.error.command_not_found" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1718,17 +1740,6 @@
         }
       }
     },
-    "preferences.dictation.cleanup.automatic" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Automatic"
-          }
-        }
-      }
-    },
     "preferences.dictation.cleanup.automatic.description" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1747,17 +1758,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Uses Apple’s on-device model when it’s available, and %@ when it isn’t."
-          }
-        }
-      }
-    },
-    "preferences.dictation.cleanup.fallback.agent" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ is used instead."
           }
         }
       }
@@ -1806,17 +1806,6 @@
         }
       }
     },
-    "preferences.dictation.cleanup.on_device" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "On this Mac"
-          }
-        }
-      }
-    },
     "preferences.dictation.cleanup.on_device.description" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1846,50 +1835,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Listening"
-          }
-        }
-      }
-    },
-    "preferences.dictation.on_device.unavailable.device" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This Mac doesn’t support Apple Intelligence."
-          }
-        }
-      }
-    },
-    "preferences.dictation.on_device.unavailable.disabled" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple Intelligence is turned off in System Settings."
-          }
-        }
-      }
-    },
-    "preferences.dictation.on_device.unavailable.not_ready" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple’s on-device model is still downloading."
-          }
-        }
-      }
-    },
-    "preferences.dictation.on_device.unavailable.other" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple’s on-device model is unavailable."
           }
         }
       }
@@ -2224,6 +2169,39 @@
         }
       }
     },
+    "preferences.model_choice.automatic" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatic"
+          }
+        }
+      }
+    },
+    "preferences.model_choice.fallback.agent" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ is used instead."
+          }
+        }
+      }
+    },
+    "preferences.model_choice.on_device" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On this Mac"
+          }
+        }
+      }
+    },
     "preferences.notifications.enabled" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2275,6 +2253,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Only when Sand Festival isn't focused"
+          }
+        }
+      }
+    },
+    "preferences.on_device.unavailable.device" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This Mac doesn’t support Apple Intelligence."
+          }
+        }
+      }
+    },
+    "preferences.on_device.unavailable.disabled" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence is turned off in System Settings."
+          }
+        }
+      }
+    },
+    "preferences.on_device.unavailable.not_ready" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple’s on-device model is still downloading."
+          }
+        }
+      }
+    },
+    "preferences.on_device.unavailable.other" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple’s on-device model is unavailable."
           }
         }
       }
@@ -2550,6 +2572,94 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ lines"
+          }
+        }
+      }
+    },
+    "preferences.turn_summary.automatic.description" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uses Apple’s on-device model when it’s available, and shows the reply’s first line when it isn’t."
+          }
+        }
+      }
+    },
+    "preferences.turn_summary.automatic.description.agent" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uses Apple’s on-device model when it’s available, and %@ when it isn’t."
+          }
+        }
+      }
+    },
+    "preferences.turn_summary.fallback.first_line" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The reply’s first line is shown instead."
+          }
+        }
+      }
+    },
+    "preferences.turn_summary.label" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Summarize with"
+          }
+        }
+      }
+    },
+    "preferences.turn_summary.off" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Don’t summarize"
+          }
+        }
+      }
+    },
+    "preferences.turn_summary.off.description" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The sidebar shows the conversation’s title, and notifications only say that the turn finished."
+          }
+        }
+      }
+    },
+    "preferences.turn_summary.on_device.description" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple’s on-device model condenses each finished turn’s reply into a one-line status for the sidebar and the notification. Nothing leaves this Mac. If the model is unavailable, the reply’s first line is shown."
+          }
+        }
+      }
+    },
+    "preferences.turn_summary.section" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn Summaries"
           }
         }
       }

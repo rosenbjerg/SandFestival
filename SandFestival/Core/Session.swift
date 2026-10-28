@@ -12,6 +12,7 @@ final class Session: Identifiable {
     private(set) var enteredCurrentStateAt: Date = Date()
     private(set) var lastError: String?
     private(set) var terminalTitle: String?
+    private(set) var turnSummary: String?
     private(set) var hasUnseenOutput = false
     private(set) var hasOutputBelowViewport = false
 
@@ -24,6 +25,7 @@ final class Session: Identifiable {
     @ObservationIgnored var sandboxedArgsProvider: ((Project) throws -> [String])?
 
     @ObservationIgnored private var extraAgentArgs: [String] = []
+    @ObservationIgnored private(set) var turnSummaryTask: Task<String?, Never>?
 
     var canContinue: Bool {
         !(continuationArgsProvider?() ?? []).isEmpty
@@ -255,6 +257,7 @@ final class Session: Identifiable {
     func apply(event: AgentEvent) {
         if case .sessionRestarted = event {
             terminalTitle = nil
+            clearTurnSummary()
         }
         let next = SessionStateMachine.next(from: state, event: event)
         guard next != state else { return }
@@ -262,6 +265,28 @@ final class Session: Identifiable {
         if case .errored(let reason) = next {
             lastError = reason
         }
+    }
+
+    func summarizeTurn(_ message: String, with summarizer: (any TurnSummarizer)?) {
+        turnSummaryTask?.cancel()
+        turnSummaryTask = Task { [weak self] in
+            var generated: String?
+            if let summarizer {
+                generated = await Deadline.value(within: summarizer.timeout) {
+                    try await summarizer.summarize(message)
+                }
+            }
+            let summary = generated.flatMap(TurnSummary.accept) ?? TurnSummary.fallback(from: message)
+            guard let self, !Task.isCancelled else { return nil }
+            self.turnSummary = summary
+            return summary
+        }
+    }
+
+    func clearTurnSummary() {
+        turnSummaryTask?.cancel()
+        turnSummaryTask = nil
+        turnSummary = nil
     }
 
     func handleUserKeystroke() {
@@ -342,6 +367,9 @@ final class Session: Identifiable {
         let previous = state
         state = next
         enteredCurrentStateAt = Date()
+        if next == .working || !next.isRunning {
+            clearTurnSummary()
+        }
         onStateChanged?(previous, next)
     }
 
