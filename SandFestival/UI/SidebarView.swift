@@ -191,7 +191,7 @@ struct SidebarView: View {
         HStack(spacing: 5) {
             disclosureCell(for: project.id, hasChildren: hasChildren)
 
-            StatusDot(state: session?.state ?? .stopped)
+            StatusDot(state: session?.state ?? .stopped, kind: StatusDot.Kind(project: project))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(project.name)
